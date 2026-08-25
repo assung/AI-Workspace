@@ -1,0 +1,22 @@
+{
+  "name": "dqa-node-graph",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Design QA gate — 脫敏 Node Graph 擷取 + 確定性 rubric 引擎(Playwright CLI 與 Chrome Extension 兩條路徑共用同一份 core)",
+  "main": "src/node/run.js",
+  "scripts": {
+    "test": "node test/run-test.js",
+    "test:guards": "node test/guards.test.js",
+    "test:sanitize": "node test/sanitize.test.js",
+    "test:core": "node test/core-browser.test.js",
+    "test:sync": "node test/sync.test.js",
+    "test:ext": "node test/extension.test.js",
+    "test:e2e": "node test/e2e.test.js",
+    "test:all": "npm test && npm run test:guards && npm run test:sanitize && npm run test:core && npm run test:sync && npm run test:ext",
+    "dqa": "node src/node/run.js",
+    "sync:ext": "node scripts/sync-extension.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.47.0"
+  }
+}

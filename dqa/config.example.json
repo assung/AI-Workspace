@@ -1,0 +1,13 @@
+{
+  "viewport": { "width": 1280, "height": 900 },
+  "themeAttrs": ["data-theme", "data-color-mode"],
+  "storybook": {
+    "url": "http://storybook.internal.corp/iframe.html?id=issue-property-row--default&viewMode=story",
+    "selector": "#storybook-root [data-component='property-row']"
+  },
+  "production": {
+    "url": "https://stg.internal.corp/browse/PROJ-1234",
+    "selector": "[data-component='property-row']",
+    "waitFor": "[data-testid='issue-detail-loaded']"
+  }
+}

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <title>property-row — Storybook</title>
+  <link rel="stylesheet" href="_base.css">
+  <style>
+    /* 元件規格:群組間 space-300(24),群組內 space-100(8) */
+    .property-list { gap: 24px; }
+    .property-group { gap: 8px; }
+    .property-row { padding-top: 0; }
+    .property-row .value { max-width: none; }
+  </style>
+</head>
+<body>
+  <div class="issue">
+    <h2>PROJ-1234 — Checkout 逾時後未回寫訂單狀態</h2>
+    <div class="property-list">
+      <div class="property-group">
+        <div class="property-row" data-dqa-target>
+          <span class="label">Assignee</span>
+          <span class="value">Priya Raghunathan</span>
+        </div>
+        <div class="property-row">
+          <span class="label">Reporter</span>
+          <span class="value">Marcus Feld</span>
+        </div>
+      </div>
+      <div class="property-group">
+        <div class="property-row">
+          <span class="label">Priority</span>
+          <span class="value">Highest</span>
+        </div>
+        <div class="property-row">
+          <span class="label">Sprint</span>
+          <span class="value">Payments 24.08</span>
+        </div>
+      </div>
+      <div class="property-group">
+        <div class="group-title">Details</div>
+        <div class="property-row">
+          <span class="label">Components</span>
+          <span class="value">checkout-api</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

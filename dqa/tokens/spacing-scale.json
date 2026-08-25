@@ -1,0 +1,20 @@
+{
+  "_comment": "把這份換成你們專案真實的 spacing scale。這是 token 逆映射的唯一權威,不准讓 AI 猜。",
+  "unit": "px",
+  "scale": {
+    "space-0": 0,
+    "space-25": 2,
+    "space-50": 4,
+    "space-75": 6,
+    "space-100": 8,
+    "space-150": 12,
+    "space-200": 16,
+    "space-250": 20,
+    "space-300": 24,
+    "space-400": 32,
+    "space-500": 40,
+    "space-600": 48,
+    "space-800": 64,
+    "space-1000": 80
+  }
+}

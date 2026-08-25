@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="report.css">
+  <title>DQA 報告</title>
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <h1>DQA 報告</h1>
+      <div class="sub" id="head-sub">產生中…</div>
+      <div class="metrics" id="metrics"></div>
+      <div class="sides" id="sides"></div>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div id="banners"></div>
+
+    <section class="block">
+      <h2>確定性違規 <span class="count" id="c-violations">0</span></h2>
+      <p class="note">程式判定的既定事實,100% 可複現。AI 不得推翻,也不會重新評估。</p>
+      <div id="violations"></div>
+    </section>
+
+    <section class="block">
+      <h2>跳過的檢查 <span class="count" id="c-skipped">0</span></h2>
+      <p class="note">
+        量不到就說量不到(ADR-006)。這一區佔比過高代表規則的實際覆蓋遠小於預期 ——
+        該做的是重估規則價值,不是放寬 guard。
+      </p>
+      <div id="skipped"></div>
+    </section>
+
+    <section class="block">
+      <h2>AI 的作業範圍 <span class="count" id="c-unresolved">0</span></h2>
+      <p class="note">
+        這是 AI 該回答的清單,不是它能看到的範圍 —— 完整鄰域(<span id="n-nodes">0</span> 個節點)一字不漏照送(ADR-005)。
+      </p>
+      <div id="unresolved"></div>
+    </section>
+
+    <section class="block">
+      <h2>結構差異</h2>
+      <p class="note">兩側配不到的 structural path。出現在這裡本身就是訊號,不需要再判斷樣式。</p>
+      <div id="structural"></div>
+    </section>
+
+    <section class="block">
+      <h2>Prompt</h2>
+      <p class="note">
+        這個擴充套件不會把任何東西送出去。要跑 AI 分類就自己複製到公司 gateway ——
+        payload 已脫敏(無文字內容、無 URL、無字型名),但仍請依內部規範確認送出路徑。
+      </p>
+      <textarea id="prompt" readonly></textarea>
+      <div class="actions">
+        <button class="primary" id="copy-prompt">複製 prompt</button>
+        <button id="dl-prompt">下載 prompt.txt</button>
+        <button id="dl-payload">下載 payload.json</button>
+        <span id="copy-state" class="empty"></span>
+      </div>
+    </section>
+  </div>
+
+  <script src="../core/tokens.js"></script>
+  <script src="../core/rubric-engine.js"></script>
+  <script src="../core/payload.js"></script>
+  <script src="../core/prompt.js"></script>
+  <script src="../lib/storage.js"></script>
+  <script src="report.js"></script>
+</body>
+</html>

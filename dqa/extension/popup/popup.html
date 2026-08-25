@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="popup.css">
+  <title>DQA</title>
+</head>
+<body>
+  <header>
+    <h1>DQA<small id="rubric-version">rubric —</small></h1>
+    <a class="link" id="open-options">設定</a>
+  </header>
+
+  <section>
+    <div class="label">環境鎖</div>
+    <div class="row">
+      <div class="grow">
+        viewport <strong id="vp-target">—</strong>
+        <span class="pill" id="vp-state">目前 —</span>
+      </div>
+      <button id="calibrate">校正視窗</button>
+    </div>
+  </section>
+
+  <section>
+    <div class="label">目標節點</div>
+    <div class="row">
+      <div class="grow mono" id="selection">(未選取)</div>
+    </div>
+    <div class="row">
+      <button id="pick" class="primary">選取元素</button>
+      <button id="clear-pick">清除選取</button>
+    </div>
+  </section>
+
+  <section>
+    <div class="label">兩側擷取</div>
+    <div class="side" id="side-A">
+      <div class="side-head">
+        <span class="tag">A</span>
+        <span class="side-name grow">Storybook(元件規格)</span>
+        <button data-capture="A">擷取</button>
+        <button class="icon" data-clear="A" title="清除">✕</button>
+      </div>
+      <div class="side-meta" data-meta="A">尚未擷取</div>
+    </div>
+    <div class="side" id="side-B">
+      <div class="side-head">
+        <span class="tag">B</span>
+        <span class="side-name grow">Production(實作)</span>
+        <button data-capture="B">擷取</button>
+        <button class="icon" data-clear="B" title="清除">✕</button>
+      </div>
+      <div class="side-meta" data-meta="B">尚未擷取</div>
+    </div>
+  </section>
+
+  <section>
+    <button id="report" class="primary wide" disabled>產生報告</button>
+    <div class="row" style="margin-top:8px">
+      <button id="unfreeze" class="grow">解除頁面凍結</button>
+      <button id="clear-all" class="grow">清除兩側</button>
+    </div>
+  </section>
+
+  <div id="status"></div>
+
+  <script src="../lib/storage.js"></script>
+  <script src="../lib/capture.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

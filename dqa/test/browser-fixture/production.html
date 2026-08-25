@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <title>property-row — Production (STG)</title>
+  <link rel="stylesheet" href="_base.css">
+  <style>
+    /* 實作端埋入的四個 bug —— 每一個都對應一條 rubric 規則 */
+    .property-list { gap: 12px; }        /* TOKEN-002:規格是 space-300,這裡變成 space-150 */
+    .property-group { gap: 12px; }       /* GESTALT-001:群組內外都是 12,proximity 失效 */
+    .property-row { padding-top: 13px; } /* TOKEN-001:13px 不在 spacing scale 上 */
+    .property-row .value {
+      position: relative;
+      top: 2px;                          /* ALIGN-001:與 label 的 baseline 差 2px */
+      max-width: 120px;                  /* TRUNC-001:截斷且沒有 title / aria-label */
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="issue">
+    <h2>PROJ-1234 — Checkout 逾時後未回寫訂單狀態</h2>
+    <div class="property-list">
+      <div class="property-group">
+        <div class="property-row" data-dqa-target>
+          <span class="label">Assignee</span>
+          <span class="value">Priya Raghunathan(Platform Payments)</span>
+        </div>
+        <div class="property-row">
+          <span class="label">Reporter</span>
+          <span class="value">Marcus Feld</span>
+        </div>
+      </div>
+      <div class="property-group">
+        <div class="property-row">
+          <span class="label">Priority</span>
+          <span class="value">Highest</span>
+        </div>
+        <div class="property-row">
+          <span class="label">Sprint</span>
+          <span class="value">Payments 24.08</span>
+        </div>
+      </div>
+      <div class="property-group">
+        <div class="group-title">Details</div>
+        <div class="property-row">
+          <span class="label">Components</span>
+          <span class="value">checkout-api</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

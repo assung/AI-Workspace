@@ -1,0 +1,29 @@
+/* 兩側共用的部分。差異全部集中在各自頁面的 <style>,一眼看得出埋了哪些 bug。 */
+html { overflow-y: scroll; }           /* 兩側捲軸狀態一致,否則 clientWidth 會差 15px */
+body {
+  margin: 0;
+  padding: 40px;
+  font: 14px/20px Arial, Helvetica, sans-serif;
+  color: #172b4d;
+  background: #ffffff;
+}
+.issue { max-width: 640px; }
+.issue h2 { font-size: 20px; line-height: 24px; margin: 0 0 16px; font-weight: 600; }
+
+.property-list { display: flex; flex-direction: column; }
+.property-group { display: flex; flex-direction: column; }
+.property-row { display: flex; flex-direction: row; align-items: flex-start; }
+
+.property-row .label {
+  width: 120px;
+  flex: none;
+  font-size: 12px;
+  line-height: 20px;
+  color: #44546f;
+}
+.property-row .value {
+  font-size: 14px;
+  line-height: 20px;
+  color: #172b4d;
+}
+.group-title { font-size: 12px; line-height: 20px; color: #626f86; font-weight: 600; }

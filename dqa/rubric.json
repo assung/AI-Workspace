@@ -1,0 +1,97 @@
+{
+  "version": "0.1.0",
+  "_contract": "沒有 source 的規則不准進這份檔案。source 必須指回既有 spec 或 token 定義。",
+  "rules": [
+    {
+      "code": "TOKEN-001",
+      "name": "spacing 值不在 scale 上",
+      "check_type": "single_side",
+      "side": "prod",
+      "evaluator": "deterministic",
+      "condition": "tokens[prop].token === null (prop ∈ spacing props)",
+      "severity": "medium",
+      "delta_independent": true,
+      "_why_delta_independent": "13px 與 40px 同樣是繞過設計系統的約束。1px 偏離最容易被複製繁殖,降級成雜訊等於放行。",
+      "source": "tokens/spacing-scale.json",
+      "description": "使用了未定義於 spacing scale 的魔術數字"
+    },
+    {
+      "code": "TOKEN-002",
+      "name": "兩側使用不同 token",
+      "check_type": "comparative",
+      "evaluator": "deterministic",
+      "condition": "sb.token !== null && prod.token !== null && sb.token !== prod.token",
+      "severity": "high",
+      "source": "tokens/spacing-scale.json",
+      "description": "實作與元件規格使用了不同的 spacing token"
+    },
+    {
+      "code": "RENDER-001",
+      "name": "同 token 的次像素渲染差異",
+      "check_type": "comparative",
+      "evaluator": "deterministic",
+      "condition": "sb.token === prod.token && sb.exact && prod.exact && |sb.px - prod.px| < 2",
+      "severity": "info",
+      "source": "tokens/spacing-scale.json",
+      "description": "兩側解析到同一 token,數值差異屬渲染誤差,可忽略"
+    },
+    {
+      "code": "GESTALT-001",
+      "name": "群組內間距未小於群組間間距",
+      "check_type": "single_side",
+      "side": "prod",
+      "evaluator": "deterministic",
+      "condition": "intra_gap !== null && inter_gap !== null && intra_gap >= inter_gap",
+      "severity": "high",
+      "guard": "僅在 parent 為 flex/grid、且子節點無 absolute/fixed 脫離文件流時採集;其餘一律 intra_gap = null 跳過",
+      "source": "tokens/spacing-scale.json#proximity",
+      "description": "Proximity 失效:群組內外間距無法區分,結構不可解析"
+    },
+    {
+      "code": "ALIGN-001",
+      "name": "同列元素 baseline 未對齊",
+      "check_type": "single_side",
+      "side": "prod",
+      "evaluator": "deterministic",
+      "condition": "同一列(垂直重疊 > 50%)的兩節點 |baselineY 差| ∈ [0.5, 4]",
+      "severity": "high",
+      "_why_upper_bound": "差距大於 4px 通常是刻意的不同層級,不是對齊 bug。近似而未命中才是最傷的那種。",
+      "source": "spec/typography.md#baseline-alignment",
+      "description": "文字 baseline 近似但未對齊,視覺上讀作歪斜"
+    },
+    {
+      "code": "TRUNC-001",
+      "name": "文字截斷且無替代取用方式",
+      "check_type": "single_side",
+      "side": "prod",
+      "evaluator": "deterministic",
+      "condition": "text.truncated === true && text.hasAffordance === false",
+      "severity": "high",
+      "_why_single_side": "Storybook 容器通常寬鬆,兩側 truncated 狀態不同是預期而非 bug。放進 comparative 就是誤報來源。",
+      "source": "spec/content.md#truncation",
+      "description": "內容被截斷且無 tooltip/aria-label,資訊不可取得"
+    },
+    {
+      "code": "EMPHASIS-001",
+      "name": "視覺重量倒置",
+      "check_type": "single_side",
+      "side": "prod",
+      "evaluator": "ai",
+      "_why_ai": "emphasis 的門檻值不存在於任何既有 spec。程式把分數當事實算出來,由 AI 依鄰域脈絡判斷是否構成倒置,不得自行發明門檻。",
+      "fact_provided": "每個節點的 emphasisScore = f(fontSize, fontWeight, contrastVsParentBg)",
+      "severity": "medium",
+      "source": "spec/typography.md#hierarchy",
+      "description": "次要元素的視覺重量超過同層標題"
+    },
+    {
+      "code": "ELEVATION-001",
+      "name": "層次關係異常",
+      "check_type": "comparative",
+      "evaluator": "ai",
+      "_why_ai": "elevation 是相對量,需要鄰域全部節點的 shadow/zIndex 才能判斷,無法用單一屬性門檻定讞。",
+      "severity": "medium",
+      "source": "spec/elevation.md",
+      "description": "陰影或堆疊層級的變更改變了元件的層次歸屬"
+    }
+  ]
+}

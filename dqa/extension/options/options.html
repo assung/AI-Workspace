@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="options.css">
+  <title>DQA 設定</title>
+</head>
+<body>
+<div class="wrap">
+  <h1>DQA 設定</h1>
+  <p class="lede">環境鎖與規則來源。擷取與判定全部在本機完成,這個擴充套件不會對外連線。</p>
+
+  <section>
+    <h2>環境鎖</h2>
+    <p class="note">
+      viewport 寬度是唯一真正決定幾何可比性的變因(ADR-009)。兩側寬度不同時,報告會直接拒絕產出。
+    </p>
+
+    <div class="field">
+      <label for="viewportWidth">viewport 寬度</label>
+      <input type="number" id="viewportWidth" min="320" max="3840" step="1">
+      <span class="hint">px。兩側都必須是這個寬度,面板上的「校正視窗」會幫你調。</span>
+    </div>
+
+    <div class="field">
+      <label for="fontSettleMs">字型沉澱等待</label>
+      <input type="number" id="fontSettleMs" min="0" max="2000" step="10">
+      <span class="hint">ms。fonts.ready 之後再等一段時間(ADR-010)。</span>
+    </div>
+
+    <div class="field">
+      <label for="themeAttrs">主題屬性</label>
+      <input type="text" id="themeAttrs" placeholder="data-theme, data-color-mode">
+    </div>
+
+    <div class="field">
+      <label for="affordanceAttrs">替代取用屬性</label>
+      <input type="text" id="affordanceAttrs" placeholder="title, aria-label, data-tooltip">
+    </div>
+
+    <div class="field">
+      <label for="maxNodes">節點數上限</label>
+      <input type="number" id="maxNodes" min="10" max="1000" step="10">
+      <span class="hint">鄰域應該是十幾到幾十筆;逼近上限代表選錯層級。</span>
+    </div>
+
+    <div class="field">
+      <label for="fallbackSelector">後備選擇器</label>
+      <input type="text" id="fallbackSelector" placeholder="[data-dqa-target]">
+    </div>
+
+    <div class="field">
+      <label for="allowEnvMismatch">允許環境不一致</label>
+      <span><input type="checkbox" id="allowEnvMismatch"></span>
+      <span class="hint">預設關閉。打開後環境差異只會降級成警告 —— 幾乎一定會製造誤報,只在除錯時用。</span>
+    </div>
+
+    <div class="actions">
+      <button class="primary" id="save-settings">儲存設定</button>
+      <button id="reset-settings">還原預設</button>
+    </div>
+    <div class="msg" id="settings-msg"></div>
+  </section>
+
+  <section>
+    <h2>規則與 token 來源 <span class="status-pill" id="data-state">內建 placeholder</span></h2>
+    <p class="note">
+      內建的是 placeholder。換成專案真值之前,任何違規報告都不具說服力(docs/TASKS.md 的 T0)。
+      沒有 <code>source</code> 的規則會被擋下 —— 這是 rubric 的契約,不是可調的檢查(ADR-007)。
+    </p>
+
+    <div class="data-block">
+      <h3>rubric.json</h3>
+      <p class="sub">每條規則必須有 code / severity / evaluator / description / source。</p>
+      <textarea id="rubric" spellcheck="false"></textarea>
+    </div>
+
+    <div class="data-block">
+      <h3>tokens/spacing-scale.json</h3>
+      <p class="sub">token 逆映射的唯一權威。值必須是數字(px)。</p>
+      <textarea id="spacing" spellcheck="false"></textarea>
+    </div>
+
+    <div class="data-block">
+      <h3>tokens/color-primitives.json</h3>
+      <p class="sub">值必須是小寫 #rrggbb。</p>
+      <textarea id="colors" spellcheck="false"></textarea>
+    </div>
+
+    <div class="actions">
+      <button class="primary" id="save-data">驗證並儲存</button>
+      <button id="reload-bundled">載回內建版本</button>
+      <button id="clear-data">清除自訂,改用內建</button>
+    </div>
+    <div class="msg" id="data-msg"></div>
+  </section>
+</div>
+
+<script src="../lib/storage.js"></script>
+<script src="options.js"></script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "DQA — Design QA Gate",
+  "version": "0.2.0",
+  "description": "在 Storybook / Staging 上擷取脫敏 Node Graph,本地跑確定性 rubric,產出可貼給 LLM 的 prompt。",
+  "minimum_chrome_version": "116",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "DQA"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_page": "options/options.html",
+  "commands": {
+    "pick-element": {
+      "suggested_key": { "default": "Alt+Shift+D" },
+      "description": "啟動元素挑選器"
+    },
+    "capture-storybook": {
+      "suggested_key": { "default": "Alt+Shift+1" },
+      "description": "擷取為 A 側(Storybook)"
+    },
+    "capture-production": {
+      "suggested_key": { "default": "Alt+Shift+2" },
+      "description": "擷取為 B 側(Production)"
+    }
+  }
+}
