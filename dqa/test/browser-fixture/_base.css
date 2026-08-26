@@ -1,11 +1,15 @@
 /* 兩側共用的部分。差異全部集中在各自頁面的 <style>,一眼看得出埋了哪些 bug。 */
 html { overflow-y: scroll; }           /* 兩側捲軸狀態一致,否則 clientWidth 會差 15px */
+/* 色票刻意用 oklch + alpha,對齊 @qijenchen/design-system 的實際寫法:
+   --color-neutral-9 = oklch(0 0 0 / 85%)、--color-neutral-8 = oklch(0 0 0 / 65%)。
+   Chromium 的 computed value 會保留 oklch,所以這份 fixture 同時是
+   「extract.js 的 canvas 正規化有沒有生效」的證據。 */
 body {
   margin: 0;
   padding: 40px;
   font: 14px/20px Arial, Helvetica, sans-serif;
-  color: #172b4d;
-  background: #ffffff;
+  color: oklch(0 0 0 / 0.85);
+  background: oklch(1 0 0);
 }
 .issue { max-width: 640px; }
 .issue h2 { font-size: 20px; line-height: 24px; margin: 0 0 16px; font-weight: 600; }
@@ -19,11 +23,11 @@ body {
   flex: none;
   font-size: 12px;
   line-height: 20px;
-  color: #44546f;
+  color: oklch(0 0 0 / 0.65);
 }
 .property-row .value {
   font-size: 14px;
   line-height: 20px;
-  color: #172b4d;
+  color: oklch(0 0 0 / 0.85);
 }
-.group-title { font-size: 12px; line-height: 20px; color: #626f86; font-weight: 600; }
+.group-title { font-size: 12px; line-height: 20px; color: oklch(0.54 0.22 258); font-weight: 600; }

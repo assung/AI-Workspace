@@ -64,15 +64,42 @@
     return round((hi + 0.05) / (lo + 0.05), 2);
   }
 
-  /** 往上找第一個非透明背景 */
+  function toHex(rgb) {
+    return `#${rgb.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
+  }
+
+  /** source-over 合成:把帶 alpha 的上層疊到不透明的下層上 */
+  function blend(top, bottomHex) {
+    if (!top || top.alpha == null || top.alpha >= 1) return top ? top.hex : bottomHex;
+    const a = top.alpha;
+    const f = hexToRgb(top.hex);
+    const b = hexToRgb(bottomHex);
+    return toHex([0, 1, 2].map((i) => f[i] * a + b[i] * (1 - a)));
+  }
+
+  /**
+   * 有效背景色 —— 往上收集背景層,疊到第一個不透明的那層為止。
+   *
+   * 不能只回「第一個 alpha === 1 的背景」:半透明的背景層會改變實際看到的顏色,
+   * 而對比度是拿「實際看到的」在算。design system 用 alpha 疊色是常態
+   * (@qijenchen/design-system 的 --surface 在 dark 就是 --white-a08)。
+   */
   function effectiveBg(node, map) {
+    const layers = [];   // 由內而外
     let cur = node;
+    let opaque = null;
     while (cur) {
       const t = cur.tokens && cur.tokens.backgroundColor;
-      if (t && t.alpha === 1) return t.hex;
+      if (t && t.alpha > 0) {
+        if (t.alpha >= 1) { opaque = t.hex; break; }
+        layers.push(t);
+      }
       cur = map.get(parentPath(cur.path));
     }
-    return '#ffffff';
+    // 一路到頂都沒有不透明背景 → 只能假設頁面底色是白的。這是假設,不是量到的。
+    let base = opaque || '#ffffff';
+    for (let i = layers.length - 1; i >= 0; i -= 1) base = blend(layers[i], base);
+    return base;
   }
 
   /* --------------------------------------------------------------- gap 採集 */
@@ -257,9 +284,12 @@
     annotateEmphasis(extraction) {
       const map = byPath(extraction.nodes);
       for (const n of extraction.nodes) {
-        const fg = n.tokens && n.tokens.color ? n.tokens.color.hex : null;
-        if (!fg || !n.text) { n.emphasis = null; continue; }
+        const fgToken = n.tokens && n.tokens.color ? n.tokens.color : null;
+        if (!fgToken || !n.text) { n.emphasis = null; continue; }
         const bg = effectiveBg(n, map);
+        // 前景本身可能帶 alpha —— @qijenchen/design-system 的 --foreground 就是 85% 黑。
+        // 不合成就會把「85% 黑 on 白」算成純黑的 21:1,而實際看到的只有 15:1 左右。
+        const fg = blend(fgToken, bg);
         const cr = contrastRatio(fg, bg);
         const size = parseFloat(n.style.fontSize) || 0;
         const weight = parseInt(n.style.fontWeight, 10) || 400;
@@ -267,6 +297,10 @@
           fontSize: size,
           fontWeight: weight,
           contrastVsBg: cr,
+          // 合成後的實際前景色。與 tokens.color.hex 不同時代表原色帶 alpha,
+          // 判讀對比度時看的是這個值,不是 style 裡寫的那個。
+          fgEffective: fg,
+          bgEffective: bg,
           // 公式僅為排序用途,不承載門檻;門檻不存在於任何 spec,故不做確定性判定
           score: round((size / 16) * (weight / 400) * Math.min(cr / 4.5, 2), 3),
           isHeading: /^h[1-6]$/.test(n.tag) || n.role === 'heading',
@@ -297,5 +331,5 @@
     }
   }
 
-  return { RubricEngine, collectGaps, contrastRatio, parentPath, childrenOf };
+  return { RubricEngine, collectGaps, contrastRatio, blend, parentPath, childrenOf };
 });

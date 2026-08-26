@@ -154,6 +154,24 @@ async function main() {
     check(label && label.text.fontHash && !/Arial/.test(JSON.stringify(label.text)),
       'fontFamily 只以 hash 出現', label ? label.text.fontHash : '');
 
+    /* --------------------------------------------- 2b. 色彩正規化(oklch) */
+
+    console.log('\n=== 色彩正規化 ===');
+    // 先確認頁面上真的是 oklch —— 否則這一節等於什麼都沒測
+    const rawComputed = await page.evaluate(() => {
+      const el = document.querySelector('.property-row .label');
+      const cs = getComputedStyle(el);
+      return { color: cs.color, bg: getComputedStyle(document.body).backgroundColor };
+    });
+    check(/^oklch\(/.test(rawComputed.color),
+      'fixture 的 computed value 確實是 oklch(Chromium 不轉回 rgb)', rawComputed.color);
+
+    check(label && /^rgba?\(/.test(label.style.color || ''),
+      'extract 送出的是正規化後的 rgb/rgba', label ? label.style.color : '');
+
+    // token 逆映射與 emphasis 是 buildPayload 之後才有的欄位(擷取記錄裡沒有),
+    // 因此那幾條斷言放在報告頁那一節。
+
     /* ------------------------------------------------------ 3. 挑選器 */
 
     console.log('\n=== 元素挑選器 ===');
@@ -218,6 +236,30 @@ async function main() {
     check(built.payload.meta.captureMode === 'extension', 'payload 記錄了擷取路徑');
     check(built.payload.meta.env.warnings.length === 0, '兩側環境一致');
     check(built.promptLen > 1000, 'prompt 產得出來', `${built.promptLen} 字元`);
+
+    /* ------------------------------- 色彩:逆映射與 alpha 合成(annotate 後) */
+
+    console.log('\n=== 色彩逆映射與對比度 ===');
+    const pLabel = built.payload.nodes.find((n) => n.path === 'g>div0>div0>span0');
+    const labelColor = pLabel && pLabel.tokens ? pLabel.tokens.color : null;
+    check(!!labelColor && !!labelColor.hex,
+      '色彩 token 逆映射拿得到 hex(oklch 未正規化時這裡是 undefined)',
+      labelColor ? `${labelColor.hex} α=${labelColor.alpha}` : '(無)');
+    check(!!labelColor && Math.abs(labelColor.alpha - 0.651) < 0.01,
+      'alpha 沒有在正規化過程中被吃掉', labelColor ? String(labelColor.alpha) : '');
+
+    check(!!pLabel.emphasis, 'emphasis 不再是 null(EMPHASIS-001 的前提)');
+    check(pLabel.emphasis && pLabel.emphasis.fgEffective !== labelColor.hex,
+      '前景 alpha 有合成到背景上', pLabel.emphasis
+        ? `${labelColor.hex} → ${pLabel.emphasis.fgEffective} on ${pLabel.emphasis.bgEffective}`
+        : '');
+    check(pLabel.emphasis && pLabel.emphasis.contrastVsBg > 5 && pLabel.emphasis.contrastVsBg < 21,
+      '對比度是實際看得到的值,不是把半透明當純黑算的 21',
+      pLabel.emphasis ? String(pLabel.emphasis.contrastVsBg) : '');
+
+    const allText = built.payload.nodes.filter((n) => n.text && n.style.color);
+    check(allText.length > 0 && allText.every((n) => n.emphasis),
+      '鄰域裡每個文字節點都有 emphasis 事實', `${allText.length} 個`);
 
     const shown = await report.locator('.finding .code').allTextContents();
     check(shown.length === codes.length, '報告頁列出全部違規', `${shown.length} 筆`);

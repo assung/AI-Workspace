@@ -214,6 +214,50 @@ pinch zoom 可用 `visualViewport.scale` 直接偵測;瀏覽器層級縮放無�
 
 ---
 
+## ADR-014 — 色彩正規化用瀏覽器當引擎,不自己實作色彩空間轉換
+
+**決定**:`src/browser/extract.js` 在色值進入 `style` 之前,用 canvas 把它正規化成 `rgb()` / `rgba()`
+(`fillStyle = 值` → `fillRect` → `getImageData`)。core 完全不碰色彩空間數學。
+
+**否決的替代**:在 `src/core/tokens.js` 實作 oklch → oklab → linear sRGB → gamma 的轉換。
+
+**理由**:那段矩陣運算本身不難,實測對 DS 的色票也算得出跟 Chromium 一模一樣的值。
+分歧點在**色域外的 gamut mapping** —— `@qijenchen/design-system` 的色票有相當比例超出 sRGB
+(`--color-blue-6` = `oklch(0.54 0.22 258)` 就是),而 CSS Color 4 的 gamut mapping 不是單純裁切。
+維護一份「必須永遠跟畫出這個頁面的引擎一致」的第二套色彩實作,就是 ADR-011 要避免的
+「同一個事實兩份答案」。canvas 用的是同一顆引擎,而且 relative color syntax
+(`oklch(from var(--x) calc(l*0.44) c h)`)在 computed 階段就已經解析完,不需要另外處理。
+
+**為什麼放在 browser 層而不是 core**:只有瀏覽器裡有那顆引擎。放進 `src/browser/` 的附帶好處是
+Playwright 與 Extension 兩條路徑同時修好,而且 payload 形狀不變 ——
+`rgbToHex()` 本來就吃 `rgb()`/`rgba()`,core、fixture、既有測試一行都不用改。
+
+**正規化目標空間是 sRGB,這是刻意的**:超出色域的色票在 P3 螢幕上的實際顯色與此不同。
+但 DQA 要的是兩側可比、跨機器可複現,sRGB 是唯一站得住的正規空間。
+
+**失敗時保留原字串**,不丟棄 —— 少一個欄位比送一個看不懂的值糟。
+
+---
+
+## ADR-015 — 對比度必須先合成 alpha
+
+**決定**:`contrastRatio` 的兩個輸入都是**合成後**的色。前景帶 alpha 時先疊到有效背景上;
+有效背景本身若有半透明層,一路往上疊到第一個不透明層為止。
+
+**理由**:`@qijenchen/design-system` 的 `--foreground` 是 `oklch(0 0 0 / 85%)` —— 預設文字色本身就是半透明的。
+不合成會把「85% 黑 on 白」算成純黑的 **21:1**,而使用者實際看到的是 **15:1**。
+這個錯誤在 placeholder 資料下完全看不出來(那些色都不透明),換成真實 DS 才會浮出來,
+而且錯得很安靜 —— 數字看起來完全正常。
+
+**同時修的**:舊的 `effectiveBg()` 只往上找第一個 `alpha === 1` 的背景就回傳,
+中間的半透明層直接被忽略。用 alpha 疊色是 design system 的常態
+(該 DS 的 `--surface` 在 dark mode 就是 `--white-a08`),忽略中間層等於算錯底色。
+
+**留下的假設**:一路往上都沒有不透明背景時,假設頁面底色是白的。
+這是假設不是量測值,`emphasis.bgEffective` 會把用到的底色寫出來,判讀時看得到。
+
+---
+
 ## 待裁決(尚未進入實作)
 
 | 議題 | 需要什麼才能裁決 |

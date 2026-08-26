@@ -48,6 +48,17 @@
     'src',
   ]);
 
+  /**
+   * 需要正規化成 sRGB 的屬性。
+   * 這份清單必須與 `src/core/tokens.js` 的 COLOR_PROPS 相同 —— 那邊是逆映射的入口,
+   * 這邊是量測的出口,少一個屬性就等於那個屬性的 token 永遠解析不到。
+   */
+  const COLOR_PROPS = new Set([
+    'color', 'backgroundColor',
+    'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor',
+    'outlineColor',
+  ]);
+
   /** 最後一道防線:任何含 url( 或引號的值一律丟棄 */
   function sanitize(value) {
     if (typeof value !== 'string') return value;
@@ -95,6 +106,70 @@
       _canvasCtx = document.createElement('canvas').getContext('2d');
     }
     return _canvasCtx;
+  }
+
+  /* ------------------------------------------------------- color 正規化 */
+
+  /**
+   * 把任何 CSS 色值正規化成 rgb() / rgba()。
+   *
+   * 為什麼用 canvas 而不是自己算:現代 design system 的色票是 oklch,
+   * 而 Chromium 的 computed value **保留 oklch 不轉回 rgb** ——
+   * `getComputedStyle(el).color` 直接回 `oklch(0.54 0.22 258)`。
+   * 下游的 rgbToHex() 只認 rgb()/#hex,遇到 oklch 一律回 null,
+   * 於是色彩 token 全部解析不到、emphasis 全是 null、EMPHASIS-001 永遠不觸發 ——
+   * 而且完全沒有錯誤訊息。
+   *
+   * 自己實作 oklch → sRGB 的問題不在那段矩陣運算,在色域外的 gamut mapping:
+   * 那份實作必須永遠跟「畫出這個頁面的引擎」一致,否則就是同一個事實有兩份答案(ADR-011)。
+   * canvas 用的就是同一顆引擎,連 relative color syntax 都已經在 computed 階段解析完。
+   *
+   * 正規化的目標空間是 **sRGB**:DS 有色票超出 sRGB 色域,在 P3 螢幕上的實際顯色與此不同。
+   * 這是刻意的取捨 —— 要的是兩側可比、跨機器可複現,sRGB 是唯一站得住的正規空間。
+   */
+  let _colorCtx = null;
+  const _colorCache = new Map();
+
+  function colorCtx() {
+    if (!_colorCtx) {
+      const c = document.createElement('canvas');
+      c.width = 1;
+      c.height = 1;
+      _colorCtx = c.getContext('2d', { willReadFrequently: true });
+    }
+    return _colorCtx;
+  }
+
+  function normalizeColor(value) {
+    if (typeof value !== 'string' || !value) return null;
+    if (_colorCache.has(value)) return _colorCache.get(value);
+
+    const ctx = colorCtx();
+    // fillStyle 遇到不合法的值會「保留原值」而不是丟錯 —— 用兩個哨兵確認它真的被接受,
+    // 避免把上一個顏色誤認成這次的解析結果。
+    let accepted = false;
+    for (const sentinel of ['#000000', '#ffffff']) {
+      ctx.fillStyle = sentinel;
+      ctx.fillStyle = value;
+      if (ctx.fillStyle !== sentinel) { accepted = true; break; }
+    }
+    if (!accepted) { _colorCache.set(value, null); return null; }
+
+    ctx.clearRect(0, 0, 1, 1);
+    ctx.fillRect(0, 0, 1, 1);
+    let px;
+    try {
+      px = ctx.getImageData(0, 0, 1, 1).data;
+    } catch (e) {
+      _colorCache.set(value, null);
+      return null;
+    }
+    const [r, g, b, a] = px;
+    const out = a === 255
+      ? `rgb(${r}, ${g}, ${b})`
+      : `rgba(${r}, ${g}, ${b}, ${round(a / 255, 3)})`;
+    _colorCache.set(value, out);
+    return out;
   }
 
   /** 只取直接子文字節點的文字。字串永不離開此函式。 */
@@ -198,7 +273,10 @@
       if (STYLE_DENYLIST.has(prop)) continue;
       const raw = cs[prop];
       const clean = sanitize(raw);
-      if (clean !== null && clean !== undefined && clean !== '') out[prop] = clean;
+      if (clean === null || clean === undefined || clean === '') continue;
+      // 先 sanitize 再正規化:denylist / sanitize 是資安防線,順序不能倒過來。
+      // 正規化失敗時保留 sanitize 後的原字串 —— 少送一個欄位比送一個看不懂的值糟。
+      out[prop] = COLOR_PROPS.has(prop) ? (normalizeColor(clean) || clean) : clean;
     }
     return { cs, out };
   }

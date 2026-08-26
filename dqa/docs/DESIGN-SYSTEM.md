@@ -67,9 +67,9 @@ iframe.html?id=<story-id>&viewMode=story&globals=theme:light;density:md
 
 ## 三個已知不相容(還沒修,不要當成「設定沒填好」)
 
-### 1. 色彩全部是 oklch,DQA 的 parser 讀不到 → 兩條規則靜默失效
+### 1. ~~色彩全部是 oklch~~ → 已修(ADR-014 / ADR-015)
 
-DS 的色票是 oklch,而且大量使用 relative color syntax:
+DS 的色票是 oklch,而且大量使用 relative color syntax 與 alpha:
 
 ```css
 --color-blue-6:  oklch(0.54 0.22 258);
@@ -78,25 +78,16 @@ DS 的色票是 oklch,而且大量使用 relative color syntax:
 --foreground: var(--color-neutral-9);
 ```
 
-Chromium 的 computed value **保留 oklch,不會轉回 rgb()**(實測):
+Chromium 的 computed value **保留 oklch,不會轉回 rgb()**(實測)。原本的
+`rgbToHex()` 只認 `rgb()` / `#rrggbb`,遇到 oklch 回 `null`,連鎖導致色彩 token 全部解析不到、
+`emphasis` 全是 `null`、EMPHASIS-001 永遠不觸發 —— 而且沒有任何錯誤訊息。
 
-```
-color: oklch(0.55 0.2 250)      ← 指定 oklch 就回 oklch
-color: rgb(23, 43, 77)          ← 指定 hex/rgb 才回 rgb
-```
+**現在**:`extract.js` 在色值進入 `style` 之前用 canvas 正規化成 `rgb()` / `rgba()`
+(瀏覽器自己的引擎,不自己實作色彩空間數學,見 ADR-014);
+`contrastRatio` 先把前景 alpha 合成到有效背景上再算(ADR-015)。
 
-`src/core/tokens.js` 的 `rgbToHex()` 只認 `rgb()` / `rgba()` / `#rrggbb`,遇到 oklch 回 `null`。
-連鎖效應:
-
-- 所有色彩 token 逆映射失效 → `node.tokens.color` / `backgroundColor` 永遠不存在
-- `annotateEmphasis()` 第一行就 `if (!fg) { n.emphasis = null; continue; }` → **每個節點的 emphasis 都是 null**
-- payload 的 `hasHeading && hasSibling` 判斷永遠 false → **EMPHASIS-001 永遠不會進 unresolved**
-
-而且不會有任何錯誤訊息。這是最糟的那種壞法。
-
-**修法**:`rgbToHex` 擴充成能解析 oklch → sRGB(oklch → oklab → linear sRGB → gamma),
-並且因為 `--foreground` 本身帶 alpha,`contrastRatio` 必須先把前景 alpha 合成到有效背景上才算對比。
-現在的 `effectiveBg()` 只往上找第一個 `alpha === 1` 的背景,前景的 alpha 完全沒被納入計算。
+驗證:`npm run test:color`(單元)與 `npm run test:e2e` 的「色彩正規化」「色彩逆映射與對比度」兩節。
+e2e 的 fixture 刻意用 `oklch(0 0 0 / 0.65)`,把正規化拔掉會有 7 項斷言失敗。
 
 ### 2. spacing 沒有數字階梯,DQA 的逆映射前提不成立
 
@@ -149,7 +140,7 @@ DS 管的是「**同步義務**」,DQA 量的是「**值有沒有名字**」。�
 | GESTALT-001 | ✅ 可用 —— 只比幾何,不需要 token 表 |
 | ALIGN-001 | ✅ 可用 —— baselineY 是純幾何 |
 | TRUNC-001 | ✅ 可用,而且 DS 的 spec 跟它一字對得上 |
-| EMPHASIS-001 | ❌ 因為 oklch 靜默失效 |
+| EMPHASIS-001 | ✅ 可用 —— oklch 正規化與 alpha 合成已修(ADR-014 / ADR-015)|
 | ELEVATION-001 | ✅ 可用(boxShadow 的 computed value 帶 oklch 但整串是字串比對,不受影響)|
 
-也就是說:**幾何類的規則現在就能對這個 DS 跑,token 類的不行。**
+也就是說:**幾何類與色彩類的規則現在就能對這個 DS 跑,spacing token 類的還不行。**

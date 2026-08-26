@@ -17,13 +17,12 @@
 
 仍未完成 —— 這三項是三個不同性質的問題,不要混在一起處理:
 
-- [ ] **色彩 parser 支援 oklch**(這是 bug,不是決策)
-      DS 的色票全是 oklch,Chromium 的 computed value 保留 oklch 不轉 rgb。
-      `rgbToHex()` 回 null → 色彩 token 全失效 → `emphasis` 全 null → **EMPHASIS-001 永遠不觸發,且無錯誤訊息**。
-      修法:oklch → oklab → linear sRGB → gamma;另外 `--foreground` 本身帶 alpha(85% 黑),
-      `contrastRatio` 必須先把前景 alpha 合成到有效背景上。
-      **驗收**:對 `oklch(0.54 0.22 258)` 解析出的 hex 與 Chromium 實際渲染值誤差 < 1/255;
-      拿 DS 的 `--foreground` on `--canvas` 算出的對比度落在 spec 宣稱的範圍內。
+- [x] **色彩正規化**(bug,已修 —— ADR-014 / ADR-015)
+      `extract.js` 用 canvas 把色值正規化成 `rgb()` / `rgba()` 後才進 `style`(瀏覽器自己的引擎,
+      不自己實作色彩空間數學);`contrastRatio` 先把前景 alpha 合成到有效背景上,
+      `effectiveBg()` 也會把中間的半透明層疊回去。
+      **驗收結果**:`npm run test:color` 全過(85% 黑 on 白 → `#262626`,對比度 15.13 而非 21);
+      `npm run test:e2e` 的 fixture 改用 `oklch(0 0 0 / 0.65)`,正規化拔掉會有 7 項斷言失敗。
 
 - [ ] **決定 spacing 逆映射怎麼做**(這是設計,不是填值)
       DS 沒有數字階梯。間距來自語意 token(隨 density 變)、family 尺寸、Tailwind 4px 倍數三個來源。
@@ -37,8 +36,8 @@
       三個選項(降級成提示 / 改判鄰域內同語意位置的值不一致 / 依 ADR-007 移除)見 `docs/DESIGN-SYSTEM.md`。
       **驗收**:對 DS Storybook 的任一 story 跑一次,TOKEN-001 的誤報率可被說明,而不是「看起來很多」。
 
-**目前可用的規則**:GESTALT-001 / ALIGN-001 / TRUNC-001 / ELEVATION-001(純幾何或字串比對)。
-TOKEN-002 / RENDER-001 要等 spacing 逆映射;EMPHASIS-001 要等 oklch。
+**目前可用的規則**:GESTALT-001 / ALIGN-001 / TRUNC-001 / ELEVATION-001 / EMPHASIS-001。
+TOKEN-002 / RENDER-001 要等 spacing 逆映射;TOKEN-001 要等規則裁決。
 
 ---
 
