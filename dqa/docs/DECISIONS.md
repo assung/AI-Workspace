@@ -428,6 +428,55 @@ row-gap: 12px                     →  gap = "12px normal"
 
 ---
 
+## ADR-022 — AI 層的 egress、模型與輸出約束
+
+**決定**(2026-08,user 裁決):
+
+| | |
+|---|---|
+| egress | 公司內部 gateway(hostname 只走環境變數 / `config.json`,不進版控)|
+| 模型 | `claude-opus-4-6` |
+| 輸出約束 | structured outputs(`output_config.format`),schema 的 `code` enum 從 rubric 產生 |
+| 位置 | `src/node/llm.js` —— **只有 Playwright 這條路徑有**,擴充套件維持零 egress(ADR-013)|
+
+**endpoint 與金鑰為什麼不進 repo**:內部 hostname 就是「內部網路拓撲」,
+而 ADR-003 已經認定那是 payload 不可外洩的類別之一
+(`url(https://cdn.internal.corp/...)` 被 sanitize 擋掉的理由)。
+同一個判準對版控成立:`config.example.json` 只放佔位字串,真值走
+`DQA_LLM_BASE_URL` 或已 gitignore 的 `config.json`;金鑰只走環境變數,任何檔案都不放。
+
+**否決的替代 1**:用 prompt 叫模型「輸出純 JSON、不要 markdown 圍欄」然後事後驗。
+那是原本的做法。structured outputs 把「模型發明新代碼」從**事後重試**變成
+**結構上不可能發生** —— rubric 的 `code` 清單直接編進 schema 的 enum。
+可用性查過:第一方 API / Claude Platform on AWS / Bedrock / Vertex 都是 GA,Foundry beta,
+所以這個做法不會綁死 egress 的選擇。
+
+**否決的替代 2**:schema 過了就信。
+schema 保證得了形狀,保證不了語意。三件它表達不了的事由 `validateFindings()` 把關:
+`severity` 是否沿用規則定義(跨欄位相依)、`unclassified` 時 `code` 是否為 null、
+`id` 是否真的在 `unresolved` 裡。實測:模型把 EMPHASIS-001 的 severity 從 medium 改成 low
+會通過 schema(`low` 是合法 enum 值),只有 `validateFindings` 抓得到。
+
+**`claude-opus-4-6` 的兩個特性寫死在 `llm.js`,換模型時要重看**:
+
+1. **thinking 必須明確設 `{type: 'adaptive'}`。** 在 4.6 上省略 `thinking` 等於**不思考**
+   (Opus 4.8 / 5 才是預設開)。這條漏掉不會報錯,只會安靜地變笨 —— 而這個任務是拿幾何數字
+   做判斷,關掉思考等於自找幻覺。`test/llm.test.js` 有一條斷言盯著送出去的請求。
+2. **4.6 沒有 `xhigh` effort。** 那一階是 4.7 才加的,送過去會被拒。目前用 `high`。
+
+**重試是重新發一次單輪請求**,不是接續對話 —— 接續需要把上一輪的 thinking block
+原封不動送回去,少送會出事;而這本來就是單輪分類,沒有需要保留的上下文。
+重試一次就停:反覆重試只是把不確定性藏起來,而「模型答不出合約內的答案」
+本身就是要讓人看到的訊號。
+
+**測試不連任何真實 endpoint。** `test/llm.test.js` 在本機起一個假的 Messages API,
+驗的是**送出去的請求形狀**與**收回來之後的合約檢查** —— 這兩種失敗都不會自己現形。
+閘道器本身支不支援那些參數,由 `npm run llm:check` 對著真閘道器跑,那是另一件事:
+企業閘道器可能是薄的反向代理(什麼都透傳),也可能是自己重寫的一層(只實作部分參數),
+在確認之前任何「它應該支援」的假設都不該寫進判定流程。
+
+---
+
 ## 待裁決(尚未進入實作)
 
 | 議題 | 需要什麼才能裁決 |

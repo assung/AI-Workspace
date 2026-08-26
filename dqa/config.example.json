@@ -1,8 +1,15 @@
 {
   "_comment": "對照基準 = @qijenchen/design-system 的 Storybook。story id 取自該 repo 的 packages/design-system/ds-story-manifest.json(65 元件 / 947 story 的 canonical 清單)。",
-  "viewport": { "width": 1280, "height": 900 },
+  "viewport": {
+    "width": 1280,
+    "height": 900
+  },
   "_themeAttrs_note": "Storybook 的 decorator 把 theme 與 density 寫在 documentElement 上(packages/storybook-config/preview.tsx)。density 會整組換掉 --layout-space-* 的值,兩側不一致時每一個間距都會差 —— 這是環境變因,不是實作錯誤,所以必須列進來比對。",
-  "themeAttrs": ["data-theme", "data-density", "data-layout-space"],
+  "themeAttrs": [
+    "data-theme",
+    "data-density",
+    "data-layout-space"
+  ],
   "storybook": {
     "_comment": "用 iframe.html 直接開,不要開外層 UI。globals 明確指定 theme 與 density,不要依賴預設值。",
     "url": "https://ajenchen-design-system.netlify.app/iframe.html?id=design-system-components-descriptionlist-展示--user-profile&viewMode=story&globals=theme:light;density:md",
@@ -13,5 +20,16 @@
     "url": "https://stg.internal.corp/your-page",
     "selector": "[data-component='description-list'] > div:first-of-type",
     "waitFor": "[data-testid='page-loaded']"
+  },
+  "llm": {
+    "_comment": "AI 分類層(T3)。只有 Playwright 這條路徑會用到 —— 擴充套件不內建任何 LLM 呼叫(ADR-013)。",
+    "_baseURL_note": "真實的內部 endpoint 不要填在這裡:這份會進版控,而內部 hostname 屬於網路拓撲,正是 ADR-003 認定不可外洩的那一類。填在 config.json(已在 .gitignore)或設環境變數 DQA_LLM_BASE_URL。",
+    "baseURL": "https://<your-internal-gateway>",
+    "model": "claude-opus-4-6",
+    "_model_note": "4.6 有兩個特性寫死在 src/node/llm.js:thinking 必須明確設 adaptive(省略等於關閉),且沒有 xhigh effort(那是 4.7 才加的)。換模型時這兩條要重看。",
+    "effort": "high",
+    "maxTokens": 16000,
+    "structuredOutputs": true,
+    "_credentials_note": "金鑰只走環境變數,永遠不進檔案:DQA_LLM_API_KEY(x-api-key)或 DQA_LLM_AUTH_TOKEN(Bearer)。"
   }
 }

@@ -12,11 +12,12 @@ description: 完整驗證(確定性引擎 + guard + 脫敏)
 6. `npm run test:core` — core 在 Node 與瀏覽器兩條路徑上輸出必須逐字相同
 7. `npm run test:sync` — `extension/` 的複製品與 `src/` 一致
 8. `npm run test:ext` — 擴充套件靜態完整性
+9. `npm run test:llm` — AI 層送出的請求形狀 + 收回的合約檢查(本機 mock)
 
 有瀏覽器的話再跑一次端對端(不含在 `test:all`):
 
-9. `DQA_CHROMIUM=<chrome> xvfb-run -a npm run test:e2e` — 擴充套件端對端
-10. `DQA_CHROMIUM=<chrome> xvfb-run -a npm run test:tokens` — token 抽取
+10. `DQA_CHROMIUM=<chrome> xvfb-run -a npm run test:e2e` — 擴充套件端對端
+11. `DQA_CHROMIUM=<chrome> xvfb-run -a npm run test:tokens` — token 抽取
 
 任何一項失敗,**先讀 `docs/DECISIONS.md` 對應的 ADR 再動手**。
 很多「修好測試」的直覺做法其實是回退掉一個已經辯論過的決定。
@@ -34,3 +35,5 @@ description: 完整驗證(確定性引擎 + guard + 脫敏)
 - 把排除掉的 `0px` 改成進 `skipped_checks` → 違反 ADR-020,會把覆蓋率指標稀釋成背景噪音
 - 讓 `gap` 簡寫也進逆映射「比較完整」→ 違反 ADR-021,兩軸不同時 parseFloat 會安靜地取到第一個數
 - 兩軸不同時也合成一筆 gap「讓報告乾淨」→ 違反 ADR-021,那是把兩個決定壓成一個
+- 把內部 endpoint 寫進 `config.example.json` 或文件「方便下次用」→ 違反 ADR-022 與 ADR-003
+- 在 4.6 上省略 `thinking` 或改用 `xhigh` effort → 違反 ADR-022,前者安靜變笨、後者直接被拒

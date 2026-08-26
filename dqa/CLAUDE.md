@@ -29,6 +29,8 @@
 
 ### 專案工作慣例
 
+- **內部 endpoint / 金鑰永遠不進版控。** 內部 hostname 就是網路拓撲,ADR-003 認定它跟
+  `url(https://cdn.internal.corp/...)` 同一類。走 `DQA_LLM_BASE_URL` 或已 gitignore 的 `config.json`。
 - **`tokens/color-primitives.json` 是產生檔。** 要改就改抽取參數重跑 `npm run tokens:extract`,不要手改(ADR-016)。
 - **新增任何值 / 名 / pattern 前先 grep 既有的。** 特別是 rubric code 命名(`DOMAIN-NNN`)、skip reason 常數、style allowlist 條目。不要憑感覺造新的。
 - **改一處必看三處。** 改 `rubric.json` 的規則 → 同時看 `src/node/rubric-engine.js` 的實作、`test/fixture.js` 的對應案例、`README.md` 的表格。三方不同步就是 bug。
@@ -56,6 +58,10 @@ rubric-engine  確定性規則 → deterministic_violations(既定事實,AI 不�
 payload.js     nodes 整包 + 事實層 + unresolved 清單
      ↓
 prompt.js      AI 只答 unresolved,只能引用 rubric code
+     ↓
+llm.js         送去公司 gateway 分類 → structured outputs 約束形狀
+               → validateFindings 把關 schema 表達不了的語意(ADR-022)
+               ⚠ 只有 Playwright 這條路徑有;擴充套件維持零 egress(ADR-013)
 ```
 
 ### 兩條擷取路徑
@@ -93,9 +99,16 @@ npm run test:density  # spacing 逆映射的 density 相依性、0px 的可觀�
 npm run test:core     # core 在 Node 與瀏覽器兩條路徑上的輸出必須逐字相同
 npm run test:sync     # extension/ 的複製品與 src/ 一致
 npm run test:ext      # 擴充套件靜態完整性(manifest / script src / 可解析)
+npm run test:llm      # AI 層:送出的請求形狀 + 收回的合約檢查(本機 mock,不連線)
 npm run test:all      # 以上全部,都不需要瀏覽器
 
 npm run dqa config.json out   # Playwright 路徑
+
+# AI 分類層。endpoint 與金鑰只走環境變數,不進版控(ADR-022)
+export DQA_LLM_BASE_URL='https://<internal-gateway>'
+export DQA_LLM_API_KEY='...'
+npm run llm:check                                    # 先體檢閘道器支援什麼
+npm run llm:classify out/payload.json out/findings.json
 npm run sync:ext              # src/ → extension/ 同步
 
 # 從 design system 的 CSS 抽色彩 token(需要瀏覽器,參數見 docs/DESIGN-SYSTEM.md)

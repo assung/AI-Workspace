@@ -56,6 +56,9 @@ rubric-engine 確定性規則跑完 → deterministic_violations(既定事實)
 payload.js    nodes 整包 + 事實層 + unresolved 清單
      ↓
 prompt.js     AI 只答 unresolved,只能引用 rubric code
+     ↓
+llm.js        送去公司 gateway(claude-opus-4-6)→ structured outputs 約束形狀
+              → validateFindings 把關語意。只有 CLI 這條路徑有,擴充套件零 egress
 ```
 
 `extract` / `preflight` 在瀏覽器裡跑,其餘在 Node 或擴充套件頁面裡跑,但都是同一份檔案。

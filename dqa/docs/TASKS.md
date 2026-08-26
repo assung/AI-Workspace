@@ -84,12 +84,32 @@ TOKEN-001 出提示,EMPHASIS-001 / ELEVATION-001 交給 AI。
 
 ## T3 — AI 層接上
 
-- [ ] 決定 egress 路徑(公司 gateway / Bedrock / 地端)
-- [ ] 寫 `src/node/llm.js`,吃 `prompt.txt` 吐 JSON
-- [ ] 驗證輸出的每個 `code` 都在 rubric 的 `evaluator: "ai"` 清單內;不在就當作格式錯誤重試
-- [ ] 驗證 `classification: "unclassified"` 時 `code` 必須為 `null`
+- [x] 決定 egress 路徑 —— 公司內部 gateway(2026-08 user 裁決,見 ADR-022)
+- [x] 寫 `src/node/llm.js`,吃 payload 吐經過驗證的 findings
+- [x] 驗證輸出的每個 `code` 都在 rubric 的 `evaluator: "ai"` 清單內
+      —— 用 structured outputs 讓它**結構上不可能**發生,不是事後重試
+- [x] 驗證 `classification: "unclassified"` 時 `code` 必須為 `null`
+- [x] 連線體檢 `npm run llm:check`:回報閘道器實際支援哪些能力
+      (Messages API / adaptive thinking + effort / structured outputs)
 
-**驗收**:餵一個刻意不在 rubric 內的差異(例如 `letter-spacing` 微調),AI 必須輸出 `unclassified` 而非硬塞分類。
+**驗收**:餵一個刻意不在 rubric 內的差異,AI 必須輸出 `unclassified` 而非硬塞分類。
+→ **尚未對真實 gateway 驗收**。離線的合約檢查已全部通過(`npm run test:llm`),
+但「模型面對 rubric 外的差異會不會硬塞」只能對真模型跑才算數。
+
+### 上線前要跑的順序
+
+```bash
+export DQA_LLM_BASE_URL='https://<internal-gateway>'
+export DQA_LLM_API_KEY='...'        # 或 DQA_LLM_AUTH_TOKEN(Bearer)
+npm run llm:check                    # 先確認閘道器支援什麼
+npm run llm:classify out/payload.json out/findings.json
+```
+
+`llm:check` 三項全綠才有意義往下走。`structured outputs` 那項若是紅的,
+`llm.js` 會自動降級成純文字 JSON —— 那時 `validateFindings()` 是唯一防線,
+誤分類的風險明顯上升,要在報告裡標明。
+
+**尚未做**:把 findings 併進報告(那是 T4)。
 
 ---
 
