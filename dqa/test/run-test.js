@@ -7,11 +7,17 @@ const { storybook, production } = require('./fixture');
 const { tokens, rubric } = loadData();
 const payload = buildPayload(storybook, production, { tokens, rubric });
 
-console.log('=== deterministic_violations ===');
+console.log('=== deterministic_violations(已定讞)===');
 for (const v of payload.deterministic_violations) {
   console.log(`[${v.severity.padEnd(6)}] ${v.code} @ ${v.node}`);
   console.log(`          證據: ${JSON.stringify(v.evidence)}`);
   console.log(`          依據: ${v.source}`);
+}
+
+console.log('\n=== notices(量得到但不定讞,人看的)===');
+if (!payload.notices.length) console.log('  (無)');
+for (const n of payload.notices) {
+  console.log(`  ${n.code} @ ${n.node}　${JSON.stringify(n.evidence)}`);
 }
 
 console.log('\n=== skipped_checks(量不到,誠實跳過) ===');
@@ -33,13 +39,26 @@ for (const n of payload.nodes) {
 /* ------------------------------------------------------------- assertions */
 
 const codes = payload.deterministic_violations.map((v) => v.code);
-const expected = ['TOKEN-001', 'TOKEN-002', 'GESTALT-001', 'ALIGN-001', 'TRUNC-001', 'RENDER-001'];
+const noticeCodes = payload.notices.map((v) => v.code);
+const expected = ['TOKEN-002', 'GESTALT-001', 'ALIGN-001', 'TRUNC-001', 'RENDER-001'];
 const missing = expected.filter((c) => !codes.includes(c));
 
 console.log('\n=== 驗收 ===');
 for (const c of expected) {
   console.log(`  ${codes.includes(c) ? '✓' : '✗'} ${c}`);
 }
+
+// TOKEN-001 的 outcome 是 notice(rubric.json)—— 它必須出現,但不能出現在定讞那一側。
+// 這條規則量的是「值有沒有名字」,而對照基準管的是「有沒有同步義務」,不是同一件事。
+const tokenNotice = payload.notices.find((n) => n.code === 'TOKEN-001');
+console.log(`  ${tokenNotice ? '✓' : '✗'} TOKEN-001 出現在 notices`);
+console.log(`  ${!codes.includes('TOKEN-001') ? '✓' : '✗'} TOKEN-001 沒有進 deterministic_violations`);
+// 降級的是定不定讞,不是 severity(ADR-004)
+console.log(`  ${tokenNotice && tokenNotice.severity === 'medium' ? '✓' : '✗'} TOKEN-001 的 severity 沒有被順手調低`);
+if (!tokenNotice || codes.includes('TOKEN-001') || tokenNotice.severity !== 'medium') {
+  missing.push('TOKEN-001(notice 分流)');
+}
+console.log(`  ${noticeCodes.every((c) => c === 'TOKEN-001') ? '✓' : '✗'} notices 只收 outcome = notice 的規則`);
 
 const truncCount = codes.filter((c) => c === 'TRUNC-001').length;
 console.log(`  ${truncCount === 1 ? '✓' : '✗'} TRUNC-001 只在 production 側判定一次(未因兩側狀態不同而誤報)`);

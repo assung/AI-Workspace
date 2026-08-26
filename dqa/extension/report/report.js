@@ -54,6 +54,7 @@ function renderMetrics(payload) {
   const items = [
     ['違規', payload.deterministic_violations.length],
     ['high', bySev.high || 0],
+    ['提示', (payload.notices || []).length],
     ['跳過', payload.skipped_checks.length],
     ['待 AI 判定', payload.unresolved.length],
     ['鄰域節點', payload.nodes.length],
@@ -66,18 +67,19 @@ function renderMetrics(payload) {
   }
 }
 
-function renderViolations(payload) {
-  const box = $('#violations');
-  const list = [...payload.deterministic_violations].sort((a, b) => {
+/** 違規與提示共用同一種卡片 —— 兩者的證據結構相同,差別只在進哪一區。 */
+function renderFindings(selector, countSelector, list, emptyText) {
+  const box = $(selector);
+  const sorted = [...list].sort((a, b) => {
     const d = (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9);
     return d || a.code.localeCompare(b.code) || a.node.localeCompare(b.node);
   });
-  $('#c-violations').textContent = String(list.length);
-  if (!list.length) {
-    box.appendChild(el('p', 'empty', '沒有確定性違規。'));
+  $(countSelector).textContent = String(sorted.length);
+  if (!sorted.length) {
+    box.appendChild(el('p', 'empty', emptyText));
     return;
   }
-  for (const v of list) {
+  for (const v of sorted) {
     const card = el('div', `finding sev-${v.severity}`);
     const head = el('div', 'finding-head');
     head.appendChild(el('span', 'code', v.code));
@@ -99,6 +101,14 @@ function renderViolations(payload) {
     box.appendChild(card);
   }
 }
+
+const renderViolations = (payload) => renderFindings(
+  '#violations', '#c-violations', payload.deterministic_violations, '沒有確定性違規。'
+);
+
+const renderNotices = (payload) => renderFindings(
+  '#notices', '#c-notices', payload.notices || [], '沒有提示。'
+);
 
 function renderSkipped(payload) {
   const box = $('#skipped');
@@ -230,6 +240,7 @@ function stamp() {
 
   renderMetrics(payload);
   renderViolations(payload);
+  renderNotices(payload);
   renderSkipped(payload);
   renderUnresolved(payload);
   renderStructural(payload);

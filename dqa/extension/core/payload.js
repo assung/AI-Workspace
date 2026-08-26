@@ -149,7 +149,9 @@
     const single = engine.evaluateSingleSide(prod.extraction);
     const comparative = engine.evaluateComparative(buildTokenPairs(paired));
 
-    const deterministic = [...single.violations, ...comparative];
+    const deterministic = [...single.violations, ...comparative.violations];
+    // 程式量得到、但依 spec 不必然構成問題的觀察。不定讞,也不丟給 AI —— 交給人看。
+    const notices = [...single.notices, ...comparative.notices];
     const covered = new Set(
       deterministic
         .filter((v) => v.evidence && v.evidence.prop)
@@ -186,6 +188,8 @@
       structural_diff: { onlySb, onlyProd },
       // 已定讞事實
       deterministic_violations: deterministic,
+      // 量得到但不定讞的觀察(規則的 outcome = notice)。人看的,不是 AI 的作業範圍。
+      notices,
       // 程式明確放棄判定的項目 —— 第一週要盯的覆蓋率指標
       skipped_checks: single.skipped,
       // AI 的作業範圍(不是它的視野範圍)

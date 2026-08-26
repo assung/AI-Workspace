@@ -25,6 +25,15 @@
     </section>
 
     <section class="block">
+      <h2>提示 <span class="count" id="c-notices">0</span></h2>
+      <p class="note">
+        程式量得到,但依 spec 不必然構成問題 —— 判斷依據不在單一鄰域裡,所以不定讞、也不交給 AI。
+        這一區是給人看的。severity 沿用規則定義,它表達的是「若確認成立有多嚴重」,不是「有多可能成立」。
+      </p>
+      <div id="notices"></div>
+    </section>
+
+    <section class="block">
       <h2>跳過的檢查 <span class="count" id="c-skipped">0</span></h2>
       <p class="note">
         量不到就說量不到(ADR-006)。這一區佔比過高代表規則的實際覆蓋遠小於預期 ——

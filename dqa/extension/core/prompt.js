@@ -28,6 +28,8 @@
 payload.nodes 是 production 的完整鄰域幾何與樣式(含 emphasis 分數)。
 payload.nodes_storybook 是 Storybook 同一鄰域。
 payload.deterministic_violations 是程式已經定讞的事實 —— 不要重複評估、不要推翻。
+payload.notices 是程式量得到但**不構成違規**的觀察(判斷依據不在單一鄰域裡)——
+它們是脈絡,不要評估、不要把它們寫進 findings。
 
 ## 你要回答什麼
 只針對 payload.unresolved 清單中的項目。清單以外的一律不碰。

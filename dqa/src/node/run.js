@@ -96,8 +96,12 @@ if (require.main === module) {
       fs.writeFileSync(path.join(outDir, 'payload.json'), JSON.stringify(payload, null, 2));
       fs.writeFileSync(path.join(outDir, 'prompt.txt'), prompt);
       const d = payload.deterministic_violations;
-      console.log(`確定性違規 ${d.length} 筆 / 跳過 ${payload.skipped_checks.length} 項 / unresolved ${payload.unresolved.length} 筆`);
+      console.log(
+        `確定性違規 ${d.length} 筆 / 提示 ${payload.notices.length} 筆`
+        + ` / 跳過 ${payload.skipped_checks.length} 項 / unresolved ${payload.unresolved.length} 筆`
+      );
       for (const v of d) console.log(`  [${v.severity}] ${v.code} @ ${v.node}`);
+      for (const n of payload.notices) console.log(`  (提示) ${n.code} @ ${n.node}`);
     })
     .catch((e) => {
       console.error(e.message);

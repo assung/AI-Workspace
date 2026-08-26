@@ -151,6 +151,24 @@
     return { gaps, skip: null, axis: vertical ? 'y' : 'x' };
   }
 
+  /* ------------------------------------------------------------------ 判定去向 */
+
+  /**
+   * 一條規則判出來的東西該進哪條輸出線:
+   *
+   *   violation(預設)→ deterministic_violations。既定事實,AI 不得推翻。
+   *   notice         → notices。程式量得到,但依 spec 不必然是問題,交給人看。
+   *
+   * 為什麼需要第二條線:確定性規則的價值在「可複現」,不在「一定是錯的」。
+   * TOKEN-001 就是這種 —— 對照基準的判準是「同值在 ≥ 2 處需同步才必開 token」,
+   * 而 DQA 從單一鄰域只看得到「值有沒有名字」,看不到「有沒有同步義務」。
+   * 硬定讞會系統性誤報,丟給 AI 猜也不對(它一樣看不到別的 consumer)。
+   *
+   * 注意:降級的是**定不定讞**,不是 severity。
+   * 用調低 severity 來讓報告好看是 ADR-004 明令禁止的假修法。
+   */
+  const OUTCOMES = new Set(['violation', 'notice']);
+
   /* ------------------------------------------------------------------ engine */
 
   class RubricEngine {
@@ -162,6 +180,13 @@
       const rubric = opts.rubric;
       if (!rubric || !Array.isArray(rubric.rules)) {
         throw new Error('DQA: 缺少 rubric。rubric 必須由呼叫端注入,core 不讀檔。');
+      }
+      const badOutcome = rubric.rules.filter((r) => r.outcome && !OUTCOMES.has(r.outcome));
+      if (badOutcome.length) {
+        throw new Error(
+          `DQA: 以下規則的 outcome 不合法(只能是 ${[...OUTCOMES].join(' / ')}): `
+          + badOutcome.map((r) => `${r.code}=${r.outcome}`).join(', ')
+        );
       }
       const noSource = rubric.rules.filter((r) => !r.source);
       if (noSource.length) {
@@ -194,20 +219,31 @@
 
     /* ------------------------------------------------------ 單側規則(prod) */
 
+    /** 依規則的 outcome 把判定推進對應的清單 */
+    emit(buckets, code, nodePath, evidence) {
+      const rule = this.rule(code);
+      const v = this.violation(code, nodePath, evidence);
+      if ((rule.outcome || 'violation') === 'notice') buckets.notices.push(v);
+      else buckets.violations.push(v);
+      return v;
+    }
+
     evaluateSingleSide(extraction) {
       const nodes = extraction.nodes;
       const map = byPath(nodes);
       const violations = [];
+      const notices = [];
       const skipped = [];
+      const buckets = { violations, notices };
 
       /* TOKEN-001 —— 魔術數字。severity 固定,與 delta 無關。 */
       for (const n of nodes) {
         for (const [prop, t] of Object.entries(n.tokens || {})) {
           if (!SPACING_PROPS.has(prop)) continue;
           if (t.token === null) {
-            violations.push(this.violation('TOKEN-001', n.path, {
+            this.emit(buckets, 'TOKEN-001', n.path, {
               prop, px: t.px, nearest: t.nearest, delta: t.delta,
-            }));
+            });
           }
         }
       }
@@ -228,10 +264,10 @@
         const gi = median(intra.gaps);
         const ge = median(inter.gaps);
         if (gi !== null && ge !== null && gi >= ge) {
-          violations.push(this.violation('GESTALT-001', P, {
+          this.emit(buckets, 'GESTALT-001', P, {
             intra_gap: gi, inter_gap: ge,
             intra_samples: intra.gaps, inter_samples: inter.gaps,
-          }));
+          });
         }
       }
 
@@ -254,9 +290,9 @@
             if (minH <= 0 || overlap / minH < 0.5) continue; // 不同列
             const d = Math.abs(a.baselineY - b.baselineY);
             if (d >= 0.5 && d <= 4) {
-              violations.push(this.violation('ALIGN-001', pp, {
+              this.emit(buckets, 'ALIGN-001', pp, {
                 a: a.path, b: b.path, baselineDelta: round(d),
-              }));
+              });
             }
           }
         }
@@ -266,16 +302,16 @@
       for (const n of nodes) {
         const t = n.text;
         if (t && t.truncated && !t.hasAffordance) {
-          violations.push(this.violation('TRUNC-001', n.path, {
+          this.emit(buckets, 'TRUNC-001', n.path, {
             measuredWidth: t.measuredWidth,
             availWidth: t.availWidth,
             overflowX: t.overflowX,
             chars: t.chars,
-          }));
+          });
         }
       }
 
-      return { violations, skipped };
+      return { violations, notices, skipped };
     }
 
     /* -------------------------------------------------- 事實層:emphasis 分數 */
@@ -313,21 +349,23 @@
 
     evaluateComparative(pairs) {
       const violations = [];
+      const notices = [];
+      const buckets = { violations, notices };
       for (const { path: p, prop, sb, prod } of pairs) {
         if (!sb || !prod) continue;
         if (sb.token && prod.token && sb.token !== prod.token) {
-          violations.push(this.violation('TOKEN-002', p, {
+          this.emit(buckets, 'TOKEN-002', p, {
             prop, sb: sb.token, prod: prod.token,
             sbPx: sb.px, prodPx: prod.px,
-          }));
+          });
         } else if (sb.token && prod.token && sb.token === prod.token
                    && Math.abs(sb.px - prod.px) < 2 && Math.abs(sb.px - prod.px) > 0) {
-          violations.push(this.violation('RENDER-001', p, {
+          this.emit(buckets, 'RENDER-001', p, {
             prop, token: sb.token, delta: round(prod.px - sb.px),
-          }));
+          });
         }
       }
-      return violations;
+      return { violations, notices };
     }
   }
 

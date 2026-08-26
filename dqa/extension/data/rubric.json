@@ -4,17 +4,19 @@
   "rules": [
     {
       "code": "TOKEN-001",
-      "name": "spacing 值不在 scale 上",
+      "name": "spacing 值不在 token 定義裡",
       "check_type": "single_side",
       "side": "prod",
       "evaluator": "deterministic",
+      "outcome": "notice",
+      "_why_notice": "對照基準 @qijenchen/design-system 的判準是「同值在 ≥ 2 處需要保持同步 → 必開 token;1 處 = hardcode + 註解 why」,單一 consumer 的 padding / gap 是**合法**的 hardcode。DQA 從單一鄰域的 computed style 只看得到「這個值有沒有名字」,看不到「有沒有同步義務」—— 兩者不是同一條規則,定讞會系統性誤報。因此降級成提示:數字照報、severity 不動,但不定讞。",
       "condition": "tokens[prop].token === null (prop ∈ spacing props)",
       "severity": "medium",
       "delta_independent": true,
-      "_why_delta_independent": "13px 與 40px 同樣是繞過設計系統的約束。1px 偏離最容易被複製繁殖,降級成雜訊等於放行。",
+      "_why_delta_independent": "13px 與 40px 同樣是繞過設計系統的約束。1px 偏離最容易被複製繁殖,降級成雜訊等於放行。注意:delta 無關的是 severity,跟 outcome 是提示還是違規無關。",
       "source": "https://github.com/ajenchen/design-system/blob/main/packages/design-system/src/tokens/token-system.spec.md",
       "_source_section": "Token vs Hardcode 判斷 —— 「同值在 ≥ 2 處需要保持同步 → 必開 token」。反過來說單一 consumer 的 padding / gap 是合法 hardcode,只要有註解。",
-      "description": "使用了未定義於 spacing scale 的魔術數字"
+      "description": "這個間距值不對應任何已定義的 spacing token(是否構成問題要看它有沒有同步義務,程式判斷不了)"
     },
     {
       "code": "TOKEN-002",
@@ -102,5 +104,6 @@
       "description": "陰影或堆疊層級的變更改變了元件的層次歸屬"
     }
   ],
-  "_source_base": "https://github.com/ajenchen/design-system —— 對照基準與規則依據都在這個 repo。source 為可點開的檔案連結,_source_section 指出該讀哪一段。"
+  "_source_base": "https://github.com/ajenchen/design-system —— 對照基準與規則依據都在這個 repo。source 為可點開的檔案連結,_source_section 指出該讀哪一段。",
+  "_outcome": "outcome 決定判定進哪一條輸出線:violation(預設)進 deterministic_violations 定讞;notice 進 notices,程式量得到但依 spec 不必然是問題,交給人看。outcome 改的是「定不定讞」,不是 severity —— 用調低 severity 來讓報告好看是 ADR-004 明令禁止的假修法。"
 }

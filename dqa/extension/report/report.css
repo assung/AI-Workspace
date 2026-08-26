@@ -157,3 +157,9 @@ button.primary:hover { background: #0055cc; }
 .metric { min-width: 96px; }
 .metric .n { font-size: 22px; font-weight: 600; }
 .metric .l { font-size: 11px; color: var(--subtle); text-transform: uppercase; letter-spacing: .05em; }
+
+/* 提示不是判決 —— 用虛線左邊界跟違規區分開,避免被當成同一種東西掃過去 */
+#notices .finding {
+  border-left-style: dashed;
+  background: var(--bg-sunken);
+}

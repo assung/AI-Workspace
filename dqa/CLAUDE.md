@@ -22,6 +22,7 @@
 
 4. **severity 不隨偏差量浮動。** `token: null`(魔術數字)的嚴重度固定,與 `delta` 大小無關。
    → 「delta < 2px 就降級成次要」是明確的錯誤設計,見 ADR-004。
+   規則要降級請改 `outcome`(定不定讞),不要動 severity —— 那是兩個不同的軸,見 ADR-018。
 
 5. **沒有 `source` 的規則不准進 `rubric.json`。** 每條規則必須指回既有 spec 或 token 定義檔。找不到依據的差異輸出 `unclassified`,交給人。
    → 見 ADR-007。
@@ -47,6 +48,7 @@ extract.js     鄰域擷取 → allowlist → sanitize → 幾何 / baseline / �
 tokens.js      本地 token 逆映射 → { px, token, exact, nearest, delta }
      ↓
 rubric-engine  確定性規則 → deterministic_violations(既定事實,AI 不得推翻)
+               量得到但不足以定讞的 → notices(outcome: notice,人看的)
                量不到的 → skipped_checks
      ↓
 payload.js     nodes 整包 + 事實層 + unresolved 清單
@@ -132,5 +134,6 @@ viewport 不符時擷取確實被擋下。
 (ADR-014 ~ ADR-017),`tokens/color-primitives.json` 是從真實 DS 抽出來的 **產生檔,不要手改**。
 剩下兩條性質不同(一個是設計、一個是規則裁決),見 `docs/TASKS.md` 的 T0。
 
-**現在可用**:GESTALT-001 / ALIGN-001 / TRUNC-001 / ELEVATION-001 / EMPHASIS-001。
-**現在不可用**:TOKEN-001(規則裁決)/ TOKEN-002 / RENDER-001(等 spacing 逆映射)。
+**現在可用**:GESTALT-001 / ALIGN-001 / TRUNC-001 / ELEVATION-001 / EMPHASIS-001 定讞,
+TOKEN-001 出提示不定讞(ADR-018)。
+**現在不可用**:TOKEN-002 / RENDER-001,等 spacing 逆映射。

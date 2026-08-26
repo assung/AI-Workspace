@@ -46,6 +46,7 @@ extract.js    鄰域擷取(T + P 的 children + G 的 children)
 tokens.js     本地 token 逆映射 → { px, token, exact, nearest, delta }
      ↓
 rubric-engine 確定性規則跑完 → deterministic_violations(既定事實)
+              量得到但不足以定讞的 → notices(人看的,不定讞也不給 AI)
               量不到的一律 skip,不推測
      ↓
 payload.js    nodes 整包 + 事實層 + unresolved 清單
@@ -81,6 +82,7 @@ block flow 的縫隙來自 margin collapse、父層 padding、line-height 撐開
 | 指標 | 從哪裡取 | 判讀 |
 |---|---|---|
 | 確定性規則誤報率 | 人工複核 `deterministic_violations` | 高 → rubric `condition` 太鬆 |
+| `notices` 成立比例 | 人工確認 `notices` | 長期偏低 → 該規則對這個 DS 沒價值,依 ADR-007 移除 |
 | `unclassified` 比例 | AI 輸出 | 接近 0 抽驗 20 筆對 `condition`;>50% 表示 rubric 覆蓋不足 |
 | `skipped_checks` 佔比 | payload | 過高表示 GESTALT-001 實際覆蓋遠小於預期 → 重估規則價值,**不是**放寬 guard |
 
@@ -92,6 +94,11 @@ block flow 的縫隙來自 margin collapse、父層 padding、line-height 撐開
 沒有 `source` 的規則不准進這份檔案。`source` 必須指回既有 spec 或 token 定義。
 爭議發生時,大家看的是 `source`,不是猜 AI 為什麼這樣想。
 
-`evaluator` 欄位決定路由:
-- `deterministic` → 程式判,100% 可複現,AI 不得推翻
+`evaluator` 欄位決定**誰判**:
+- `deterministic` → 程式判,100% 可複現
 - `ai` → 門檻不存在於任何 spec(如 emphasis),程式只把分數算成事實,由 AI 依脈絡判斷
+
+`outcome` 欄位決定**判出來算不算數**:
+- `violation`(預設)→ 進 `deterministic_violations`,既定事實,AI 不得推翻
+- `notice` → 進 `notices`,程式量得到但判斷依據不在單一鄰域裡,交給人。
+  降級的是定不定讞,**不是 severity**(見 ADR-018 與 ADR-004)

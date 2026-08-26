@@ -230,9 +230,21 @@ async function main() {
     for (const v of built.payload.deterministic_violations) {
       console.log(`     [${v.severity.padEnd(6)}] ${v.code} @ ${v.node}\u3000${JSON.stringify(v.evidence)}`);
     }
-    for (const code of ['TOKEN-001', 'TOKEN-002', 'GESTALT-001', 'ALIGN-001', 'TRUNC-001']) {
+    for (const code of ['TOKEN-002', 'GESTALT-001', 'ALIGN-001', 'TRUNC-001']) {
       check(codes.includes(code), `${code} 在真實頁面上被抓到`);
     }
+
+    console.log('\n=== 提示(不定讞)===');
+    const notices = built.payload.notices || [];
+    for (const n of notices) {
+      console.log(`     ${n.code} @ ${n.node}\u3000${JSON.stringify(n.evidence)}`);
+    }
+    check(notices.some((n) => n.code === 'TOKEN-001'),
+      'TOKEN-001 出現在 notices(fixture 的 padding-top: 13px)');
+    check(!codes.includes('TOKEN-001'),
+      'TOKEN-001 沒有混進 deterministic_violations');
+    check(notices.every((n) => n.severity === 'medium'),
+      '降級的是定不定讞,severity 沒有被順手調低(ADR-004)');
     check(built.payload.meta.captureMode === 'extension', 'payload 記錄了擷取路徑');
     check(built.payload.meta.env.warnings.length === 0, '兩側環境一致');
     check(built.promptLen > 1000, 'prompt 產得出來', `${built.promptLen} 字元`);
@@ -267,10 +279,13 @@ async function main() {
     check(allText.length > 0 && allText.every((n) => n.emphasis),
       '鄰域裡每個文字節點都有 emphasis 事實', `${allText.length} 個`);
 
-    const shown = await report.locator('.finding .code').allTextContents();
+    const shown = await report.locator('#violations .finding .code').allTextContents();
     check(shown.length === codes.length, '報告頁列出全部違規', `${shown.length} 筆`);
-    const firstSev = await report.locator('.finding').first().getAttribute('class');
+    const firstSev = await report.locator('#violations .finding').first().getAttribute('class');
     check(/sev-high/.test(firstSev), '違規依 severity 排序,high 在最前');
+    const shownNotices = await report.locator('#notices .finding .code').allTextContents();
+    check(shownNotices.length === notices.length && shownNotices.every((c) => c === 'TOKEN-001'),
+      '提示在報告頁獨立一區,沒有混進違規列表', `${shownNotices.length} 筆`);
     const promptText = await report.locator('#prompt').inputValue();
     check(promptText.length === built.promptLen, '報告頁的 prompt 與 core 產出一致');
     check(!/Priya|Raghunathan/.test(promptText), 'prompt 裡沒有頁面文字內容');

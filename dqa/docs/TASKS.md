@@ -37,15 +37,15 @@
       **不要**把它硬壓成一張平表填進 `tokens/spacing-scale.json` —— 那是 ADR-006 明令禁止的推測值。
       **驗收**:`resolveSpacing` 吃得到 density,且對「md 16px」與「lg 16px」給出不同的 token 名。
 
-- [ ] **裁決 TOKEN-001 的去留**
-      DS 的判準是「同值在 ≥ 2 處需同步 → 必開 token」,單一 consumer 的 hardcode 合法。
-      DQA 量的是「值有沒有名字」,兩者不是同一條規則 → 系統性誤報。
-      三個選項(降級成提示 / 改判鄰域內同語意位置的值不一致 / 依 ADR-007 移除)見 `docs/DESIGN-SYSTEM.md`。
-      **驗收**:對 DS Storybook 的任一 story 跑一次,TOKEN-001 的誤報率可被說明,而不是「看起來很多」。
+- [x] **裁決 TOKEN-001 的去留**(已裁決 —— ADR-018)
+      `outcome: "notice"`:量得到就報,但不進 `deterministic_violations`、也不交給 AI。
+      severity 與 `delta_independent` 都不動 —— 降級的是定不定讞,不是嚴重度(ADR-004)。
+      報告頁獨立一區、虛線邊界;prompt 明確告訴模型那是脈絡不是作業範圍。
+      **驗收結果**:`npm test` 與 `npm run test:e2e` 都斷言它出現在 `notices`
+      且不在 `deterministic_violations`,severity 仍是 medium。
 
-**目前可用的規則**:GESTALT-001 / ALIGN-001 / TRUNC-001 / ELEVATION-001 / EMPHASIS-001
-(色彩那一側從量測到逆映射已完整)。
-TOKEN-002 / RENDER-001 要等 spacing 逆映射;TOKEN-001 要等規則裁決。
+**目前可用的規則**:GESTALT-001 / ALIGN-001 / TRUNC-001 / ELEVATION-001 / EMPHASIS-001 定讞;
+TOKEN-001 出提示。只剩 TOKEN-002 / RENDER-001 要等 spacing 逆映射。
 
 ---
 
@@ -107,6 +107,7 @@ TOKEN-002 / RENDER-001 要等 spacing 逆映射;TOKEN-001 要等規則裁決。
 | 指標 | 判讀 | 錯誤的反應 |
 |---|---|---|
 | 確定性規則誤報率 | 高 → rubric `condition` 太鬆 | ~~直接調低 severity~~ |
+| `notices` 人工確認成立比例 | 長期偏低 → 這條規則對這個 DS 沒價值,依 ADR-007 移除 | ~~把它升回 violation 讓數字好看~~ |
 | `unclassified` 比例 | 接近 0 → 抽驗 20 筆對 `condition`;>50% → rubric 覆蓋不足 | ~~調 LLM confidence 閾值~~(沒有校準的旋鈕) |
 | `skipped_checks` 佔比 | 過高 → GESTALT-001 實際覆蓋遠小於預期,重估規則價值 | ~~放寬 guard~~(違反 ADR-006) |
 

@@ -21,6 +21,8 @@ const SETTING_FIELDS = {
 
 const VALID_SEVERITY = new Set(['high', 'medium', 'low', 'info']);
 const VALID_EVALUATOR = new Set(['deterministic', 'ai']);
+// outcome 決定判定進 deterministic_violations 還是 notices;沒寫等於 violation
+const VALID_OUTCOME = new Set(['violation', 'notice']);
 
 function show(id, text, kind) {
   const el = $(id);
@@ -52,6 +54,9 @@ function validateRubric(rubric) {
     if (!r.source) errs.push(`${at}:缺少 source —— 沒有依據的規則不准進 rubric(ADR-007)`);
     if (!VALID_SEVERITY.has(r.severity)) errs.push(`${at}:severity 必須是 high/medium/low/info`);
     if (!VALID_EVALUATOR.has(r.evaluator)) errs.push(`${at}:evaluator 必須是 deterministic 或 ai`);
+    if (r.outcome && !VALID_OUTCOME.has(r.outcome)) {
+      errs.push(`${at}:outcome 只能是 violation 或 notice(留空等於 violation)`);
+    }
     if (!r.description) errs.push(`${at}:缺少 description`);
   });
   return errs;
@@ -178,9 +183,10 @@ $('#save-data').addEventListener('click', async () => {
     await DQA_STORE.setData(rubric, { spacing, colors });
     await loadData();
     const aiRules = rubric.rules.filter((r) => r.evaluator === 'ai').length;
+    const notices = rubric.rules.filter((r) => r.outcome === 'notice').length;
     show('#data-msg',
-      `已儲存。${rubric.rules.length} 條規則(${rubric.rules.length - aiRules} 條程式判、${aiRules} 條 AI 判),`
-      + '全部帶有 source。', 'ok');
+      `已儲存。${rubric.rules.length} 條規則(${rubric.rules.length - aiRules} 條程式判、${aiRules} 條 AI 判,`
+      + `其中 ${notices} 條只出提示不定讞),全部帶有 source。`, 'ok');
   } catch (e) {
     show('#data-msg', e.message, 'err');
   }

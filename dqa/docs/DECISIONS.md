@@ -315,6 +315,38 @@ computed style 只看得到顏色,程式無法分辨實作寫的是哪一個,所
 
 ---
 
+## ADR-018 — 確定性規則有兩條輸出線:定讞與提示
+
+**決定**:rubric 規則新增 `outcome` 欄位。`violation`(預設)進 `deterministic_violations`,
+`ai` 以外的判定若標成 `notice` 則進 `payload.notices` —— 程式量得到,但不定讞、也不交給 AI。
+TOKEN-001 是第一條走這條線的規則(2026-08 user 裁決)。
+
+**否決的替代 1**:把 TOKEN-001 的 severity 調成 `info` 讓報告看起來乾淨。
+這是 ADR-004 明令禁止的假修法。severity 表達的是「若確認成立有多嚴重」,
+跟「有多可能成立」是兩個不同的軸,拿其中一個去粉飾另一個會讓兩個都失去意義。
+
+**否決的替代 2**:依 ADR-007 把 TOKEN-001 從 rubric 移除。
+移掉會連「這裡有個沒有名字的數字」這個**事實**都不見。那個事實是可複現的、量得到的,
+而且對人有用 —— 只是它不足以定讞。丟掉可量測的事實比誤報更糟。
+
+**否決的替代 3**:改成 `evaluator: "ai"` 丟給模型判。
+AI 一樣看不到別的 consumer。把程式看不到的東西丟給同樣看不到的模型,只是把誤報換成幻覺。
+
+**理由**:確定性規則的價值在**可複現**,不在**一定是錯的**。
+對照基準 `@qijenchen/design-system` 的判準是「同值在 ≥ 2 處需要保持同步 → 必開 token;
+1 處 = hardcode + 註解 why」,單一 consumer 的 padding / gap 是合法的 hardcode。
+DQA 從單一鄰域的 computed style 只看得到「這個值有沒有名字」,看不到「有沒有同步義務」——
+兩者不是同一條規則。硬定讞會系統性誤報,而誤報會讓整份報告失去可信度,連帶拖垮真正定讞的那幾條。
+
+**因此**:降級的是**定不定讞**,不是 severity。TOKEN-001 的 severity 仍然是 `medium`,
+仍然 `delta_independent`。報告頁把提示放在獨立一區、用虛線邊界區隔,
+prompt 明確告訴模型 `notices` 是脈絡不是作業範圍。
+
+**判讀方式不同**:違規的指標是誤報率(高 → `condition` 太鬆);
+提示的指標是**人工確認後的成立比例**(長期偏低 → 這條規則對這個 design system 沒有價值,該依 ADR-007 移除)。
+
+---
+
 ## 待裁決(尚未進入實作)
 
 | 議題 | 需要什麼才能裁決 |
@@ -323,4 +355,4 @@ computed style 只看得到顏色,程式無法分辨實作寫的是哪一個,所
 | Storybook 環境對齊的所有權 | 有沒有人有義務修 story |
 | 是否值得爭取 codebase 存取 | 無存取權是政策性還是流程性限制 |
 | 是否加入灰塊骨架截圖 | 資安對「不可讀的灰塊圖」是否視為敏感資料 egress |
-| `gap` / `rowGap` / `columnGap` 是否合併成一條違規 | 同一個 CSS 宣告目前會產生三筆 TOKEN-002(見 `docs/TASKS.md` 的 T6 實測數字)。要先確認合併之後 `row-gap` 與 `column-gap` 分開宣告的情況不會被吃掉 |
+| `gap` / `rowGap` / `columnGap` 是否合併成一條判定 | 同一個 CSS 宣告目前會產生三筆 TOKEN-002(見 `docs/TASKS.md` 的 T6 實測數字)。要先確認合併之後 `row-gap` 與 `column-gap` 分開宣告的情況不會被吃掉 |

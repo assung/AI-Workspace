@@ -158,28 +158,34 @@ DQA 的 `resolveSpacing()` 假設有一張 `{ token名: px值 }` 的平表,拿�
 `tokens/spacing-scale.json` 目前仍是 placeholder。**不要**把上表硬壓成一張平表填進去 ——
 那會產生看起來精確的錯誤答案,正是 ADR-006 要防的。
 
-### 3. 「魔術數字」在這個 DS 是合法的
+### 3. ~~「魔術數字」在這個 DS 是合法的~~ → 已裁決:TOKEN-001 降級為提示(ADR-018)
 
 `token-system.spec.md` 的判準:
 
 > **同值在 ≥ 2 處需要保持同步 → 必開 token。** 1 處 = hardcode + 註解 why。
 > Hardcode 合法情境:單一 consumer 的 padding / gap / size(eg. Tooltip arrow `4px`)
 
-TOKEN-001 現在的描述是「使用了未定義於 spacing scale 的魔術數字」,severity 固定 medium。
-照這個 DS 的規則,**單一 consumer 的 13px padding 只要有註解就是合法的**,
-DQA 會把它報成違規 —— 而且因為 ADR-004 規定 severity 不隨偏差量浮動,它會穩定地報成 medium。
+DQA 量的是「值有沒有名字」,DS 管的是「有沒有同步義務」—— 不是同一條規則,
+硬定讞會系統性誤報。而同步義務需要跨 consumer 的資訊,單一鄰域的 computed style 看不到。
 
-這不是把 severity 調低就能解決的(那是 ADR-004 明確禁止的假修法)。
-真正的問題是 TOKEN-001 的 `condition` 表達的規則,跟這個 DS 實際執行的規則不是同一條:
-DS 管的是「**同步義務**」,DQA 量的是「**值有沒有名字**」。前者需要跨 consumer 的資訊,
-單一鄰域的 computed style 看不到。
+**裁決**:TOKEN-001 的 `outcome` 改成 `notice`。
 
-**選項**(需要裁決,見 `docs/TASKS.md` 的 T0):
-1. TOKEN-001 降級成單側 **提示**,不進 `deterministic_violations`
-2. 改判「同一鄰域內同一語意位置出現兩個不同的 raw 值」—— 這是鄰域看得到的同步義務代理指標
-3. 依 ADR-007 從 rubric 移除
+| | 之前 | 現在 |
+|---|---|---|
+| 進哪一區 | `deterministic_violations` | `notices` |
+| severity | medium | **medium(不變)** |
+| `delta_independent` | true | **true(不變)** |
+| AI 會不會評估它 | 不會 | 不會(prompt 明確說它是脈絡) |
+| 報告頁 | 混在違規列表 | 獨立一區,虛線邊界 |
 
----
+**降級的是定不定讞,不是 severity。** 用調低 severity 讓報告好看是 ADR-004 明令禁止的假修法 ——
+severity 表達「若確認成立有多嚴重」,跟「有多可能成立」是兩個軸。
+
+也沒有把規則刪掉:「這裡有個沒有名字的數字」是可複現、量得到的事實,對人有用,
+只是不足以定讞。丟掉可量測的事實比誤報更糟。
+
+**這條的維運指標跟違規不同**:違規看誤報率,提示看**人工確認後的成立比例**。
+長期偏低代表這條規則對這個 design system 沒有價值,那時才依 ADR-007 移除。
 
 ## 那還剩下什麼能跑?
 
@@ -187,6 +193,7 @@ DS 管的是「**同步義務**」,DQA 量的是「**值有沒有名字**」。�
 
 | 規則 | 狀態 |
 |---|---|
+| TOKEN-001 | ✅ 可用 —— 但只出提示不定讞(ADR-018)|
 | TOKEN-002 | ⚠ 需要 density-aware 的 spacing scale 才有意義 |
 | RENDER-001 | ⚠ 同上 |
 | GESTALT-001 | ✅ 可用 —— 只比幾何,不需要 token 表 |
