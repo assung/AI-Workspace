@@ -66,6 +66,13 @@ console.log(`  ${truncCount === 1 ? '✓' : '✗'} TRUNC-001 只在 production �
 const emphasisIsAi = payload.unresolved.some((u) => u.rule === 'EMPHASIS-001');
 console.log(`  ${emphasisIsAi ? '✓' : '✗'} EMPHASIS-001 留在 unresolved,未被程式硬判`);
 
+// 兩側樣式差異要進 unresolved,交給 AI 依脈絡判斷(ELEVATION-001 的素材)。
+// 這條斷言的存在是因為它曾經靜默消失過:fixture 的 boxShadow 條件本來掛在 groupGap 的值上,
+// 調整 gap 就順手拿掉了整條覆蓋,而沒有任何一條斷言會失敗。
+const shadowDiff = payload.unresolved.find((u) => u.prop === 'boxShadow');
+console.log(`  ${shadowDiff ? '✓' : '✗'} 兩側 boxShadow 差異進 unresolved`);
+if (!shadowDiff) missing.push('unresolved: boxShadow');
+
 const nodesSent = payload.nodes.length > 0 && payload.nodes_storybook.length > 0;
 console.log(`  ${nodesSent ? '✓' : '✗'} 完整鄰域脈絡照送(nodes ${payload.nodes.length} 筆)`);
 

@@ -141,22 +141,41 @@ npm run tokens:extract -- \
 
 驗證見 `npm run test:color` 的「alpha-aware 逆映射」一節,以及 `npm run test:tokens`。
 
-### 2. spacing 沒有數字階梯,DQA 的逆映射前提不成立
+### 2. ~~spacing 沒有數字階梯~~ → 已處理:逆映射吃 density(ADR-019 / ADR-020)
 
-DQA 的 `resolveSpacing()` 假設有一張 `{ token名: px值 }` 的平表,拿量到的 px 去反查。
-這個 DS **沒有** `--space-100 / 200 / 300` 這種階梯,它的間距來自三個不同來源:
+DQA 原本的 `resolveSpacing()` 假設有一張 `{ token名: px值 }` 的平表。這個 DS 沒有 ——
+它的 layout space token 隨 density 整組換值:
 
-| 來源 | 例子 | 特性 |
+| Token | md | lg |
 |---|---|---|
-| L4 Layout(語意) | `--layout-space-loose` 16/24、`--layout-space-tight` 12/16 | 隨 density 改變 |
-| L3 Family(尺寸) | `--field-height-md` 32px、`--field-px` 12px | 部分隨 density 改變 |
-| Tailwind v4 utility | `p-2` `gap-3` … | 4px 的倍數,不是具名 token |
+| `--layout-space-loose` | 16px | 24px |
+| `--layout-space-tight` | 12px | 16px |
+| `--layout-space-bottom` | 48px | 48px |
 
-所以「16px 是哪個 token」這個問題本身就沒有唯一答案:md 的 `loose` 是 16,lg 的 `tight` 也是 16。
-**沒有 density 就無法逆映射**,而 DQA 現在的 `TokenResolver` 完全不知道 density 這回事。
+所以「16px 是哪個 token」有兩個答案:md 的 `loose` 與 lg 的 `tight` 都是 16。
 
-`tokens/spacing-scale.json` 目前仍是 placeholder。**不要**把上表硬壓成一張平表填進去 ——
-那會產生看起來精確的錯誤答案,正是 ADR-006 要防的。
+**現在**:`resolveSpacing(value, density)`,scale 檔改成 `densities: { md, lg }`。
+density 是每個節點各自的屬性(`extract.js` 往父層找最近的 `data-layout-space` / `data-density`),
+因為該 DS 明文支援 subtree 覆寫。**density 不明時不猜預設值** ——
+回傳 `skip: 'DENSITY_UNKNOWN'`,TOKEN-001 進 `skipped_checks`、TOKEN-002 整組跳過。
+
+token 定義檔一樣是抽出來的,不是手寫的:
+
+```bash
+DS=<design-system>/packages/design-system/src
+npm run tokens:extract -- --kind spacing \
+  --css $DS/tokens/layoutSpace/layoutSpace.css \
+  --density md,lg --include '^--(layout-space|item-gap)'
+```
+
+**附帶處理的雜訊問題**(ADR-020):真實頁面上幾乎每個節點的 margin / padding 都是 `0px`。
+實測 Chromium:margin / padding 沒設定時 computed 就是 `0px`,跟作者真的寫 `0` **分不出來**;
+而 gap 沒設定時是 `normal`。所以 TOKEN-001 排除 margin / padding 的 `0px`、保留 gap 的 `0px`。
+同一份 fixture 的提示因此從 66 筆降到 2 筆,剩下的兩筆都是真的有人寫過的 `padding-top: 13px`。
+
+**還沒涵蓋的**:Tailwind utility 產生的 4px 倍數(`p-2` / `gap-3`)不是具名 token,
+所以它們一律落在「不對應任何 token」→ 出提示。這是這個 DS 的實際模型使然,
+要不要收斂看 `notices` 的人工確認成立比例(T5)。
 
 ### 3. ~~「魔術數字」在這個 DS 是合法的~~ → 已裁決:TOKEN-001 降級為提示(ADR-018)
 
@@ -194,16 +213,26 @@ severity 表達「若確認成立有多嚴重」,跟「有多可能成立」是�
 | 規則 | 狀態 |
 |---|---|
 | TOKEN-001 | ✅ 可用 —— 但只出提示不定讞(ADR-018)|
-| TOKEN-002 | ⚠ 需要 density-aware 的 spacing scale 才有意義 |
-| RENDER-001 | ⚠ 同上 |
+| TOKEN-002 | ✅ 可用 —— density-aware 逆映射已就緒(ADR-019)|
+| RENDER-001 | ✅ 同上 |
 | GESTALT-001 | ✅ 可用 —— 只比幾何,不需要 token 表 |
 | ALIGN-001 | ✅ 可用 —— baselineY 是純幾何 |
 | TRUNC-001 | ✅ 可用,而且 DS 的 spec 跟它一字對得上 |
 | EMPHASIS-001 | ✅ 可用 —— oklch 正規化與 alpha 合成已修(ADR-014 / ADR-015)|
-| ELEVATION-001 | ✅ 可用(boxShadow 的 computed value 帶 oklch 但整串是字串比對,不受影響)|
+| ELEVATION-001 | ✅ 可用,維持 AI 判(見下)|
 
-也就是說:**幾何類與色彩類的規則現在就能對這個 DS 跑,spacing token 類的還不行。**
+也就是說:**八條規則現在全部可以對這個 DS 跑。**
 
 色彩那一側已經完整:量測正規化(ADR-014)、alpha 合成(ADR-015)、
 token 定義抽取(ADR-016)、alpha-aware 逆映射(ADR-017)四塊都到位,
 端對端實測 `oklch(0 0 0 / 0.65)` 的文字色可以一路解析到 `fg-secondary`。
+spacing 那一側則是 density-aware 逆映射(ADR-019)加上 `0px` 的可觀測性判準(ADR-020)。
+
+### ELEVATION-001 為什麼維持 AI 判(2026-08 裁決)
+
+`elevation.spec.md` 確實寫死了配對規則 ——「`--elevation-100` 必配 `bg-surface`、
+`--elevation-200` 必配 `bg-surface-raised`」,看起來有一半是機械可查的。
+
+但要套用它得先知道這個元素是**內容層**還是**浮層**,而那是角色判斷,不存在於 computed style 裡。
+只比對 shadow 與 bg 的組合,會把合法的內容層元素誤判成配錯 surface。
+程式把 shadow / zIndex / bg 當事實送出,判定交給 AI 依鄰域脈絡做。

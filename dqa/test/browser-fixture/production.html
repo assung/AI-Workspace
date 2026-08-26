@@ -1,14 +1,14 @@
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="light" data-density="md">
 <head>
   <meta charset="utf-8">
   <title>property-row — Production (STG)</title>
   <link rel="stylesheet" href="_base.css">
   <style>
     /* 實作端埋入的四個 bug —— 每一個都對應一條 rubric 規則 */
-    .property-list { gap: 12px; }        /* TOKEN-002:規格是 space-300,這裡變成 space-150 */
+    .property-list { gap: 12px; }        /* TOKEN-002:規格是 loose(16),這裡變成 tight(12) */
     .property-group { gap: 12px; }       /* GESTALT-001:群組內外都是 12,proximity 失效 */
-    .property-row { padding-top: 13px; } /* TOKEN-001:13px 不在 spacing scale 上 */
+    .property-row { padding-top: 13px; } /* TOKEN-001:13px 不對應任何 token(提示,不定讞) */
     .property-row .value {
       position: relative;
       top: 2px;                          /* ALIGN-001:與 label 的 baseline 差 2px */

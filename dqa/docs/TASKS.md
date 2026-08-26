@@ -31,21 +31,24 @@
       **驗收結果**:`npm run test:tokens` 全過;端對端實測 `oklch(0 0 0 / 0.65)` → `fg-secondary`。
       重抽指令與參數見 `docs/DESIGN-SYSTEM.md`。
 
-- [ ] **決定 spacing 逆映射怎麼做**(這是設計,不是填值)
-      DS 沒有數字階梯。間距來自語意 token(隨 density 變)、family 尺寸、Tailwind 4px 倍數三個來源。
-      「16px 是哪個 token」沒有唯一答案(md 的 loose = lg 的 tight = 16)。
-      **不要**把它硬壓成一張平表填進 `tokens/spacing-scale.json` —— 那是 ADR-006 明令禁止的推測值。
-      **驗收**:`resolveSpacing` 吃得到 density,且對「md 16px」與「lg 16px」給出不同的 token 名。
+- [x] **spacing 逆映射**(已完成 —— ADR-019 / ADR-020)
+      `resolveSpacing(value, density)`;scale 檔改成 `densities: { md, lg }`,
+      由 `npm run tokens:extract -- --kind spacing --density md,lg` 從 DS 的 CSS 抽出。
+      density 是每個節點各自的屬性(subtree 可覆寫),不明時不猜預設值 ——
+      TOKEN-001 進 `skipped_checks`、TOKEN-002 整組跳過。
+      另外排除 margin / padding 的 `0px`(與「沒設定」的 computed value 相同,分不出是不是決定),
+      提示因此從 66 筆降到 2 筆。
+      **驗收結果**:`npm run test:density` 全過(md 的 16px = `layout-space-loose`、
+      lg 的 16px = `layout-space-tight`);端對端實測 TOKEN-002 回報真實 token 名。
 
-- [x] **裁決 TOKEN-001 的去留**(已裁決 —— ADR-018)
-      `outcome: "notice"`:量得到就報,但不進 `deterministic_violations`、也不交給 AI。
-      severity 與 `delta_independent` 都不動 —— 降級的是定不定讞,不是嚴重度(ADR-004)。
-      報告頁獨立一區、虛線邊界;prompt 明確告訴模型那是脈絡不是作業範圍。
-      **驗收結果**:`npm test` 與 `npm run test:e2e` 都斷言它出現在 `notices`
-      且不在 `deterministic_violations`,severity 仍是 medium。
+- [x] **ELEVATION-001 維持 AI 判**(2026-08 裁決)
+      spec 的配對規則看似機械可查,但要套用它得先知道元素是內容層還是浮層 ——
+      那是角色判斷,不在 computed style 裡。程式送事實,判定給 AI。
 
-**目前可用的規則**:GESTALT-001 / ALIGN-001 / TRUNC-001 / ELEVATION-001 / EMPHASIS-001 定讞;
-TOKEN-001 出提示。只剩 TOKEN-002 / RENDER-001 要等 spacing 逆映射。
+**T0 已全部完成。**
+
+**目前可用的規則**:八條全部。TOKEN-002 / RENDER-001 / GESTALT-001 / ALIGN-001 / TRUNC-001 定讞,
+TOKEN-001 出提示,EMPHASIS-001 / ELEVATION-001 交給 AI。
 
 ---
 

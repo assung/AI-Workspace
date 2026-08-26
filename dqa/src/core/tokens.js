@@ -13,11 +13,22 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  const SPACING_PROPS = new Set([
-    'gap', 'rowGap', 'columnGap',
+  /**
+   * gap 家族。跟 margin / padding 分開的理由是**可觀測性**,不是語意:
+   *
+   *   gap 沒設定       → computed 是 `normal`(parseFloat → NaN,根本不會進逆映射)
+   *   margin/padding 沒設定 → computed 是 `0px`,跟作者真的寫 `0` 一模一樣
+   *
+   * 也就是說 `gap: 0` 是一個看得見的決定,而 `margin: 0` 分不出是決定還是沒碰過。
+   */
+  const GAP_PROPS = new Set(['gap', 'rowGap', 'columnGap']);
+
+  const BOX_SPACING_PROPS = new Set([
     'marginTop', 'marginRight', 'marginBottom', 'marginLeft',
     'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
   ]);
+
+  const SPACING_PROPS = new Set([...GAP_PROPS, ...BOX_SPACING_PROPS]);
 
   const COLOR_PROPS = new Set([
     'color', 'backgroundColor',
@@ -64,6 +75,30 @@
     return scale;
   }
 
+  /**
+   * spacing scale 有兩種形狀:
+   *
+   *   { scale: { name: px } }                    —— 單一階梯,與 density 無關
+   *   { densities: { md: {...}, lg: {...} } }    —— 每個 density 一份
+   *
+   * 後者是必要的:`@qijenchen/design-system` 的 `--layout-space-loose` 在 md 是 16px、
+   * lg 是 24px,而 `tight` 是 12px / 16px。「16px 是哪個 token」在不知道 density 的
+   * 情況下有兩個答案,逆映射不成立。
+   */
+  function unwrapSpacing(input) {
+    if (!input) throw new Error('DQA: 缺少 spacing scale。tokens 必須由呼叫端注入,core 不讀檔。');
+    if (input.densities && typeof input.densities === 'object') {
+      const densities = {};
+      for (const [name, scale] of Object.entries(input.densities)) {
+        if (name.startsWith('_')) continue;
+        densities[name] = scale;
+      }
+      if (!Object.keys(densities).length) throw new Error('DQA: spacing densities 是空的');
+      return { densities, flat: null };
+    }
+    return { densities: null, flat: unwrapScale(input, 'spacing') };
+  }
+
   class TokenResolver {
     /**
      * @param {object} opts
@@ -72,9 +107,22 @@
      */
     constructor(opts = {}) {
       const t = opts.tokens || {};
-      this.spacing = unwrapScale(t.spacing, 'spacing');
+      const spacing = unwrapSpacing(t.spacing);
+      this.spacingDensities = spacing.densities;
+      this.spacing = spacing.flat;
       this.colors = unwrapScale(t.colors, 'color');
-      this.spacingEntries = Object.entries(this.spacing).sort((a, b) => a[1] - b[1]);
+      // 每個 density 各自預排序,逆映射時直接取用
+      this.spacingEntriesByDensity = {};
+      if (this.spacingDensities) {
+        for (const [name, scale] of Object.entries(this.spacingDensities)) {
+          this.spacingEntriesByDensity[name] = Object.entries(scale)
+            .filter(([k]) => !k.startsWith('_'))
+            .sort((a, b) => a[1] - b[1]);
+        }
+      }
+      this.spacingEntries = this.spacing
+        ? Object.entries(this.spacing).filter(([k]) => !k.startsWith('_')).sort((a, b) => a[1] - b[1])
+        : null;
       this.colorIndex = new Map();
       for (const [name, value] of Object.entries(this.colors)) {
         const key = normalizeTokenValue(value);
@@ -87,18 +135,43 @@
      * @returns {{px:number, token:string|null, exact:boolean, nearest:string|null, delta:number|null}}
      *  token === null 就是魔術數字。這個訊號本身比 delta 大小重要得多。
      */
-    resolveSpacing(rawValue) {
+    /**
+     * @param {string|number} rawValue
+     * @param {string|null} density  節點的有效 density(node.density)
+     *
+     * scale 是 density-aware 而 density 不明時,回傳 `skip: 'DENSITY_UNKNOWN'` ——
+     * 不猜「沒宣告就是預設值」。那個預設值是 design system 的知識,不是 DQA 的(ADR-006)。
+     * 猜錯的代價是把合法的 16px 報成魔術數字,或把違規的 16px 判成合法。
+     */
+    resolveSpacing(rawValue, density) {
       const px = parseFloat(rawValue);
       if (Number.isNaN(px)) return null;
 
-      for (const [name, val] of this.spacingEntries) {
+      let entries = this.spacingEntries;
+      let scale = this.spacing;
+      if (this.spacingDensities) {
+        if (!density) {
+          return { px, token: null, exact: false, nearest: null, delta: null, skip: 'DENSITY_UNKNOWN' };
+        }
+        entries = this.spacingEntriesByDensity[density];
+        scale = this.spacingDensities[density];
+        if (!entries) {
+          // scale 裡沒有這個 density —— 一樣是量不到,不是「沒有 token」
+          return {
+            px, token: null, exact: false, nearest: null, delta: null,
+            skip: 'DENSITY_NOT_IN_SCALE', density,
+          };
+        }
+      }
+
+      for (const [name, val] of entries) {
         if (Math.abs(val - px) <= this.epsilon) {
-          return { px, token: name, exact: true, nearest: name, delta: 0 };
+          return { px, token: name, exact: true, nearest: name, delta: 0, density: density || null };
         }
       }
       let nearest = null;
       let best = Infinity;
-      for (const [name, val] of this.spacingEntries) {
+      for (const [name, val] of entries) {
         const d = Math.abs(val - px);
         if (d < best) { best = d; nearest = name; }
       }
@@ -107,7 +180,8 @@
         token: null,
         exact: false,
         nearest,
-        delta: Math.round((px - this.spacing[nearest]) * 100) / 100,
+        delta: nearest === null ? null : Math.round((px - scale[nearest]) * 100) / 100,
+        density: density || null,
       };
     }
 
@@ -123,12 +197,17 @@
       return { hex, alpha, token, exact: !!token };
     }
 
-    /** 把整個 node.style 逐屬性逆映射,結果覆寫回 node.tokens */
-    annotateNode(node) {
+    /**
+     * 把整個 node.style 逐屬性逆映射,結果覆寫回 node.tokens
+     * @param {object} node
+     * @param {string|null} [fallbackDensity] 節點本身沒有 density 宣告時退回的值(通常是文件層級的)
+     */
+    annotateNode(node, fallbackDensity) {
+      const density = node.density || fallbackDensity || null;
       const tokens = {};
       for (const [prop, value] of Object.entries(node.style || {})) {
         if (SPACING_PROPS.has(prop)) {
-          const r = this.resolveSpacing(value);
+          const r = this.resolveSpacing(value, density);
           if (r) tokens[prop] = r;
         } else if (COLOR_PROPS.has(prop)) {
           const r = this.resolveColor(value);
@@ -139,11 +218,14 @@
       return node;
     }
 
-    annotate(extraction) {
-      for (const n of extraction.nodes) this.annotateNode(n);
+    annotate(extraction, fallbackDensity) {
+      for (const n of extraction.nodes) this.annotateNode(n, fallbackDensity);
       return extraction;
     }
   }
 
-  return { TokenResolver, SPACING_PROPS, COLOR_PROPS, rgbToHex, colorKey, unwrapScale };
+  return {
+    TokenResolver, SPACING_PROPS, GAP_PROPS, BOX_SPACING_PROPS, COLOR_PROPS,
+    rgbToHex, colorKey, unwrapScale, unwrapSpacing,
+  };
 });

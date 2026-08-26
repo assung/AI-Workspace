@@ -18,7 +18,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (tokensModule) {
   'use strict';
 
-  const { SPACING_PROPS } = tokensModule;
+  const { SPACING_PROPS, GAP_PROPS } = tokensModule;
 
   /* ---------------------------------------------------------------- helpers */
 
@@ -236,13 +236,24 @@
       const skipped = [];
       const buckets = { violations, notices };
 
-      /* TOKEN-001 —— 魔術數字。severity 固定,與 delta 無關。 */
+      /* TOKEN-001 —— 值不在 token 定義裡。severity 固定,與 delta 無關。 */
       for (const n of nodes) {
         for (const [prop, t] of Object.entries(n.tokens || {})) {
           if (!SPACING_PROPS.has(prop)) continue;
+          // density 不明時 scale 本身不成立 —— 這是量不到,不是「沒有 token」。
+          // 報成沒有 token 會把合法的 16px 說成魔術數字。
+          if (t.skip) {
+            skipped.push({ code: 'TOKEN-001', reason: `spacing:${t.skip}`, node: n.path, prop });
+            continue;
+          }
+          // margin / padding 的 0px 跟「沒設定」是同一個 computed value ——
+          // 分不出是誰做的決定,就沒有可報的事實。這不是「量不到的檢查」而是
+          // 規則不適用,所以也不進 skipped_checks(進去會把覆蓋率指標稀釋掉)。
+          // gap 沒設定時 computed 是 `normal`,所以 gap: 0 是看得見的決定,照報。
+          if (t.px === 0 && !GAP_PROPS.has(prop)) continue;
           if (t.token === null) {
             this.emit(buckets, 'TOKEN-001', n.path, {
-              prop, px: t.px, nearest: t.nearest, delta: t.delta,
+              prop, px: t.px, nearest: t.nearest, delta: t.delta, density: t.density || null,
             });
           }
         }
@@ -350,9 +361,18 @@
     evaluateComparative(pairs) {
       const violations = [];
       const notices = [];
+      const skipped = [];
       const buckets = { violations, notices };
       for (const { path: p, prop, sb, prod } of pairs) {
         if (!sb || !prod) continue;
+        // 任一側的 density 不明 → 兩側的 token 名不可比,整組跳過(ADR-006)
+        if (sb.skip || prod.skip) {
+          skipped.push({
+            code: 'TOKEN-002', node: p, prop,
+            reason: `spacing:${sb.skip || prod.skip}`,
+          });
+          continue;
+        }
         if (sb.token && prod.token && sb.token !== prod.token) {
           this.emit(buckets, 'TOKEN-002', p, {
             prop, sb: sb.token, prod: prod.token,
@@ -365,7 +385,7 @@
           });
         }
       }
-      return { violations, notices };
+      return { violations, notices, skipped };
     }
   }
 

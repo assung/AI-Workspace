@@ -44,6 +44,12 @@
    */
   const LAYOUT_ATTRS = ['data-density', 'data-layout-space'];
 
+  /** 文件層級的 density —— preflight 把 themeAttrs 記在 env.theme 裡 */
+  function documentDensity(env) {
+    const theme = (env && env.theme) || {};
+    return theme['data-layout-space'] || theme['data-density'] || null;
+  }
+
   function envConsistency(sbEnv, prodEnv) {
     const errors = [];
     if (sbEnv.viewportWidth !== prodEnv.viewportWidth) {
@@ -131,8 +137,9 @@
     const resolver = new TokenResolver(opts);
     const engine = new RubricEngine(opts);
 
-    resolver.annotate(sb.extraction);
-    resolver.annotate(prod.extraction);
+    // 節點自己的 density 優先(subtree 可以覆寫);沒有的話退回文件層級記到 env 裡的那個
+    resolver.annotate(sb.extraction, documentDensity(sb.env));
+    resolver.annotate(prod.extraction, documentDensity(prod.env));
     engine.annotateEmphasis(sb.extraction);
     engine.annotateEmphasis(prod.extraction);
 
@@ -152,6 +159,7 @@
     const deterministic = [...single.violations, ...comparative.violations];
     // 程式量得到、但依 spec 不必然構成問題的觀察。不定讞,也不丟給 AI —— 交給人看。
     const notices = [...single.notices, ...comparative.notices];
+    const skipped = [...single.skipped, ...comparative.skipped];
     const covered = new Set(
       deterministic
         .filter((v) => v.evidence && v.evidence.prop)
@@ -191,7 +199,7 @@
       // 量得到但不定讞的觀察(規則的 outcome = notice)。人看的,不是 AI 的作業範圍。
       notices,
       // 程式明確放棄判定的項目 —— 第一週要盯的覆蓋率指標
-      skipped_checks: single.skipped,
+      skipped_checks: skipped,
       // AI 的作業範圍(不是它的視野範圍)
       unresolved,
     };

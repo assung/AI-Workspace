@@ -1,20 +1,36 @@
 {
-  "_comment": "仍是 placeholder。對照基準 @qijenchen/design-system 沒有數字階梯的 spacing scale —— 間距來自語意 token(--layout-space-loose 16/24,隨 density 變)、family 尺寸、Tailwind 4px 倍數三個來源,「16px 是哪個 token」沒有唯一答案。不要把它硬壓成平表填進來,見 docs/DESIGN-SYSTEM.md 與 docs/TASKS.md 的 T0。",
+  "_comment": "由 scripts/extract-tokens.mjs 產生 —— 不要手改。改了下次抽取就會被蓋掉。",
+  "_meta": {
+    "source": "github.com/ajenchen/design-system@5132e8f (…/tokens/layoutSpace/layoutSpace.css)",
+    "kind": "spacing",
+    "theme": "light",
+    "generatedAt": "2026-08-26T01:33:12.394Z",
+    "engine": "chromium computed value via probe（ADR-014 / ADR-016）",
+    "densities": [
+      "md",
+      "lg"
+    ],
+    "scannedCustomProperties": 7
+  },
   "unit": "px",
-  "scale": {
-    "space-0": 0,
-    "space-25": 2,
-    "space-50": 4,
-    "space-75": 6,
-    "space-100": 8,
-    "space-150": 12,
-    "space-200": 16,
-    "space-250": 20,
-    "space-300": 24,
-    "space-400": 32,
-    "space-500": 40,
-    "space-600": 48,
-    "space-800": 64,
-    "space-1000": 80
+  "densities": {
+    "md": {
+      "item-gap-label-desc-reading": 2,
+      "item-gap-label-desc-reading-lg": 2,
+      "item-gap-label-desc-scanning": 2,
+      "item-gap-label-desc-scanning-lg": 2,
+      "layout-space-tight": 12,
+      "layout-space-loose": 16,
+      "layout-space-bottom": 48
+    },
+    "lg": {
+      "item-gap-label-desc-reading": 2,
+      "item-gap-label-desc-reading-lg": 2,
+      "item-gap-label-desc-scanning": 2,
+      "item-gap-label-desc-scanning-lg": 2,
+      "layout-space-tight": 16,
+      "layout-space-loose": 24,
+      "layout-space-bottom": 48
+    }
   }
 }

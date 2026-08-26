@@ -87,6 +87,7 @@ npm test              # 確定性引擎 fixture 驗證,不需網路
 npm run test:guards   # gap guard 的邊界案例
 npm run test:sanitize # sanitize 的外洩向量
 npm run test:color    # 色彩正規化輸出、alpha 合成、有效背景堆疊
+npm run test:density  # spacing 逆映射的 density 相依性、0px 的可觀測性
 npm run test:core     # core 在 Node 與瀏覽器兩條路徑上的輸出必須逐字相同
 npm run test:sync     # extension/ 的複製品與 src/ 一致
 npm run test:ext      # 擴充套件靜態完整性(manifest / script src / 可解析)
@@ -97,6 +98,7 @@ npm run sync:ext              # src/ → extension/ 同步
 
 # 從 design system 的 CSS 抽色彩 token(需要瀏覽器,參數見 docs/DESIGN-SYSTEM.md)
 npm run tokens:extract -- --css <ds>/tokens/color/primitives.css --demote '^color-'
+npm run tokens:extract -- --kind spacing --css <ds>/tokens/layoutSpace/layoutSpace.css --density md,lg
 
 # 需要瀏覽器,不含在 test:all
 DQA_CHROMIUM=/path/to/chrome xvfb-run -a npm run test:e2e     # 擴充套件端對端
@@ -128,12 +130,11 @@ viewport 不符時擷取確實被擋下。
 讀 `docs/DESIGN-SYSTEM.md`。
 
 對照基準是 [@qijenchen/design-system](https://github.com/ajenchen/design-system)。
-`rubric.json` 的 `source` 已經指到它的實際 spec,但 **`tokens/*.json` 仍是 placeholder**,
-而且不能直接填 —— 那個 DS 沒有數字階梯的 spacing scale。
-色彩那一側已經完整:量測正規化、alpha 合成、token 定義抽取、alpha-aware 逆映射
-(ADR-014 ~ ADR-017),`tokens/color-primitives.json` 是從真實 DS 抽出來的 **產生檔,不要手改**。
-剩下兩條性質不同(一個是設計、一個是規則裁決),見 `docs/TASKS.md` 的 T0。
+`rubric.json` 的 `source` 指到它的實際 spec,`tokens/*.json` 兩份都是從該 DS 抽出來的
+**產生檔,不要手改**(`npm run tokens:extract`,見 ADR-016)。
 
-**現在可用**:GESTALT-001 / ALIGN-001 / TRUNC-001 / ELEVATION-001 / EMPHASIS-001 定讞,
-TOKEN-001 出提示不定讞(ADR-018)。
-**現在不可用**:TOKEN-002 / RENDER-001,等 spacing 逆映射。
+spacing 是 **density-aware** 的:`--layout-space-loose` 在 md 是 16px、lg 是 24px,
+所以 `resolveSpacing` 吃 density,不明時跳過而不是猜預設值(ADR-019)。
+
+**八條規則全部可用**:TOKEN-002 / RENDER-001 / GESTALT-001 / ALIGN-001 / TRUNC-001 定讞,
+TOKEN-001 出提示不定讞(ADR-018),EMPHASIS-001 / ELEVATION-001 交給 AI。

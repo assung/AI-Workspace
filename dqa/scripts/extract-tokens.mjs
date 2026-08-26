@@ -20,7 +20,9 @@
  *   node scripts/extract-tokens.mjs --css <ds>/src/tokens/color/primitives.css --css <ds>/src/tokens/color/semantic.css
  *
  * 選項:
+ *   --kind color|spacing  抽哪一類 token(預設 color)
  *   --theme <name>    抽取前先把 data-theme 設成這個值(預設 light)
+ *   --density a,b     spacing 模式:對每個 density 各抽一次,輸出 densities: { a: {}, b: {} }
  *   --demote <re>     名稱符合這個 regex 的 token 在「同色多名」時排到最後(可重複)
  *   --source-label <s> 寫進 _meta.source 的來源標示(例如 repo@sha),取代本機路徑
  *   --density <name>  抽取前先把 data-density 設成這個值(色彩用不到,但有些 DS 會連動)
@@ -40,7 +42,8 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 function parseArgs(argv) {
   const out = {
-    css: [], theme: 'light', density: null, out: 'tokens/color-primitives.json',
+    css: [], kind: 'color', theme: 'light', density: null, densities: null,
+    out: null,
     include: null, url: null, demote: [], sourceLabel: null,
     chromium: process.env.DQA_CHROMIUM || null,
   };
@@ -50,7 +53,12 @@ function parseArgs(argv) {
     if (a === '--css') out.css.push(next());
     else if (a === '--url') out.url = next();
     else if (a === '--theme') out.theme = next();
-    else if (a === '--density') out.density = next();
+    else if (a === '--kind') out.kind = next();
+    else if (a === '--density') {
+      const v = next();
+      if (v.includes(',')) out.densities = v.split(',').map((x) => x.trim()).filter(Boolean);
+      else out.density = v;
+    }
     else if (a === '--out') out.out = next();
     else if (a === '--include') out.include = next();
     else if (a === '--demote') out.demote.push(next());
@@ -60,6 +68,8 @@ function parseArgs(argv) {
   }
   if (!out.url && !out.css.length) throw new Error('要給 --url 或至少一個 --css');
   if (out.url && out.css.length) throw new Error('--url 與 --css 只能擇一');
+  if (!['color', 'spacing'].includes(out.kind)) throw new Error('--kind 只能是 color 或 spacing');
+  if (!out.out) out.out = out.kind === 'spacing' ? 'tokens/spacing-scale.json' : 'tokens/color-primitives.json';
   return out;
 }
 
@@ -117,7 +127,10 @@ function pageExtract(opts) {
   if (!D || !D.normalizeColor) throw new Error('DQA: normalizeColor 沒有注入');
 
   if (opts.theme) document.documentElement.setAttribute('data-theme', opts.theme);
-  if (opts.density) document.documentElement.setAttribute('data-density', opts.density);
+  if (opts.density) {
+    document.documentElement.setAttribute('data-density', opts.density);
+    document.documentElement.setAttribute('data-layout-space', opts.density);
+  }
 
   /* 名稱來源:樣式表掃描 ∪ computed 列舉。前者連沒套用到的選擇器(例如 dark 區塊)也看得到。 */
   const names = new Set();
@@ -140,35 +153,62 @@ function pageExtract(opts) {
     walk(rules);
   }
 
-  const mkHost = (sentinel) => {
-    const host = document.createElement('div');
-    host.style.color = sentinel;
-    const probe = document.createElement('span');
-    host.appendChild(probe);
-    document.body.appendChild(host);
-    return { host, probe, sentinel };
-  };
-  const A = mkHost('rgb(1, 2, 3)');
-  const B = mkHost('rgb(4, 5, 6)');
-
-  const colors = {};
-  const nonColor = [];
-  for (const name of [...names].sort()) {
-    A.probe.style.color = '';
-    B.probe.style.color = '';
-    A.probe.style.color = `var(${name})`;
-    B.probe.style.color = `var(${name})`;
-    const a = getComputedStyle(A.probe).color;
-    const b = getComputedStyle(B.probe).color;
-    if (a !== b) { nonColor.push(name); continue; }   // 各自繼承 → 不是顏色
-    const norm = D.normalizeColor(a);
-    if (!norm) { nonColor.push(name); continue; }
-    colors[name] = norm;
+  /**
+   * 判斷「這個 token 是不是<某型別>」的通用手法:兩個哨兵父層 + 一個**可繼承**的屬性。
+   *
+   * `prop: var(--x)` 若在 computed-value 階段無效(值的型別不對、或 token 不存在),
+   * 該宣告會變成 unset → 可繼承屬性就各自繼承到不同的哨兵值。兩邊算出同一個值才算數。
+   * 用可繼承的屬性是關鍵:不可繼承的屬性失敗時兩邊都會落到同一個 initial value,分不出來。
+   */
+  function probe(prop, sentinelA, sentinelB) {
+    const mk = (sentinel) => {
+      const host = document.createElement('div');
+      host.style.setProperty(prop, sentinel);
+      const el = document.createElement('span');
+      host.appendChild(el);
+      document.body.appendChild(host);
+      return { host, el };
+    };
+    const A = mk(sentinelA);
+    const B = mk(sentinelB);
+    const read = (name) => {
+      A.el.style.setProperty(prop, '');
+      B.el.style.setProperty(prop, '');
+      A.el.style.setProperty(prop, `var(${name})`);
+      B.el.style.setProperty(prop, `var(${name})`);
+      const a = getComputedStyle(A.el).getPropertyValue(prop);
+      const b = getComputedStyle(B.el).getPropertyValue(prop);
+      return a === b ? a : null;
+    };
+    return { read, done: () => { A.host.remove(); B.host.remove(); } };
   }
-  A.host.remove();
-  B.host.remove();
 
-  return { colors, nonColor, unreadableSheets, scanned: names.size };
+  const sorted = [...names].sort();
+  const values = {};
+  const rejected = [];
+
+  if (opts.kind === 'spacing') {
+    // letter-spacing 是可繼承的 <length> 屬性 —— 百分比、關鍵字、色值都會被擋掉
+    const p = probe('letter-spacing', '5px', '7px');
+    for (const name of sorted) {
+      const v = p.read(name);
+      if (!v || !/^-?[\d.]+px$/.test(v.trim())) { rejected.push(name); continue; }
+      values[name] = parseFloat(v);
+    }
+    p.done();
+  } else {
+    const p = probe('color', 'rgb(1, 2, 3)', 'rgb(4, 5, 6)');
+    for (const name of sorted) {
+      const v = p.read(name);
+      if (!v) { rejected.push(name); continue; }
+      const norm = D.normalizeColor(v);
+      if (!norm) { rejected.push(name); continue; }
+      values[name] = norm;
+    }
+    p.done();
+  }
+
+  return { values, rejected, unreadableSheets, scanned: names.size };
 }
 
 /* ------------------------------------------------------------ 後處理 */
@@ -200,12 +240,12 @@ function rgbStringToHex(v) {
  * 無論挑中誰,`_aliases` 都會列出其餘名稱 —— computed style 看到的只是顏色,
  * 程式無法分辨實作寫的是哪一個 token,看報告的人要知道還有哪些可能。
  */
-function pickNames(colors, demotePatterns) {
+function pickNames(values, demotePatterns) {
   const demote = demotePatterns.map((re) => new RegExp(re));
   const isDemoted = (name) => demote.some((re) => re.test(name));
 
   const byValue = new Map();
-  for (const [rawName, rgbString] of Object.entries(colors)) {
+  for (const [rawName, rgbString] of Object.entries(values)) {
     const hex = rgbStringToHex(rgbString);
     if (!hex) continue;
     const name = rawName.replace(/^--/, '');
@@ -226,6 +266,23 @@ function pickNames(colors, demotePatterns) {
 }
 
 /* ------------------------------------------------------------------ 主 */
+
+async function extractOnce(page, args, density) {
+  const raw = await page.evaluate(pageExtract, { kind: args.kind, theme: args.theme, density });
+  let values = raw.values;
+  if (args.include) {
+    const re = new RegExp(args.include);
+    values = Object.fromEntries(Object.entries(values).filter(([k]) => re.test(k)));
+  }
+  return { raw, values };
+}
+
+/** spacing:token 名去掉 `--`,值是數字 px。同值多名不合併 —— 名字本身就是意圖。 */
+function spacingScale(values) {
+  const out = {};
+  for (const [name, px] of Object.entries(values)) out[name.replace(/^--/, '')] = px;
+  return Object.fromEntries(Object.entries(out).sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0])));
+}
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
@@ -250,44 +307,72 @@ async function main() {
     // 用的是量測那一側的同一份 extract.js —— 正規化器只有一個(ADR-014)
     await page.addScriptTag({ path: path.join(ROOT, 'src', 'browser', 'extract.js') });
 
-    const raw = await page.evaluate(pageExtract, { theme: args.theme, density: args.density });
+    const outFile = path.isAbsolute(args.out) ? args.out : path.join(ROOT, args.out);
+    const meta = {
+      // 本機路徑對別人沒有意義 —— 有 --source-label 就用它(例如 repo@sha)
+      source: args.sourceLabel || args.url || args.css,
+      kind: args.kind,
+      theme: args.theme,
+      generatedAt: new Date().toISOString(),
+      engine: 'chromium computed value via probe（ADR-014 / ADR-016）',
+    };
+    let doc;
 
-    let colors = raw.colors;
-    if (args.include) {
-      const re = new RegExp(args.include);
-      colors = Object.fromEntries(Object.entries(colors).filter(([k]) => re.test(k)));
+    if (args.kind === 'spacing') {
+      const densities = args.densities || [args.density].filter(Boolean);
+      if (!densities.length) {
+        throw new Error('spacing 模式要給 --density(單一值或以逗號分隔,例如 --density md,lg)');
+      }
+      const scales = {};
+      let scanned = 0;
+      for (const d of densities) {
+        const { raw, values } = await extractOnce(page, args, d);
+        scales[d] = spacingScale(values);
+        scanned = raw.scanned;
+      }
+      meta.densities = densities;
+      meta.scannedCustomProperties = scanned;
+      doc = {
+        _comment: '由 scripts/extract-tokens.mjs 產生 —— 不要手改。改了下次抽取就會被蓋掉。',
+        _meta: meta,
+        unit: 'px',
+        // 每個 density 一份:同一個 px 值在不同 density 下可能對應不同 token(ADR-019)
+        densities: scales,
+      };
+      const names = new Set(Object.values(scales).flatMap((x) => Object.keys(x)));
+      console.log(`掃到 ${scanned} 個自訂屬性`);
+      for (const d of densities) {
+        console.log(`  density=${d} → ${Object.keys(scales[d]).length} 個 spacing token`);
+      }
+      const collisions = [...names].filter((n) =>
+        densities.some((d) => scales[d][n] !== scales[densities[0]][n]));
+      console.log(`  ${collisions.length} 個 token 的值隨 density 改變:${collisions.join(', ') || '(無)'}`);
+    } else {
+      const { raw, values } = await extractOnce(page, args, args.density);
+      const { scale, aliases } = pickNames(values, args.demote);
+      meta.density = args.density;
+      meta.demoted = args.demote;
+      meta.scannedCustomProperties = raw.scanned;
+      meta.colorTokens = Object.keys(values).length;
+      meta.distinctValues = Object.keys(scale).length;
+      meta.unreadableStyleSheets = raw.unreadableSheets;
+      doc = {
+        _comment: '由 scripts/extract-tokens.mjs 產生 —— 不要手改。改了下次抽取就會被蓋掉。',
+        _meta: meta,
+        _aliases: aliases,
+        scale,
+      };
+      const withAlpha = Object.values(scale).filter((v) => v.length === 9).length;
+      console.log(`掃到 ${raw.scanned} 個自訂屬性,其中 ${Object.keys(values).length} 個是顏色`);
+      console.log(`  → ${Object.keys(scale).length} 個相異色值(${withAlpha} 個帶 alpha)`);
+      console.log(`  → ${Object.keys(aliases).length} 個值有多個 token 名,已列進 _aliases`);
+      if (raw.unreadableSheets) {
+        console.log(`  ⚠ ${raw.unreadableSheets} 份樣式表讀不到(跨網域),名稱可能有漏`);
+      }
     }
 
-    const { scale, aliases } = pickNames(colors, args.demote);
-    const outFile = path.isAbsolute(args.out) ? args.out : path.join(ROOT, args.out);
-    const doc = {
-      _comment: '由 scripts/extract-tokens.mjs 產生 —— 不要手改。改了下次抽取就會被蓋掉。',
-      _meta: {
-        // 本機路徑對別人沒有意義 —— 有 --source-label 就用它(例如 repo@sha)
-        source: args.sourceLabel || args.url || args.css,
-        demoted: args.demote,
-        theme: args.theme,
-        density: args.density,
-        generatedAt: new Date().toISOString(),
-        engine: 'chromium canvas via window.__DQA__.normalizeColor(ADR-014)',
-        scannedCustomProperties: raw.scanned,
-        colorTokens: Object.keys(colors).length,
-        distinctValues: Object.keys(scale).length,
-        unreadableStyleSheets: raw.unreadableSheets,
-      },
-      _aliases: aliases,
-      scale,
-    };
     fs.mkdirSync(path.dirname(outFile), { recursive: true });
     fs.writeFileSync(outFile, `${JSON.stringify(doc, null, 2)}\n`);
-
-    const withAlpha = Object.values(scale).filter((v) => v.length === 9).length;
-    console.log(`掃到 ${raw.scanned} 個自訂屬性,其中 ${Object.keys(colors).length} 個是顏色`);
-    console.log(`  → ${Object.keys(scale).length} 個相異色值(${withAlpha} 個帶 alpha)`);
-    console.log(`  → ${Object.keys(aliases).length} 個值有多個 token 名,已列進 _aliases`);
-    if (raw.unreadableSheets) {
-      console.log(`  ⚠ ${raw.unreadableSheets} 份樣式表讀不到(跨網域),名稱可能有漏`);
-    }
     console.log(`寫入 ${path.relative(ROOT, outFile)}`);
   } finally {
     await browser.close();

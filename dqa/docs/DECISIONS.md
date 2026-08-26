@@ -347,6 +347,56 @@ prompt 明確告訴模型 `notices` 是脈絡不是作業範圍。
 
 ---
 
+## ADR-019 — spacing 逆映射吃 density 參數
+
+**決定**:`resolveSpacing(rawValue, density)`。spacing scale 檔改成
+`{ densities: { md: {...}, lg: {...} } }`,每個 density 一份。
+density 是**每個節點各自的屬性**(`node.density`),節點沒宣告時退回文件層級的。
+
+**否決的替代 1**:把各 density 的值壓成一張平表。
+`@qijenchen/design-system` 的 `--layout-space-loose` 在 md 是 16px、lg 是 24px;
+`tight` 是 12px / 16px。壓平之後「16px 是哪個 token」有兩個答案,逆映射不成立 ——
+而且會**安靜地**答錯:md 的合法 `loose` 會被說成 lg 的 `tight`。
+
+**否決的替代 2**:density 不明時就用預設值(md)。
+「沒宣告就是預設值」是 design system 的知識,不是 DQA 的(ADR-006)。猜錯的代價是雙向的:
+把合法的 16px 報成沒有 token,或把違規的 16px 判成合法。因此 density 不明時回傳
+`skip: 'DENSITY_UNKNOWN'`,TOKEN-001 進 `skipped_checks`、TOKEN-002 整組跳過。
+
+**為什麼是 per-node 而不是 per-document**:該 DS 明文支援 subtree 覆寫 ——
+`[data-density="md"]` 這個 reset 選擇器存在的唯一理由就是讓子樹能改回 md。
+`extract.js` 因此在每個節點上往父層找最近的 `data-layout-space` / `data-density`。
+`data-layout-space` 較具體(只管 layout space),同一元素上兩者都有時取它。
+
+**環境鎖同步**:`envConsistency` 已經在比對這兩個屬性(見 ADR-012 那一輪),
+兩側 density 不同時直接拒絕產出 payload —— 那種差異來自環境,不是實作。
+
+---
+
+## ADR-020 — `0px` 是否可報,取決於它跟「沒設定」分不分得出來
+
+**決定**:TOKEN-001 排除 margin / padding 的 `0px`,但保留 gap 的 `0px`。
+
+**理由**(實測 Chromium):
+
+| 屬性 | 沒設定時的 computed value | 寫 `0` 時 |
+|---|---|---|
+| `margin*` / `padding*` | `0px` | `0px` ← **分不出來** |
+| `gap` / `rowGap` / `columnGap` | `normal` | `0px` ← 分得出來 |
+
+margin / padding 的 `0px` 無法區分「作者決定不留間距」與「沒人碰過這個屬性」,
+所以它不承載任何可報的事實。gap 沒設定時是 `normal`(`parseFloat` 直接 NaN,根本進不了逆映射),
+因此 `gap: 0` 是一個看得見的決定,照報。
+
+**否決的替代**:把這些 `0px` 丟進 `skipped_checks`。
+那不是「量不到的檢查」而是**規則不適用**,兩者不同。塞進去會把
+`skipped_checks` 佔比這個覆蓋率指標稀釋掉(見 `docs/TASKS.md` 的 T5),
+讓它從「規則覆蓋不足的警訊」變成「每頁都有幾十筆的背景噪音」。
+
+**實測效果**:同一份 fixture,提示從 66 筆降到 2 筆 —— 剩下的兩筆都是真的有人寫過的 `padding-top: 13px`。
+
+---
+
 ## 待裁決(尚未進入實作)
 
 | 議題 | 需要什麼才能裁決 |

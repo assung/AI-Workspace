@@ -69,6 +69,38 @@
     return value;
   }
 
+  /* ------------------------------------------------------------------ density */
+
+  /**
+   * 有效 density —— spacing token 的值取決於它。
+   *
+   * `@qijenchen/design-system` 的 `--layout-space-loose` 在 md 是 16px、lg 是 24px,
+   * `tight` 是 12px / 16px。也就是說「16px 是哪個 token」沒有唯一答案:
+   * md 的 loose 與 lg 的 tight 都是 16。不知道 density 就不能做逆映射。
+   *
+   * 而且 density 可以在 subtree 上被覆寫(該 DS 明文支援,`[data-density="md"]` reset 選擇器
+   * 存在的理由就是這個),所以這是**每個節點各自的屬性**,不是整份文件一個值。
+   *
+   * `data-layout-space` 比 `data-density` 更具體(它只管 layout space),同一個元素上兩者
+   * 都有時取前者;往上找最近的一個。
+   */
+  const DENSITY_ATTRS = ['data-layout-space', 'data-density'];
+
+  function effectiveDensity(el) {
+    for (let cur = el; cur && cur.nodeType === 1; cur = cur.parentElement) {
+      for (const attr of DENSITY_ATTRS) {
+        const raw = cur.getAttribute && cur.getAttribute(attr);
+        if (!raw) continue;
+        const v = raw.trim();
+        // density 是 md / lg 這種列舉值。長得不像列舉值的一律不送 —— 那不會是 density,
+        // 而任何來路不明的字串都可能挾帶內容。
+        if (!/^[A-Za-z0-9_-]{1,32}$/.test(v)) continue;
+        return { value: v, attr };
+      }
+    }
+    return null;
+  }
+
   /* ---------------------------------------------------------------- utilities */
 
   /** FNV-1a —— 給 fontFamily 用。跨環境可比對,但不可讀。 */
@@ -287,10 +319,15 @@
     const tm = textMetrics(el, cs, opts);
     const bl = baselineY(el, tm);
 
+    const density = effectiveDensity(el);
+
     return {
       path: pathFrom(root, el),
       tag: el.tagName.toLowerCase(),
       role: el.getAttribute('role') || null,
+      // spacing token 的逆映射需要它。null = 這個節點往上沒有任何 density 宣告。
+      density: density ? density.value : null,
+      densityAttr: density ? density.attr : null,
       // 座標一律相對鄰域根節點 —— 兩個環境的頁面偏移量不同,絕對座標不可比
       box: [round(r.left - rootRect.left), round(r.top - rootRect.top), round(r.width), round(r.height)],
       baselineY: bl == null ? null : round(bl - rootRect.top),

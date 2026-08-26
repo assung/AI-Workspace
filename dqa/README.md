@@ -16,11 +16,15 @@ cp config.example.json config.json
 npm run dqa config.json out      # 產出 out/payload.json 與 out/prompt.txt
 ```
 
-色彩 token 定義檔是從 design system 的 CSS 抽出來的產生檔:
+`tokens/*.json` 兩份都是從 design system 的 CSS 抽出來的產生檔,不要手改:
 
 ```bash
 npm run tokens:extract -- --css <ds>/src/tokens/color/primitives.css --demote '^color-'
+npm run tokens:extract -- --kind spacing --css <ds>/src/tokens/layoutSpace/layoutSpace.css --density md,lg
 ```
+
+spacing 是 density-aware 的 —— `--layout-space-loose` 在 md 是 16px、lg 是 24px,
+所以逆映射吃 density,不明時跳過而不是猜(見 ADR-019)。
 
 **B. Chrome Extension** —— Storybook / STG 躲在 SSO 後面、只有瀏覽器進得去的時候。
 
@@ -76,6 +80,7 @@ block flow 的縫隙來自 margin collapse、父層 padding、line-height 撐開
 - 非 flex/grid 容器的間距關係(見 `skipped_checks`)
 - 兩側都一樣地錯、且錯在單側規則涵蓋範圍外的情況
 - 同一個 `gap` 宣告會產生三筆 TOKEN-002(`gap` / `rowGap` / `columnGap`),見 `docs/TASKS.md` 的 T6
+- Tailwind utility 產生的 4px 倍數不是具名 token,一律落在「不對應任何 token」→ 出提示
 
 ## 第一週要看的三個數字
 

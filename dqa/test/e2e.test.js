@@ -245,6 +245,27 @@ async function main() {
       'TOKEN-001 沒有混進 deterministic_violations');
     check(notices.every((n) => n.severity === 'medium'),
       '降級的是定不定讞,severity 沒有被順手調低(ADR-004)');
+
+    // density 相依的逆映射:fixture 的 <html data-density="md">,
+    // 12px 在 md 是 layout-space-tight、在 lg 就不是任何 token(ADR-019)
+    const tokenTwo = built.payload.deterministic_violations.find((v) => v.code === 'TOKEN-002');
+    check(!!tokenTwo && tokenTwo.evidence.sb === 'layout-space-loose'
+      && tokenTwo.evidence.prod === 'layout-space-tight',
+      'spacing 逆映射用的是真實 DS 的 density-aware token 名',
+      tokenTwo ? `${tokenTwo.evidence.sb} → ${tokenTwo.evidence.prod}` : '(沒抓到)');
+    check(notices.every((n) => n.code !== 'TOKEN-001' || n.evidence.density === 'md'),
+      '提示裡記錄了判定當下用的 density');
+    check(!built.payload.skipped_checks.some((x) => /DENSITY_UNKNOWN/.test(x.reason || '')),
+      'fixture 宣告了 density,沒有任何一項因為 density 不明而跳過');
+
+    // 真實頁面上每個節點的 margin / padding 都是 0px(沒人設定過)。
+    // 把它們全報成「不在 token 定義裡」會用雜訊淹掉唯一真實的那一筆。
+    const zeroBoxNotices = notices.filter((n) =>
+      n.evidence.px === 0 && !['gap', 'rowGap', 'columnGap'].includes(n.evidence.prop));
+    check(zeroBoxNotices.length === 0,
+      'margin / padding 的 0px 沒有變成提示雜訊', `${zeroBoxNotices.length} 筆`);
+    check(notices.length > 0 && notices.every((n) => n.evidence.px !== 0 || n.evidence.prop === 'gap'),
+      '提示只剩下真的有人做過決定的值', `共 ${notices.length} 筆`);
     check(built.payload.meta.captureMode === 'extension', 'payload 記錄了擷取路徑');
     check(built.payload.meta.env.warnings.length === 0, '兩側環境一致');
     check(built.promptLen > 1000, 'prompt 產得出來', `${built.promptLen} 字元`);
