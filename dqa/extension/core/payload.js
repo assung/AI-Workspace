@@ -19,7 +19,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (core) {
   'use strict';
 
-  const { TokenResolver, RubricEngine, SPACING_PROPS, COLOR_PROPS } = core;
+  const { TokenResolver, RubricEngine, SPACING_PROPS, COLOR_PROPS, collapseGapEntries } = core;
 
   /** 已由確定性規則涵蓋的屬性,不再丟給 AI */
   const DETERMINISTICALLY_COVERED = new Set([...SPACING_PROPS]);
@@ -92,16 +92,43 @@
     return { paired, onlySb, onlyProd };
   }
 
+  /**
+   * 配對兩側的 token 結果。
+   *
+   * gap 的合成必須**兩側都是等向**才做 —— 只有一側 row === column 時合起來,
+   * 兩邊比的就不是同一件事了。保守處理:任一側兩軸不等就都拆開比。
+   */
   function buildTokenPairs(paired) {
     const out = [];
     for (const { path: p, sb, prod } of paired) {
-      const props = new Set([
-        ...Object.keys(sb.tokens || {}),
-        ...Object.keys(prod.tokens || {}),
-      ]);
+      const sbEntries = new Map(collapseGapEntries(sb.tokens));
+      const prodEntries = new Map(collapseGapEntries(prod.tokens));
+      const bothCollapsed = sbEntries.has('gap') && prodEntries.has('gap');
+
+      const expand = (entries) => {
+        if (bothCollapsed || !entries.has('gap')) return entries;
+        // 另一側是非等向的 → 這一側也拆回兩軸,才對得上
+        const m = new Map(entries);
+        const g = m.get('gap');
+        m.delete('gap');
+        m.set('rowGap', g);
+        m.set('columnGap', g);
+        return m;
+      };
+      const a = expand(sbEntries);
+      const b = expand(prodEntries);
+
+      const props = new Set([...a.keys(), ...b.keys()]);
+      // 色彩不在 collapse 的範圍內,另外併進來
+      for (const src of [sb.tokens || {}, prod.tokens || {}]) {
+        for (const prop of Object.keys(src)) if (COLOR_PROPS.has(prop)) props.add(prop);
+      }
+
       for (const prop of props) {
         if (!SPACING_PROPS.has(prop) && !COLOR_PROPS.has(prop)) continue;
-        out.push({ path: p, prop, sb: (sb.tokens || {})[prop], prod: (prod.tokens || {})[prop] });
+        const sbVal = COLOR_PROPS.has(prop) ? (sb.tokens || {})[prop] : a.get(prop);
+        const prodVal = COLOR_PROPS.has(prop) ? (prod.tokens || {})[prop] : b.get(prop);
+        out.push({ path: p, prop, sb: sbVal, prod: prodVal });
       }
     }
     return out;

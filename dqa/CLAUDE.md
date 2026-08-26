@@ -32,6 +32,8 @@
 - **`tokens/color-primitives.json` 是產生檔。** 要改就改抽取參數重跑 `npm run tokens:extract`,不要手改(ADR-016)。
 - **新增任何值 / 名 / pattern 前先 grep 既有的。** 特別是 rubric code 命名(`DOMAIN-NNN`)、skip reason 常數、style allowlist 條目。不要憑感覺造新的。
 - **改一處必看三處。** 改 `rubric.json` 的規則 → 同時看 `src/node/rubric-engine.js` 的實作、`test/fixture.js` 的對應案例、`README.md` 的表格。三方不同步就是 bug。
+- **fixture 要照 computed style 的真實形狀給。** 例如 gap 永遠是 `gap` / `rowGap` / `columnGap`
+  三個屬性,只寫簡寫就測不到合成邏輯,而且跟 `extract.js` 送出的資料不一樣(ADR-021)。
 - **測試 fixture 必須是可辨識的真實業務場景**(Jira issue detail、Stripe customers table、Notion property list)。禁止 `Option A/B/C`、`div1/div2`、極端不現實的數值。
 - **對標世界級。** 新增規則時要能回答「Polaris / Material / Apple HIG / Atlassian / NN/g 怎麼定義這件事?」規則的 `source` 若只是內部慣例而無外部對應,在 ADR 裡寫明為什麼不同。
 

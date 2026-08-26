@@ -118,26 +118,41 @@ TOKEN-001 出提示,EMPHASIS-001 / ELEVATION-001 交給 AI。
 
 ---
 
-## T6 — 裁決 `gap` 的三重計數
+## T6 — `gap` 的三重計數(已完成 —— ADR-021)
 
-真實頁面實測(`npm run test:e2e`):把 `.property-group { gap: 8px }` 改成 `12px`,
-一個 CSS 宣告產生 **三筆** TOKEN-002 —— `gap`、`rowGap`、`columnGap` 是同一個宣告的三種讀法,
-`getComputedStyle` 三個都回值,`SPACING_PROPS` 三個都收。
+真實頁面實測:一個 `gap` 宣告產生三筆 TOKEN-002,因為 `gap` / `rowGap` / `columnGap`
+是同一個宣告的三種讀法,`getComputedStyle` 三個都回值。
 
-單元 fixture 看不出這件事(fixture 只寫 `gap` 一個屬性),真實頁面一定會踩到。
+- [x] 合併規則:`rowGap` 與 `columnGap` 解析結果相同時只報一筆 `gap`
+- [x] `row-gap` 與 `column-gap` 分開宣告成不同值時,兩條都留(fixture 的 ⑥ 就是這個案例)
+- [x] `gap` 簡寫永遠不逆映射 —— 兩軸不同時它的 computed 是 `"8px 16px"`,
+      `parseFloat` 會安靜地取到 8。**原本的實作有這個 bug**,只是兩軸相同時看不出來
+- [x] 三處同步:`src/core/tokens.js`(`collapseGapEntries`)/ `src/core/rubric-engine.js` /
+      `src/core/payload.js`(比較時兩側都等向才合成)/ `test/fixture.js` 加了雙軸不同的案例 / `README.md`
 
-- [ ] 決定合併規則:同一節點上 `gap` 與 `rowGap` / `columnGap` 值相同時,只報 `gap`
-- [ ] 確認 `row-gap` 與 `column-gap` 分開宣告成不同值時,兩條都要留
-- [ ] 三處同步:`src/core/rubric-engine.js` / `test/fixture.js` 加一個雙軸不同值的案例 / `README.md`
-
-**這不是放寬 guard**(ADR-006 管的是「量不到就跳過」),是同一個事實被數了三次。
-但它會改變確定性違規的筆數,所以要當成決策做,不要當成清理順手改掉。
-
-**驗收**:e2e 對同一個 fixture 的 TOKEN-002 筆數從 9 降到 3,且五條規則仍全部觸發。
+**驗收結果**:e2e 同一份 fixture 的 TOKEN-002 從 15 筆降到 4 筆,五條規則仍全部觸發。
 
 ---
 
-## 明確不做
+## T7 — 觀察 Tailwind 4px 倍數的提示成立比例(2026-08 決定)
+
+該 DS 的間距有一部分來自 Tailwind utility(`p-2` / `gap-3`),它們是 4px 的倍數但**不是具名 token**,
+所以一律落在「不對應任何 token」→ 出 TOKEN-001 提示。
+
+**決定先不收斂**,用 T5 的「`notices` 人工確認成立比例」判斷,而不是先猜一個門檻。
+理由同 ADR-018:提示的價值在可複現,該不該收斂要看人工確認的結果,
+不是看它有幾筆(那是用數量粉飾判斷)。
+
+- [ ] 累積至少 20 筆 Tailwind 倍數的提示,人工確認有幾筆真的該改
+- [ ] 成立比例偏低 → 考慮把 4px 倍數視為「合法但無名」另立一類,或依 ADR-007 收窄 TOKEN-001
+- [ ] 成立比例高 → 維持現狀,這些提示本來就該看
+
+**錯誤的反應**:直接把 4px 倍數加進 spacing scale 當成 token。
+那個 DS 的 token 定義裡沒有它們,硬加等於偽造依據(違反 ADR-007 與 ADR-016)。
+
+---
+
+## 明確不做## 明確不做
 
 - Icon glyph 的 optical centering(需要 raster)
 - Pixel diff / 視覺回歸(見 ADR-003 的取捨)

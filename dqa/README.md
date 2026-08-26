@@ -79,8 +79,8 @@ block flow 的縫隙來自 margin collapse、父層 padding、line-height 撐開
 - Icon glyph 的 optical centering(需要 raster,本階段不做)
 - 非 flex/grid 容器的間距關係(見 `skipped_checks`)
 - 兩側都一樣地錯、且錯在單側規則涵蓋範圍外的情況
-- 同一個 `gap` 宣告會產生三筆 TOKEN-002(`gap` / `rowGap` / `columnGap`),見 `docs/TASKS.md` 的 T6
-- Tailwind utility 產生的 4px 倍數不是具名 token,一律落在「不對應任何 token」→ 出提示
+- Tailwind utility 產生的 4px 倍數不是具名 token,一律落在「不對應任何 token」→ 出提示。
+  要不要收斂看 `notices` 的人工確認成立比例,見 `docs/TASKS.md` 的 T7
 
 ## 第一週要看的三個數字
 
@@ -88,6 +88,7 @@ block flow 的縫隙來自 margin collapse、父層 padding、line-height 撐開
 |---|---|---|
 | 確定性規則誤報率 | 人工複核 `deterministic_violations` | 高 → rubric `condition` 太鬆 |
 | `notices` 成立比例 | 人工確認 `notices` | 長期偏低 → 該規則對這個 DS 沒價值,依 ADR-007 移除 |
+| Tailwind 4px 倍數的提示成立比例 | 從 `notices` 裡篩出來人工確認 | 見 `docs/TASKS.md` 的 T7 |
 | `unclassified` 比例 | AI 輸出 | 接近 0 抽驗 20 筆對 `condition`;>50% 表示 rubric 覆蓋不足 |
 | `skipped_checks` 佔比 | payload | 過高表示 GESTALT-001 實際覆蓋遠小於預期 → 重估規則價值,**不是**放寬 guard |
 

@@ -18,7 +18,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (tokensModule) {
   'use strict';
 
-  const { SPACING_PROPS, GAP_PROPS } = tokensModule;
+  const { SPACING_PROPS, GAP_PROPS, collapseGapEntries } = tokensModule;
 
   /* ---------------------------------------------------------------- helpers */
 
@@ -238,7 +238,8 @@
 
       /* TOKEN-001 —— 值不在 token 定義裡。severity 固定,與 delta 無關。 */
       for (const n of nodes) {
-        for (const [prop, t] of Object.entries(n.tokens || {})) {
+        // rowGap / columnGap 相等時合成一筆 gap —— 一個宣告只該產生一筆判定
+        for (const [prop, t] of collapseGapEntries(n.tokens)) {
           if (!SPACING_PROPS.has(prop)) continue;
           // density 不明時 scale 本身不成立 —— 這是量不到,不是「沒有 token」。
           // 報成沒有 token 會把合法的 16px 說成魔術數字。

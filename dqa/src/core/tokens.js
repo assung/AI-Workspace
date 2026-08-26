@@ -23,6 +23,25 @@
    */
   const GAP_PROPS = new Set(['gap', 'rowGap', 'columnGap']);
 
+  /** 真正承載單一長度的兩個軸。`gap` 是簡寫,見 GAP_SHORTHAND 的說明。 */
+  const GAP_AXIS_PROPS = new Set(['rowGap', 'columnGap']);
+
+  /**
+   * `gap` 簡寫**永遠不做逆映射**。
+   *
+   * 它的 computed value 在兩軸不同時是兩個長度:
+   *
+   *   row-gap: 8px; column-gap: 16px  →  gap = "8px 16px"
+   *   row-gap: 12px                    →  gap = "12px normal"
+   *
+   * `parseFloat("8px 16px")` 會安靜地得到 8 —— 把一個不是單一長度的值解析成 token,
+   * 而且看起來完全正常。兩軸相同時它又跟 rowGap / columnGap 重複,
+   * 同一個宣告會產生三筆一模一樣的判定。
+   *
+   * 所以只解析兩個軸,呈現時再由 collapseGapEntries() 合回一筆。
+   */
+  const GAP_SHORTHAND = 'gap';
+
   const BOX_SPACING_PROPS = new Set([
     'marginTop', 'marginRight', 'marginBottom', 'marginLeft',
     'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
@@ -206,6 +225,7 @@
       const density = node.density || fallbackDensity || null;
       const tokens = {};
       for (const [prop, value] of Object.entries(node.style || {})) {
+        if (prop === GAP_SHORTHAND) continue;   // 簡寫不解析(見 GAP_SHORTHAND)
         if (SPACING_PROPS.has(prop)) {
           const r = this.resolveSpacing(value, density);
           if (r) tokens[prop] = r;
@@ -224,8 +244,44 @@
     }
   }
 
+  /** 兩個軸解析出來的結果是否為同一個值(含 skip 狀態)—— 相同才合得起來 */
+  function sameAxisResult(a, b) {
+    if (!a || !b) return false;
+    if (a.skip || b.skip) return a.skip === b.skip;
+    return a.px === b.px && a.token === b.token;
+  }
+
+  /**
+   * 把 node.tokens 攤成「邏輯間距屬性」清單:
+   * rowGap 與 columnGap 相等時合成一筆 `gap`,不等時各自保留。
+   *
+   * 這是呈現層的收斂,不是判定的放寬 —— 一個 `gap: 12px` 宣告本來就只是一個決定,
+   * 報成三筆(gap / rowGap / columnGap)只是把 computed style 的形狀洩漏給讀報告的人。
+   *
+   * @returns {Array<[string, object]>} [prop, resolved] —— prop 可能是 gap / rowGap / columnGap
+   */
+  function collapseGapEntries(tokens) {
+    const t = tokens || {};
+    const out = [];
+    for (const [prop, resolved] of Object.entries(t)) {
+      if (!SPACING_PROPS.has(prop)) continue;
+      if (prop === GAP_SHORTHAND) continue;
+      if (!GAP_AXIS_PROPS.has(prop)) { out.push([prop, resolved]); continue; }
+    }
+    const row = t.rowGap;
+    const col = t.columnGap;
+    if (row && col && sameAxisResult(row, col)) {
+      out.push([GAP_SHORTHAND, row]);
+    } else {
+      if (row) out.push(['rowGap', row]);
+      if (col) out.push(['columnGap', col]);
+    }
+    return out;
+  }
+
   return {
-    TokenResolver, SPACING_PROPS, GAP_PROPS, BOX_SPACING_PROPS, COLOR_PROPS,
-    rgbToHex, colorKey, unwrapScale, unwrapSpacing,
+    TokenResolver, SPACING_PROPS, GAP_PROPS, GAP_AXIS_PROPS, GAP_SHORTHAND,
+    BOX_SPACING_PROPS, COLOR_PROPS,
+    rgbToHex, colorKey, unwrapScale, unwrapSpacing, collapseGapEntries, sameAxisResult,
   };
 });

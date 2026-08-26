@@ -32,3 +32,5 @@ description: 完整驗證(確定性引擎 + guard + 脫敏)
 - 把 8 碼 hex 改回 6 碼「簡化」→ 違反 ADR-017,DS 的整條 neutral scale 會被壓成一個 token
 - density 不明時用預設值(md)讓規則跑得動 → 違反 ADR-019,會安靜地把合法值判成違規或反過來
 - 把排除掉的 `0px` 改成進 `skipped_checks` → 違反 ADR-020,會把覆蓋率指標稀釋成背景噪音
+- 讓 `gap` 簡寫也進逆映射「比較完整」→ 違反 ADR-021,兩軸不同時 parseFloat 會安靜地取到第一個數
+- 兩軸不同時也合成一筆 gap「讓報告乾淨」→ 違反 ADR-021,那是把兩個決定壓成一個

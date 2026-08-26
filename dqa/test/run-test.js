@@ -73,6 +73,29 @@ const shadowDiff = payload.unresolved.find((u) => u.prop === 'boxShadow');
 console.log(`  ${shadowDiff ? '✓' : '✗'} 兩側 boxShadow 差異進 unresolved`);
 if (!shadowDiff) missing.push('unresolved: boxShadow');
 
+/* --------------------------------------------- gap 的三個屬性只算一個決定 */
+
+const gapFindings = [...payload.deterministic_violations, ...payload.notices]
+  .filter((v) => ['gap', 'rowGap', 'columnGap'].includes((v.evidence || {}).prop));
+const onDiv0 = gapFindings.filter((v) => v.node === 'g>div0');
+const onDiv1 = gapFindings.filter((v) => v.node === 'g>div1');
+
+console.log(`  ${onDiv0.length === 1 && onDiv0[0].evidence.prop === 'gap' ? '✓' : '✗'} `
+  + `兩軸相同 → 合成一筆 gap(不是 gap/rowGap/columnGap 三筆)`
+  + `　${onDiv0.map((v) => v.evidence.prop).join(', ')}`);
+if (!(onDiv0.length === 1 && onDiv0[0].evidence.prop === 'gap')) missing.push('gap 合成');
+
+// production 的 g>div1 是 row 8 / column 16 —— 合成會把兩個不同的決定壓成一個
+const div1Props = onDiv1.map((v) => v.evidence.prop).sort();
+const div1Ok = div1Props.length > 0 && !div1Props.includes('gap');
+console.log(`  ${div1Ok ? '✓' : '✗'} 兩軸不同 → 各自保留,不合成　${div1Props.join(', ')}`);
+if (!div1Ok) missing.push('兩軸不同不可合成');
+
+// gap 簡寫的 computed 在兩軸不同時是 "8px 16px",parseFloat 會安靜地取到 8
+const shorthandResolved = payload.nodes.some((n) => n.tokens && n.tokens.gap);
+console.log(`  ${!shorthandResolved ? '✓' : '✗'} gap 簡寫沒有被逆映射(它不是單一長度)`);
+if (shorthandResolved) missing.push('gap 簡寫被解析');
+
 const nodesSent = payload.nodes.length > 0 && payload.nodes_storybook.length > 0;
 console.log(`  ${nodesSent ? '✓' : '✗'} 完整鄰域脈絡照送(nodes ${payload.nodes.length} 筆)`);
 

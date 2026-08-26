@@ -266,6 +266,15 @@ async function main() {
       'margin / padding 的 0px 沒有變成提示雜訊', `${zeroBoxNotices.length} 筆`);
     check(notices.length > 0 && notices.every((n) => n.evidence.px !== 0 || n.evidence.prop === 'gap'),
       '提示只剩下真的有人做過決定的值', `共 ${notices.length} 筆`);
+
+    // 一個 `gap: 12px` 宣告在 computed style 裡是三個屬性,但它只是一個決定
+    const gapProps = built.payload.deterministic_violations
+      .filter((v) => ['gap', 'rowGap', 'columnGap'].includes((v.evidence || {}).prop));
+    check(gapProps.every((v) => v.evidence.prop === 'gap'),
+      '兩軸相同的 gap 只報一筆,不報成 gap/rowGap/columnGap 三筆',
+      [...new Set(gapProps.map((v) => v.evidence.prop))].join(', '));
+    check(!built.payload.nodes.some((n) => n.tokens && n.tokens.gap),
+      'gap 簡寫沒有被逆映射(兩軸不同時它不是單一長度)');
     check(built.payload.meta.captureMode === 'extension', 'payload 記錄了擷取路徑');
     check(built.payload.meta.env.warnings.length === 0, '兩側環境一致');
     check(built.promptLen > 1000, 'prompt 產得出來', `${built.promptLen} 字元`);

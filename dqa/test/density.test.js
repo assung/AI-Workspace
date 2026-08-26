@@ -62,18 +62,22 @@ check(bogus.skip === 'DENSITY_NOT_IN_SCALE',
 /* ------------------------------- 節點自帶的 density 蓋過文件層級的 */
 
 console.log('\n=== subtree 覆寫 ===');
+// computed style 的 gap 永遠是三個屬性,fixture 要照這個形狀給(gap 簡寫本身不做逆映射)
+const browserGap = (px) => ({ gap: `${px}px`, rowGap: `${px}px`, columnGap: `${px}px` });
 const extraction = {
   nodes: [
-    { path: 'g', style: { gap: '16px' }, density: null },
-    { path: 'g>div0', style: { gap: '16px' }, density: 'lg' },
+    { path: 'g', style: browserGap(16), density: null },
+    { path: 'g>div0', style: browserGap(16), density: 'lg' },
   ],
 };
 resolver.annotate(extraction, 'md');
 const [root, inner] = extraction.nodes;
-check(root.tokens.gap.token === 'layout-space-loose',
-  '沒有自帶 density 的節點退回文件層級(md)', root.tokens.gap.token);
-check(inner.tokens.gap.token === 'layout-space-tight',
-  '自帶 density 的節點用自己的(lg)—— DS 明文支援 subtree 覆寫', inner.tokens.gap.token);
+check(root.tokens.rowGap.token === 'layout-space-loose',
+  '沒有自帶 density 的節點退回文件層級(md)', root.tokens.rowGap.token);
+check(inner.tokens.rowGap.token === 'layout-space-tight',
+  '自帶 density 的節點用自己的(lg)—— DS 明文支援 subtree 覆寫', inner.tokens.rowGap.token);
+check(!root.tokens.gap && !inner.tokens.gap,
+  'gap 簡寫不做逆映射 —— 兩軸不同時它不是單一長度');
 
 /* ----------------------------------------- 引擎:skip 要進 skipped_checks */
 
@@ -110,7 +114,7 @@ const zeros = {
   nodes: [{
     path: 'g>div0>div0', order: 0, box: [0, 0, 10, 10], baselineY: null, text: null, density: 'md',
     // margin/padding 的 0px = 沒設定;gap 沒設定時 computed 是 `normal`,所以 0px 是決定
-    style: { marginTop: '0px', paddingLeft: '0px', gap: '0px' },
+    style: { marginTop: '0px', paddingLeft: '0px', ...browserGap(0) },
   }],
 };
 resolver.annotate(zeros, null);
@@ -125,7 +129,7 @@ check(!r3.skipped.some((x) => x.prop === 'marginTop'),
   '排除的 0px 也不進 skipped_checks(規則不適用 ≠ 量不到)');
 
 const pairs = [{
-  path: 'g', prop: 'gap',
+  path: 'g', prop: 'rowGap',
   sb: resolver.resolveSpacing('16px', null),
   prod: resolver.resolveSpacing('12px', 'md'),
 }];
