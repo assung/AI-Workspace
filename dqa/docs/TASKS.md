@@ -113,13 +113,29 @@ npm run llm:classify out/payload.json out/findings.json
 
 ---
 
-## T4 — 報告輸出
+## T4 — 報告輸出(已完成 —— ADR-023)
 
-- [ ] `deterministic_violations` 與 AI findings 合併,依 severity 排序
-- [ ] 每條顯示:code / severity / node path / 證據數字 / **source 連結**
-- [ ] `skipped_checks` 獨立一區,不要混進違規列表
+- [x] `deterministic_violations` 與 AI findings 合併,依 severity 排序
+      —— 但每一列標「程式判 / AI 判」,兩者可信度不同不可混為一談
+- [x] 每條顯示 code / severity / node path / 證據數字 / **可點的 source 連結**
+- [x] `skipped_checks` 獨立一區,不混進違規列表
+- [x] `acceptable` 與 `unclassified` 各自成區(前者讓「AI 有沒有看」可稽核,
+      後者是 T5 的指標,混進去就數不到)
 
-**驗收**:任意一條違規,都能在 3 秒內點到它的 spec 依據。
+**驗收**:任意一條違規都能在 3 秒內點到它的 spec 依據 —— `source` 現在是
+指向 design system repo 的 URL,在 HTML 報告裡是 `<a href>`。
+
+**產出**:
+
+```bash
+npm run dqa config.json out          # payload.json / prompt.txt / report.html(只有確定性判定)
+npm run llm:classify out/payload.json out/findings.json
+npm run report out/payload.json out/findings.json out/report.html   # 併入 AI findings 重產
+```
+
+擴充套件的報告頁與 CLI 的 HTML 用**同一份** `src/core/report.js` 決定分區與排序,
+只有渲染各自做。沒接 AI 時報告會明說「AI 分類尚未執行」,
+而不是看起來像「沒有問題」。
 
 ---
 

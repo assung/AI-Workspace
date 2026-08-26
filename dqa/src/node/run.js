@@ -4,6 +4,8 @@ const path = require('path');
 const fs = require('fs');
 const { buildPayload } = require('../core/payload');
 const { buildPrompt } = require('../core/prompt');
+const { buildReport } = require('../core/report');
+const { renderReport } = require('./report-html');
 const { loadData } = require('./data');
 
 const BROWSER_DIR = path.join(__dirname, '..', 'browser');
@@ -95,6 +97,13 @@ if (require.main === module) {
     .then(({ payload, prompt }) => {
       fs.writeFileSync(path.join(outDir, 'payload.json'), JSON.stringify(payload, null, 2));
       fs.writeFileSync(path.join(outDir, 'prompt.txt'), prompt);
+      // 先產一份只有確定性判定的報告。接上 AI 之後用 npm run report 重產,
+      // 兩份的分區與排序來自同一支 core/report.js。
+      const { rubric } = loadData({ tokensDir: cfg.tokensDir, rubricFile: cfg.rubricFile });
+      fs.writeFileSync(
+        path.join(outDir, 'report.html'),
+        renderReport(buildReport(payload, null, rubric))
+      );
       const d = payload.deterministic_violations;
       console.log(
         `確定性違規 ${d.length} 筆 / 提示 ${payload.notices.length} 筆`
@@ -102,6 +111,7 @@ if (require.main === module) {
       );
       for (const v of d) console.log(`  [${v.severity}] ${v.code} @ ${v.node}`);
       for (const n of payload.notices) console.log(`  (提示) ${n.code} @ ${n.node}`);
+      console.log(`\n報告:${path.join(outDir, 'report.html')}`);
     })
     .catch((e) => {
       console.error(e.message);

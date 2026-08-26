@@ -62,6 +62,9 @@ prompt.js      AI 只答 unresolved,只能引用 rubric code
 llm.js         送去公司 gateway 分類 → structured outputs 約束形狀
                → validateFindings 把關 schema 表達不了的語意(ADR-022)
                ⚠ 只有 Playwright 這條路徑有;擴充套件維持零 egress(ADR-013)
+     ↓
+report.js      合併確定性與 AI 判定、依 severity 排序、分區(ADR-023)
+               每一列標出處。擴充套件與 CLI 共用這份模型,只有渲染各自做
 ```
 
 ### 兩條擷取路徑
@@ -100,6 +103,7 @@ npm run test:core     # core 在 Node 與瀏覽器兩條路徑上的輸出必須
 npm run test:sync     # extension/ 的複製品與 src/ 一致
 npm run test:ext      # 擴充套件靜態完整性(manifest / script src / 可解析)
 npm run test:llm      # AI 層:送出的請求形狀 + 收回的合約檢查(本機 mock,不連線)
+npm run test:report   # 報告的合併 / 分區 / source 連結 / HTML escape
 npm run test:all      # 以上全部,都不需要瀏覽器
 
 npm run dqa config.json out   # Playwright 路徑
@@ -109,6 +113,7 @@ export DQA_LLM_BASE_URL='https://<internal-gateway>'
 export DQA_LLM_API_KEY='...'
 npm run llm:check                                    # 先體檢閘道器支援什麼
 npm run llm:classify out/payload.json out/findings.json
+npm run report out/payload.json out/findings.json out/report.html   # 併入 AI 重產報告
 npm run sync:ext              # src/ → extension/ 同步
 
 # 從 design system 的 CSS 抽色彩 token(需要瀏覽器,參數見 docs/DESIGN-SYSTEM.md)

@@ -8,7 +8,6 @@
  */
 
 const $ = (sel) => document.querySelector(sel);
-const SEV_ORDER = { high: 0, medium: 1, low: 2, info: 3 };
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -67,13 +66,12 @@ function renderMetrics(payload) {
   }
 }
 
-/** 違規與提示共用同一種卡片 —— 兩者的證據結構相同,差別只在進哪一區。 */
-function renderFindings(selector, countSelector, list, emptyText) {
+/**
+ * 違規與提示共用同一種卡片 —— 兩者的證據結構相同,差別只在進哪一區。
+ * 分區與排序由 core/report.js 決定,不在這裡重寫一份(ADR-011)。
+ */
+function renderFindings(selector, countSelector, sorted, emptyText) {
   const box = $(selector);
-  const sorted = [...list].sort((a, b) => {
-    const d = (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9);
-    return d || a.code.localeCompare(b.code) || a.node.localeCompare(b.node);
-  });
   $(countSelector).textContent = String(sorted.length);
   if (!sorted.length) {
     box.appendChild(el('p', 'empty', emptyText));
@@ -102,12 +100,12 @@ function renderFindings(selector, countSelector, list, emptyText) {
   }
 }
 
-const renderViolations = (payload) => renderFindings(
-  '#violations', '#c-violations', payload.deterministic_violations, '沒有確定性違規。'
+const renderViolations = (report) => renderFindings(
+  '#violations', '#c-violations', report.violations, '沒有確定性違規。'
 );
 
-const renderNotices = (payload) => renderFindings(
-  '#notices', '#c-notices', payload.notices || [], '沒有提示。'
+const renderNotices = (report) => renderFindings(
+  '#notices', '#c-notices', report.notices, '沒有提示。'
 );
 
 function renderSkipped(payload) {
@@ -238,9 +236,11 @@ function stamp() {
       + '換成專案真值之前,違規報告不具說服力 —— 到設定頁貼上真實的 rubric.json 與 tokens。');
   }
 
+  // 分區與排序走 core —— 跟 CLI 的報告用同一份規則
+  const report = DQA_CORE.buildReport(payload, null, data.rubric);
   renderMetrics(payload);
-  renderViolations(payload);
-  renderNotices(payload);
+  renderViolations(report);
+  renderNotices(report);
   renderSkipped(payload);
   renderUnresolved(payload);
   renderStructural(payload);

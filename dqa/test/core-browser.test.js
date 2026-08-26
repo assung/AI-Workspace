@@ -21,7 +21,7 @@ const { storybook, production } = require('./fixture');
 
 const CORE_DIR = path.join(__dirname, '..', 'src', 'core');
 // 順序即 report.html 裡 <script> 的順序 —— 相依性只靠這個順序解決
-const LOAD_ORDER = ['tokens.js', 'rubric-engine.js', 'payload.js', 'prompt.js'];
+const LOAD_ORDER = ['tokens.js', 'rubric-engine.js', 'payload.js', 'prompt.js', 'report.js'];
 
 const { tokens, rubric } = loadData();
 
@@ -43,7 +43,7 @@ console.log('=== core 在瀏覽器路徑載入 ===');
 console.log(`  ${loadError ? '✗' : '✓'} 四支 core 皆可用一般 <script> 載入${loadError ? ` —— ${loadError.message}` : ''}`);
 if (loadError) process.exit(1);
 
-const exported = ['TokenResolver', 'RubricEngine', 'buildPayload', 'buildPrompt', 'collectGaps'];
+const exported = ['TokenResolver', 'RubricEngine', 'buildPayload', 'buildPrompt', 'buildReport', 'collectGaps'];
 const missing = exported.filter((k) => typeof sandbox.DQA_CORE[k] !== 'function');
 console.log(`  ${missing.length ? '✗' : '✓'} DQA_CORE 對外介面完整${missing.length ? ` —— 缺 ${missing.join(', ')}` : ''}`);
 

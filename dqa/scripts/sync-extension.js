@@ -23,6 +23,7 @@ const FILE_MAP = [
   ['src/core/rubric-engine.js', 'extension/core/rubric-engine.js'],
   ['src/core/payload.js', 'extension/core/payload.js'],
   ['src/core/prompt.js', 'extension/core/prompt.js'],
+  ['src/core/report.js', 'extension/core/report.js'],
   ['rubric.json', 'extension/data/rubric.json'],
   ['tokens/spacing-scale.json', 'extension/data/spacing-scale.json'],
   ['tokens/color-primitives.json', 'extension/data/color-primitives.json'],
