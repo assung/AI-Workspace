@@ -258,6 +258,63 @@ Playwright 與 Extension 兩條路徑同時修好,而且 payload 形狀不變 �
 
 ---
 
+## ADR-016 — 色彩 token 定義檔由瀏覽器求值產生,不手寫
+
+**決定**:`tokens/color-primitives.json` 由 `scripts/extract-tokens.mjs` 產生 ——
+開一個載入了 design system CSS 的頁面,把每個自訂屬性套到元素上讀 computed value,
+再經過 `window.__DQA__.normalizeColor`(ADR-014 的同一個正規化器)轉成 sRGB。
+
+**否決的替代 1**:直接讀 CSS 檔用字串解析。
+`getComputedStyle(root).getPropertyValue('--color-blue-9')` 拿到的是
+`oklch(from oklch(0.54 0.22 258) calc(l*0.44) calc(c*0.65) h)` ——
+**代換過但沒求值**。自訂屬性是 token stream,relative color syntax 與 `calc()` 都不會被算。
+要拿到真正的顏色,只能把它套到元素上。
+
+**否決的替代 2**:手寫維護一份 hex 對照表。
+`@qijenchen/design-system` 的色階是用相對公式從 base-6 推導的
+(`L = l × D`,D: 7=0.82 8=0.62 9=0.44 …),手寫等於把公式的結果凍結成魔術數字,
+上游改一個 base 色,這份表就整條錯掉且沒人會發現。
+
+**關鍵約束**:token 定義那一側與量測那一側必須經過**同一個**正規化器。
+兩邊各自量化的話,逆映射是拿兩種精度在做精確比對,永遠對不上。
+腳本因此直接 `addScriptTag` 載入 `src/browser/extract.js`,而不是自己複製一份轉換邏輯。
+
+**同色多名怎麼選**:一個顏色值常常有多個 token 名(`--foreground` 與 `--color-neutral-9`)。
+computed style 只看得到顏色,程式無法分辨實作寫的是哪一個,所以選一個進 `scale`、其餘進 `_aliases`。
+挑選順序是「未被 `--demote` 命中 → 名稱短 → 字典序」。
+`--demote` 是參數而不是內建規則,因為哪些名稱屬於 Internal 層是各 design system 自己的慣例。
+**實測記錄**:只比長度會挑錯 —— `black-a85`(9 字)贏過 `foreground`(10 字),
+而該 DS 明文把 `--black-a*` 歸為 Internal。這就是 `--demote` 存在的理由。
+
+---
+
+## ADR-017 — 逆映射的索引鍵包含 alpha
+
+**決定**:token 定義檔允許 `#rrggbb` 與 `#rrggbbaa` 兩種寫法;
+`resolveColor()` 用「hex + alpha 量化成 0~255 整數」當索引鍵。
+
+**否決的替代**:只用 6 碼 hex 查表,alpha 另外記錄但不參與比對(原本的做法)。
+
+**理由**:`@qijenchen/design-system` 的整條 neutral scale 是「黑色 + 不同 alpha」:
+
+```css
+--color-neutral-1: oklch(0 0 0 / 2%);
+…
+--color-neutral-9: oklch(0 0 0 / 85%);
+```
+
+九個 token 的 hex 全部都是 `#000000`。只比 hex 等於把九個 token 壓成一個 ——
+而這九個涵蓋了 `--foreground` / `--fg-secondary` / `--fg-disabled` / `--border` / `--divider`,
+也就是這個 DS 最常用的那批顏色。
+
+**alpha 的量化精度**是 0~255 整數,因為那就是 canvas 正規化器實際輸出的精度(ADR-014),
+兩側走同一條路徑,round-trip 穩定。
+
+**保留的退路**:帶 alpha 的色查 8 碼鍵沒中時,**不**退回同 hex 的不透明版本。
+「85% 黑」跟「純黑」是兩個不同的顏色,硬湊成命中就是製造假的 exact。
+
+---
+
 ## 待裁決(尚未進入實作)
 
 | 議題 | 需要什麼才能裁決 |

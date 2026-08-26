@@ -38,10 +38,31 @@ check(opaque === '#0065ea', '不透明的正規化值直接得 hex', String(opaq
 check(rgbToHex('oklch(0.54 0.22 258)') === null,
   '未正規化的 oklch 仍然回 null(正規化沒做的話就是這個結果)');
 
+/* ------------------------------------------ alpha 必須參與 token 逆映射 */
+
+console.log('\n=== alpha-aware 逆映射 ===');
 const resolver = new TokenResolver({ tokens });
-const r = resolver.resolveColor('rgba(0, 0, 0, 0.851)');
-check(r && r.exact === false && near(r.alpha, 0.851, 0.001),
-  '半透明色不算 exact —— 它跟任何不透明 token 都不是同一個顏色');
+
+// @qijenchen/design-system 的整條 neutral scale 是「黑色 + 不同 alpha」,
+// 九個 token 的 hex 全都是 #000000。只用 6 碼 hex 查表等於把九個壓成一個。
+const fg = resolver.resolveColor('rgba(0, 0, 0, 0.851)');     // --foreground = 85% 黑
+const fgSecondary = resolver.resolveColor('rgba(0, 0, 0, 0.651)'); // 65% 黑
+check(!!fg && !!fg.token, '85% 黑命中 token', fg ? `${fg.token} ${fg.hex} α=${fg.alpha}` : '(無)');
+check(!!fgSecondary && !!fgSecondary.token, '65% 黑命中 token',
+  fgSecondary ? `${fgSecondary.token} ${fgSecondary.hex}` : '(無)');
+check(!!fg && !!fgSecondary && fg.token !== fgSecondary.token,
+  '同一個 hex、不同 alpha → 不同 token(6 碼查表會把它們合併)',
+  fg && fgSecondary ? `${fg.token} ≠ ${fgSecondary.token}` : '');
+check(!!fg && fg.exact === true, '精確命中(含 alpha)算 exact');
+
+const notInScale = resolver.resolveColor('rgba(0, 0, 0, 0.5)');
+check(!!notInScale && notInScale.token === null && near(notInScale.alpha, 0.5, 0.001),
+  'scale 裡沒有的 alpha → token 為 null,不退回同 hex 的其他 alpha',
+  notInScale ? String(notInScale.token) : '');
+
+const opaqueToken = resolver.resolveColor('rgb(0, 101, 234)');
+check(!!opaqueToken && !!opaqueToken.token, '不透明色照樣命中',
+  opaqueToken ? `${opaqueToken.token} ${opaqueToken.hex}` : '');
 
 /* --------------------------------------------------------- alpha 合成 */
 

@@ -1,0 +1,28 @@
+/* 抽取測試的 fixture —— 刻意複製 @qijenchen/design-system 的四個寫法特徵:
+   oklch 原色、relative color syntax 推導、alpha 走 var()、以及 dark theme 覆寫。
+   這四種寫法都不能靠字串解析,只能靠瀏覽器求值。 */
+:root {
+  --_na5: 25%;
+  --_na9: 85%;
+
+  --color-blue-6: oklch(0.54 0.22 258);
+  --color-blue-9: oklch(from var(--color-blue-6) calc(l * 0.44) calc(c * 0.65) h);
+  --color-neutral-5: oklch(0 0 0 / var(--_na5));
+  --color-neutral-9: oklch(0 0 0 / var(--_na9));
+  --color-white: oklch(1 0 0);
+
+  /* semantic 層:跟 primitive 同值,逆映射時該回報這一邊 */
+  --primary: var(--color-blue-6);
+  --foreground: var(--color-neutral-9);
+  --border: var(--color-neutral-5);
+  --canvas: var(--color-white);
+
+  /* 非色值 —— 不可以被當成顏色收進去 */
+  --layout-space-loose: 16px;
+  --font-body-size: 14px;
+}
+
+[data-theme="dark"] {
+  --color-blue-6: oklch(0.72 0.14 258);
+  --color-neutral-9: oklch(1 0 0 / var(--_na9));
+}

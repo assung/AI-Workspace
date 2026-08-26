@@ -16,6 +16,12 @@ cp config.example.json config.json
 npm run dqa config.json out      # 產出 out/payload.json 與 out/prompt.txt
 ```
 
+色彩 token 定義檔是從 design system 的 CSS 抽出來的產生檔:
+
+```bash
+npm run tokens:extract -- --css <ds>/src/tokens/color/primitives.css --demote '^color-'
+```
+
 **B. Chrome Extension** —— Storybook / STG 躲在 SSO 後面、只有瀏覽器進得去的時候。
 
 ```bash

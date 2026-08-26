@@ -28,6 +28,7 @@
 
 ### 專案工作慣例
 
+- **`tokens/color-primitives.json` 是產生檔。** 要改就改抽取參數重跑 `npm run tokens:extract`,不要手改(ADR-016)。
 - **新增任何值 / 名 / pattern 前先 grep 既有的。** 特別是 rubric code 命名(`DOMAIN-NNN`)、skip reason 常數、style allowlist 條目。不要憑感覺造新的。
 - **改一處必看三處。** 改 `rubric.json` 的規則 → 同時看 `src/node/rubric-engine.js` 的實作、`test/fixture.js` 的對應案例、`README.md` 的表格。三方不同步就是 bug。
 - **測試 fixture 必須是可辨識的真實業務場景**(Jira issue detail、Stripe customers table、Notion property list)。禁止 `Option A/B/C`、`div1/div2`、極端不現實的數值。
@@ -92,8 +93,12 @@ npm run test:all      # 以上全部,都不需要瀏覽器
 npm run dqa config.json out   # Playwright 路徑
 npm run sync:ext              # src/ → extension/ 同步
 
-# 端對端:真的把擴充套件載進 Chromium 跑完整流程(需要瀏覽器,不含在 test:all)
-DQA_CHROMIUM=/path/to/chrome xvfb-run -a npm run test:e2e
+# 從 design system 的 CSS 抽色彩 token(需要瀏覽器,參數見 docs/DESIGN-SYSTEM.md)
+npm run tokens:extract -- --css <ds>/tokens/color/primitives.css --demote '^color-'
+
+# 需要瀏覽器,不含在 test:all
+DQA_CHROMIUM=/path/to/chrome xvfb-run -a npm run test:e2e     # 擴充套件端對端
+DQA_CHROMIUM=/path/to/chrome xvfb-run -a npm run test:tokens  # token 抽取
 ```
 
 ---
@@ -123,7 +128,8 @@ viewport 不符時擷取確實被擋下。
 對照基準是 [@qijenchen/design-system](https://github.com/ajenchen/design-system)。
 `rubric.json` 的 `source` 已經指到它的實際 spec,但 **`tokens/*.json` 仍是 placeholder**,
 而且不能直接填 —— 那個 DS 沒有數字階梯的 spacing scale。
-色彩那條已經修好(oklch 正規化 + alpha 合成,ADR-014 / ADR-015);
+色彩那一側已經完整:量測正規化、alpha 合成、token 定義抽取、alpha-aware 逆映射
+(ADR-014 ~ ADR-017),`tokens/color-primitives.json` 是從真實 DS 抽出來的 **產生檔,不要手改**。
 剩下兩條性質不同(一個是設計、一個是規則裁決),見 `docs/TASKS.md` 的 T0。
 
 **現在可用**:GESTALT-001 / ALIGN-001 / TRUNC-001 / ELEVATION-001 / EMPHASIS-001。

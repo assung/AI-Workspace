@@ -311,6 +311,13 @@
    *   G  = P 的 parent        → 取 G 的全部直接 children(= P 的 siblings)  → inter
    *   另外附上 T 的直接 children,讓 T 內部的對齊也看得到。
    */
+  /**
+   * 對外露出正規化器。`scripts/extract-tokens.mjs` 用它把 token 定義解析成 sRGB ——
+   * token 定義那一側與量測那一側必須經過**同一個**正規化器,
+   * 否則逆映射是拿兩種量化結果在做精確比對,永遠對不上。
+   */
+  DQA.normalizeColor = normalizeColor;
+
   DQA.extract = function extract(targetSelector, opts = {}) {
     const options = {
       affordanceAttrs: opts.affordanceAttrs || ['title', 'aria-label', 'data-tooltip'],

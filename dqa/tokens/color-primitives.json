@@ -1,14 +1,370 @@
 {
-  "_comment": "換成你們真實的 color primitives。key 為 token 名,value 為 #rrggbb(小寫)。",
+  "_comment": "由 scripts/extract-tokens.mjs 產生 —— 不要手改。改了下次抽取就會被蓋掉。",
+  "_meta": {
+    "source": "github.com/ajenchen/design-system@5132e8f (packages/design-system/src/tokens/color/{primitives,semantic}.css)",
+    "demoted": [
+      "^(color-|black-a|white-a)"
+    ],
+    "theme": "light",
+    "density": null,
+    "generatedAt": "2026-08-26T01:11:09.840Z",
+    "engine": "chromium canvas via window.__DQA__.normalizeColor(ADR-014)",
+    "scannedCustomProperties": 264,
+    "colorTokens": 251,
+    "distinctValues": 149,
+    "unreadableStyleSheets": 0
+  },
+  "_aliases": {
+    "neutral-hover": [
+      "neutral-selected-hover",
+      "black-a02",
+      "color-neutral-1"
+    ],
+    "muted": [
+      "bg-disabled",
+      "bg-readonly",
+      "neutral-active",
+      "scrollbar-track",
+      "neutral-selected",
+      "black-a04",
+      "color-neutral-2"
+    ],
+    "secondary": [
+      "neutral-selected-focus",
+      "neutral-selected-active",
+      "black-a06",
+      "color-neutral-3"
+    ],
+    "divider": [
+      "black-a09",
+      "color-neutral-4"
+    ],
+    "border": [
+      "scrollbar-thumb",
+      "black-a15",
+      "color-neutral-5"
+    ],
+    "fg-disabled": [
+      "border-hover",
+      "scrollbar-thumb-hover",
+      "black-a25",
+      "color-neutral-6"
+    ],
+    "overlay": [
+      "fg-muted",
+      "black-a45",
+      "color-neutral-7"
+    ],
+    "fg-secondary": [
+      "black-a65",
+      "color-neutral-8"
+    ],
+    "foreground": [
+      "on-emphasis-dark",
+      "black-a85",
+      "color-neutral-9"
+    ],
+    "info-text": [
+      "blue-active",
+      "info-active",
+      "primary-text",
+      "primary-active",
+      "color-blue-7"
+    ],
+    "info": [
+      "ring",
+      "chart-1",
+      "primary",
+      "color-blue-6"
+    ],
+    "green-active": [
+      "success-text",
+      "success-active",
+      "color-green-7"
+    ],
+    "indigo-active": [
+      "color-indigo-7"
+    ],
+    "turquoise-active": [
+      "color-turquoise-7"
+    ],
+    "chart-3": [
+      "success",
+      "status-online",
+      "color-green-6"
+    ],
+    "tooltip": [
+      "color-neutral-9-opaque"
+    ],
+    "blue-hover": [
+      "info-hover",
+      "primary-hover",
+      "color-blue-5"
+    ],
+    "indigo-hover": [
+      "color-indigo-5"
+    ],
+    "green-hover": [
+      "success-hover",
+      "color-green-5"
+    ],
+    "purple-active": [
+      "color-purple-7"
+    ],
+    "turquoise-hover": [
+      "color-turquoise-5"
+    ],
+    "chart-2": [
+      "color-purple-6"
+    ],
+    "lime-active": [
+      "color-lime-7"
+    ],
+    "surface-strong-hover": [
+      "color-neutral-7-opaque"
+    ],
+    "purple-hover": [
+      "color-purple-5"
+    ],
+    "red-active": [
+      "color-red-7"
+    ],
+    "magenta-active": [
+      "color-magenta-7"
+    ],
+    "error-text": [
+      "error-active",
+      "deep-orange-active",
+      "color-deep-orange-7"
+    ],
+    "lime-hover": [
+      "color-lime-5"
+    ],
+    "status-offline": [
+      "surface-strong",
+      "color-neutral-6-opaque"
+    ],
+    "amber-active": [
+      "color-amber-7"
+    ],
+    "orange-active": [
+      "color-orange-7"
+    ],
+    "chart-4": [
+      "warning-text",
+      "yellow-active",
+      "warning-active",
+      "color-yellow-7"
+    ],
+    "red-hover": [
+      "color-red-5"
+    ],
+    "error": [
+      "chart-5",
+      "status-busy",
+      "notification",
+      "color-deep-orange-6"
+    ],
+    "border-opaque": [
+      "color-neutral-5-opaque"
+    ],
+    "magenta-hover": [
+      "color-magenta-5"
+    ],
+    "info-subtle": [
+      "primary-subtle",
+      "color-blue-1"
+    ],
+    "error-hover": [
+      "deep-orange-hover",
+      "color-deep-orange-5"
+    ],
+    "success-subtle": [
+      "color-green-1"
+    ],
+    "amber-hover": [
+      "color-amber-5"
+    ],
+    "orange-hover": [
+      "color-orange-5"
+    ],
+    "warning": [
+      "status-away",
+      "color-yellow-6"
+    ],
+    "yellow-hover": [
+      "warning-hover",
+      "color-yellow-5"
+    ],
+    "error-subtle": [
+      "color-deep-orange-1"
+    ],
+    "warning-subtle": [
+      "color-yellow-1"
+    ],
+    "canvas": [
+      "surface",
+      "inverse-fg",
+      "on-emphasis",
+      "surface-raised",
+      "color-white"
+    ],
+    "inverse-neutral-hover": [
+      "white-a04"
+    ],
+    "inverse-neutral-active": [
+      "white-a08"
+    ]
+  },
   "scale": {
-    "color-text-default": "#172b4d",
-    "color-text-subtle": "#44546f",
-    "color-text-inverse": "#ffffff",
-    "color-text-danger": "#ae2e24",
-    "color-bg-default": "#ffffff",
-    "color-bg-neutral": "#f1f2f4",
-    "color-bg-neutral-subtle": "#f7f8f9",
-    "color-bg-danger": "#ffecea",
-    "color-border-default": "#dcdfe4"
+    "color-black": "#000000",
+    "neutral-hover": "#00000005",
+    "muted": "#0000000a",
+    "secondary": "#0000000f",
+    "divider": "#00000017",
+    "border": "#00000026",
+    "fg-disabled": "#00000040",
+    "overlay": "#00000073",
+    "fg-secondary": "#000000a6",
+    "foreground": "#000000d9",
+    "color-blue-10": "#000236",
+    "color-blue-9": "#001160",
+    "color-turquoise-10": "#001718",
+    "color-green-10": "#001f00",
+    "color-blue-8": "#002890",
+    "color-turquoise-9": "#003233",
+    "color-green-9": "#003f00",
+    "info-text": "#0047c0",
+    "color-turquoise-8": "#005354",
+    "info": "#0065ea",
+    "color-green-8": "#006700",
+    "green-active": "#009400",
+    "color-indigo-10": "#02003d",
+    "color-indigo-9": "#03006a",
+    "color-indigo-8": "#05099d",
+    "indigo-active": "#0c2fd0",
+    "color-purple-10": "#10002d",
+    "color-lime-10": "#152100",
+    "turquoise-active": "#17797a",
+    "color-indigo-6": "#1c4dfb",
+    "chart-3": "#22bf12",
+    "color-red-10": "#240000",
+    "color-purple-9": "#240051",
+    "tooltip": "#262626",
+    "color-magenta-10": "#28001a",
+    "color-deep-orange-10": "#2a0000",
+    "color-amber-10": "#2e1300",
+    "color-yellow-10": "#2f1c00",
+    "blue-hover": "#2f85fe",
+    "color-orange-10": "#300700",
+    "color-lime-9": "#324500",
+    "color-turquoise-6": "#3b9d9e",
+    "color-purple-8": "#3d0d7c",
+    "indigo-hover": "#3d75ff",
+    "color-red-9": "#430000",
+    "color-magenta-9": "#4b0036",
+    "color-deep-orange-9": "#4e0000",
+    "green-hover": "#53d049",
+    "color-lime-8": "#557000",
+    "color-amber-9": "#582f00",
+    "purple-active": "#592aa8",
+    "color-neutral-8-opaque": "#595959",
+    "color-orange-9": "#5a1e00",
+    "color-yellow-9": "#5a3e00",
+    "turquoise-hover": "#5fb2b3",
+    "color-blue-4": "#60a5ff",
+    "color-indigo-4": "#659aff",
+    "color-red-8": "#690000",
+    "chart-2": "#7445ce",
+    "color-magenta-8": "#760057",
+    "color-deep-orange-8": "#7a0000",
+    "color-green-4": "#7ddf73",
+    "lime-active": "#81a300",
+    "color-turquoise-4": "#84c7c7",
+    "color-amber-8": "#8a5300",
+    "color-orange-8": "#8c3b00",
+    "surface-strong-hover": "#8c8c8c",
+    "purple-hover": "#8d69e5",
+    "color-yellow-8": "#8e6800",
+    "red-active": "#900000",
+    "color-indigo-3": "#98bcff",
+    "color-blue-3": "#98c2ff",
+    "magenta-active": "#a3007c",
+    "error-text": "#a82300",
+    "color-purple-4": "#a88df6",
+    "color-lime-6": "#acd300",
+    "color-green-3": "#afe7a8",
+    "color-turquoise-3": "#b0d6d6",
+    "color-red-6": "#b30000",
+    "lime-hover": "#badf44",
+    "status-offline": "#bfbfbf",
+    "color-purple-3": "#c0b2f2",
+    "amber-active": "#c17f00",
+    "orange-active": "#c36100",
+    "color-indigo-2": "#c5d8fe",
+    "color-blue-2": "#c6dbfa",
+    "chart-4": "#c99c00",
+    "color-lime-4": "#c9e972",
+    "color-magenta-6": "#cc0e9e",
+    "red-hover": "#d23035",
+    "error": "#d24100",
+    "color-turquoise-2": "#d3e6e5",
+    "color-green-2": "#d4efd0",
+    "color-purple-2": "#d8d3f2",
+    "border-opaque": "#d9d9d9",
+    "color-lime-3": "#daefac",
+    "brand": "#df3232",
+    "magenta-hover": "#e34bb5",
+    "color-indigo-1": "#e3efff",
+    "info-subtle": "#e3f1ff",
+    "error-hover": "#e8663c",
+    "color-neutral-4-opaque": "#e8e8e8",
+    "success-subtle": "#e9fbe7",
+    "color-lime-2": "#eaf5d4",
+    "color-turquoise-1": "#eaf6f6",
+    "color-red-4": "#eb6761",
+    "color-red-3": "#ee9c95",
+    "color-purple-1": "#f0ecff",
+    "color-neutral-3-opaque": "#f0f0f0",
+    "color-red-2": "#f1c7c3",
+    "color-amber-6": "#f4aa1d",
+    "color-magenta-4": "#f578cb",
+    "color-orange-6": "#f5871a",
+    "color-magenta-3": "#f5a8d8",
+    "color-magenta-2": "#f5cee5",
+    "color-neutral-2-opaque": "#f5f5f5",
+    "color-lime-1": "#f5fce8",
+    "color-deep-orange-2": "#f6d4c9",
+    "color-deep-orange-3": "#f7b29d",
+    "color-deep-orange-4": "#f98b68",
+    "color-neutral-1-opaque": "#fafafa",
+    "color-amber-2": "#fcebd4",
+    "amber-hover": "#fdba4e",
+    "color-orange-2": "#fde3d1",
+    "color-amber-3": "#fedcad",
+    "color-yellow-2": "#fef4d8",
+    "orange-hover": "#ff9d4a",
+    "color-orange-4": "#ffb474",
+    "color-amber-4": "#ffcb77",
+    "warning": "#ffce27",
+    "color-orange-3": "#ffcea9",
+    "yellow-hover": "#ffd854",
+    "color-yellow-4": "#ffe27c",
+    "color-red-1": "#ffe6e3",
+    "color-magenta-1": "#ffe8f7",
+    "color-yellow-3": "#ffecb2",
+    "error-subtle": "#ffece5",
+    "color-orange-1": "#fff3e7",
+    "color-amber-1": "#fff7e8",
+    "warning-subtle": "#fffbe9",
+    "canvas": "#ffffff",
+    "inverse-neutral-hover": "#ffffff0a",
+    "inverse-neutral-active": "#ffffff14",
+    "white-a12": "#ffffff1f",
+    "white-a15": "#ffffff26",
+    "white-a25": "#ffffff40",
+    "white-a45": "#ffffff73",
+    "white-a65": "#ffffffa6",
+    "white-a85": "#ffffffd9"
   }
 }

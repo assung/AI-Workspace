@@ -248,6 +248,12 @@ async function main() {
     check(!!labelColor && Math.abs(labelColor.alpha - 0.651) < 0.01,
       'alpha 沒有在正規化過程中被吃掉', labelColor ? String(labelColor.alpha) : '');
 
+    // fixture 的 label 是 oklch(0 0 0 / 0.65) = #000000a6,
+    // 那正是 tokens/color-primitives.json 裡從真實 DS 抽出來的 fg-secondary
+    check(!!labelColor && labelColor.token !== null,
+      '逆映射查得到 token 名(需要 8 碼 alpha 索引鍵)',
+      labelColor ? `${labelColor.token} exact=${labelColor.exact}` : '');
+
     check(!!pLabel.emphasis, 'emphasis 不再是 null(EMPHASIS-001 的前提)');
     check(pLabel.emphasis && pLabel.emphasis.fgEffective !== labelColor.hex,
       '前景 alpha 有合成到背景上', pLabel.emphasis

@@ -89,6 +89,58 @@ Chromium 的 computed value **保留 oklch,不會轉回 rgb()**(實測)。原本
 驗證:`npm run test:color`(單元)與 `npm run test:e2e` 的「色彩正規化」「色彩逆映射與對比度」兩節。
 e2e 的 fixture 刻意用 `oklch(0 0 0 / 0.65)`,把正規化拔掉會有 7 項斷言失敗。
 
+### 1b. token 定義檔怎麼來的
+
+`tokens/color-primitives.json` 不是手寫的,是 `scripts/extract-tokens.mjs` 從這個 DS 的 CSS 抽出來的:
+
+```bash
+DS=<design-system>/packages/design-system/src
+npm run tokens:extract -- \
+  --css $DS/tokens/color/primitives.css \
+  --css $DS/tokens/color/semantic.css \
+  --theme light \
+  --demote '^(color-|black-a|white-a)' \
+  --source-label "github.com/ajenchen/design-system@<sha> (…/color/{primitives,semantic}.css)"
+```
+
+目前這份的內容(`_meta` 有完整記錄):
+
+| | |
+|---|---|
+| 來源 | `github.com/ajenchen/design-system@5132e8f` |
+| 掃到的自訂屬性 | 264 |
+| 其中是顏色的 | 251 |
+| 相異色值 | 149(17 個帶 alpha) |
+| 同值多名 → `_aliases` | 49 |
+
+**必須用抽取而不是手寫的三個理由**(ADR-016):
+
+1. `getPropertyValue('--color-blue-9')` 拿到的是 `oklch(from oklch(…) calc(l*0.44) …)` ——
+   代換過但**沒求值**。relative color syntax 只有瀏覽器算得出來。
+2. 這個 DS 的色階是相對公式推導的(`L = l × D`,D: 7=0.82 8=0.62 9=0.44…)。
+   手寫等於把公式結果凍結成魔術數字,上游改一個 base 色這份表就整條錯掉。
+3. token 定義那一側必須跟量測那一側經過**同一個**正規化器,否則是拿兩種量化精度做精確比對。
+
+**`--demote` 為什麼必要**:一個色值常有多個名字(`--foreground` 與 `--color-neutral-9` 同值)。
+只比長度會挑錯 —— 實測 `black-a85`(9 字)贏過 `foreground`(10 字),
+而這個 DS 明文把 `--color-*` / `--black-a*` 歸為 **Internal**,`--foreground` 才是 **Public**。
+被蓋掉的名字全部進 `_aliases`,一個都不會丟。
+
+### 1c. alpha 必須進索引鍵
+
+這個 DS 的整條 neutral scale 是「黑色 + 不同 alpha」:
+
+```css
+--color-neutral-1: oklch(0 0 0 / 2%);  …  --color-neutral-9: oklch(0 0 0 / 85%);
+```
+
+九個 token 的 hex 全部是 `#000000`,而它們涵蓋了 `--foreground` / `--fg-secondary` /
+`--fg-disabled` / `--border` / `--divider` —— 這個 DS 最常用的那批顏色。
+只用 6 碼 hex 查表會把九個壓成一個,所以 token 定義檔改用 `#rrggbbaa`,
+`resolveColor()` 的索引鍵含 alpha(ADR-017)。
+
+驗證見 `npm run test:color` 的「alpha-aware 逆映射」一節,以及 `npm run test:tokens`。
+
 ### 2. spacing 沒有數字階梯,DQA 的逆映射前提不成立
 
 DQA 的 `resolveSpacing()` 假設有一張 `{ token名: px值 }` 的平表,拿量到的 px 去反查。
@@ -135,7 +187,7 @@ DS 管的是「**同步義務**」,DQA 量的是「**值有沒有名字**」。�
 
 | 規則 | 狀態 |
 |---|---|
-| TOKEN-002 | ⚠ 需要 density-aware 的 scale 才有意義 |
+| TOKEN-002 | ⚠ 需要 density-aware 的 spacing scale 才有意義 |
 | RENDER-001 | ⚠ 同上 |
 | GESTALT-001 | ✅ 可用 —— 只比幾何,不需要 token 表 |
 | ALIGN-001 | ✅ 可用 —— baselineY 是純幾何 |
@@ -144,3 +196,7 @@ DS 管的是「**同步義務**」,DQA 量的是「**值有沒有名字**」。�
 | ELEVATION-001 | ✅ 可用(boxShadow 的 computed value 帶 oklch 但整串是字串比對,不受影響)|
 
 也就是說:**幾何類與色彩類的規則現在就能對這個 DS 跑,spacing token 類的還不行。**
+
+色彩那一側已經完整:量測正規化(ADR-014)、alpha 合成(ADR-015)、
+token 定義抽取(ADR-016)、alpha-aware 逆映射(ADR-017)四塊都到位,
+端對端實測 `oklch(0 0 0 / 0.65)` 的文字色可以一路解析到 `fg-secondary`。

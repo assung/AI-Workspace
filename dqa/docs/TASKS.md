@@ -24,6 +24,13 @@
       **驗收結果**:`npm run test:color` 全過(85% 黑 on 白 → `#262626`,對比度 15.13 而非 21);
       `npm run test:e2e` 的 fixture 改用 `oklch(0 0 0 / 0.65)`,正規化拔掉會有 7 項斷言失敗。
 
+- [x] **色彩 token 定義檔**(已產出 —— ADR-016 / ADR-017)
+      `scripts/extract-tokens.mjs` 從 DS 的 CSS 抽出 149 個相異色值(17 個帶 alpha),
+      走的是與量測同一個正規化器。token 定義檔改用 `#rrggbbaa`,逆映射索引鍵含 alpha ——
+      該 DS 的整條 neutral scale 是「黑 + 不同 alpha」,只比 hex 會把九個 token 壓成一個。
+      **驗收結果**:`npm run test:tokens` 全過;端對端實測 `oklch(0 0 0 / 0.65)` → `fg-secondary`。
+      重抽指令與參數見 `docs/DESIGN-SYSTEM.md`。
+
 - [ ] **決定 spacing 逆映射怎麼做**(這是設計,不是填值)
       DS 沒有數字階梯。間距來自語意 token(隨 density 變)、family 尺寸、Tailwind 4px 倍數三個來源。
       「16px 是哪個 token」沒有唯一答案(md 的 loose = lg 的 tight = 16)。
@@ -36,7 +43,8 @@
       三個選項(降級成提示 / 改判鄰域內同語意位置的值不一致 / 依 ADR-007 移除)見 `docs/DESIGN-SYSTEM.md`。
       **驗收**:對 DS Storybook 的任一 story 跑一次,TOKEN-001 的誤報率可被說明,而不是「看起來很多」。
 
-**目前可用的規則**:GESTALT-001 / ALIGN-001 / TRUNC-001 / ELEVATION-001 / EMPHASIS-001。
+**目前可用的規則**:GESTALT-001 / ALIGN-001 / TRUNC-001 / ELEVATION-001 / EMPHASIS-001
+(色彩那一側從量測到逆映射已完整)。
 TOKEN-002 / RENDER-001 要等 spacing 逆映射;TOKEN-001 要等規則裁決。
 
 ---

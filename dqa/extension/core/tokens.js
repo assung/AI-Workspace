@@ -25,6 +25,28 @@
     'outlineColor',
   ]);
 
+  /**
+   * 逆映射的索引鍵。
+   *
+   * 不能只用 6 碼 hex:@qijenchen/design-system 的整條 neutral scale 是
+   * 「黑色 + 不同 alpha」(--color-neutral-1..9 = oklch(0 0 0 / 2%..85%)),
+   * 九個 token 的 hex 全部都是 #000000。只比 hex 等於把九個 token 壓成一個。
+   *
+   * alpha 以 0~255 的整數量化 —— 那是 canvas 正規化器實際輸出的精度(ADR-014),
+   * 兩側走同一條路徑,round-trip 穩定。
+   */
+  function colorKey(hex, alpha) {
+    const h = String(hex).toLowerCase();
+    if (alpha == null || alpha >= 1) return h;
+    return h + Math.round(alpha * 255).toString(16).padStart(2, '0');
+  }
+
+  /** token 定義檔允許 #rrggbb 與 #rrggbbaa 兩種寫法,統一成索引鍵 */
+  function normalizeTokenValue(v) {
+    const s = String(v).trim().toLowerCase();
+    return /^#[0-9a-f]{6}([0-9a-f]{2})?$/.test(s) ? s : null;
+  }
+
   function rgbToHex(v) {
     const m = /^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,/\s]+([\d.]+))?\s*\)$/i.exec(v);
     if (!m) return /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : null;
@@ -53,9 +75,11 @@
       this.spacing = unwrapScale(t.spacing, 'spacing');
       this.colors = unwrapScale(t.colors, 'color');
       this.spacingEntries = Object.entries(this.spacing).sort((a, b) => a[1] - b[1]);
-      this.colorIndex = new Map(
-        Object.entries(this.colors).map(([k, v]) => [String(v).toLowerCase(), k])
-      );
+      this.colorIndex = new Map();
+      for (const [name, value] of Object.entries(this.colors)) {
+        const key = normalizeTokenValue(value);
+        if (key) this.colorIndex.set(key, name);
+      }
       this.epsilon = opts.epsilon == null ? 0.5 : opts.epsilon;
     }
 
@@ -92,8 +116,11 @@
       if (!conv) return null;
       const hex = typeof conv === 'string' ? conv : conv.hex;
       const alpha = typeof conv === 'string' ? 1 : conv.alpha;
-      const token = this.colorIndex.get(hex) || null;
-      return { hex, alpha, token, exact: !!token && alpha === 1 };
+      // 帶 alpha 的色先查 8 碼鍵;查不到再退回 6 碼 —— token 定義檔可能只寫了不透明版本
+      const token = this.colorIndex.get(colorKey(hex, alpha))
+        || (alpha < 1 ? null : this.colorIndex.get(colorKey(hex, 1)))
+        || null;
+      return { hex, alpha, token, exact: !!token };
     }
 
     /** 把整個 node.style 逐屬性逆映射,結果覆寫回 node.tokens */
@@ -118,5 +145,5 @@
     }
   }
 
-  return { TokenResolver, SPACING_PROPS, COLOR_PROPS, rgbToHex, unwrapScale };
+  return { TokenResolver, SPACING_PROPS, COLOR_PROPS, rgbToHex, colorKey, unwrapScale };
 });

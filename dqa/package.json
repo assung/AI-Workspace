@@ -13,9 +13,11 @@
     "test:sync": "node test/sync.test.js",
     "test:ext": "node test/extension.test.js",
     "test:e2e": "node test/e2e.test.js",
+    "test:tokens": "node test/extract-tokens.test.js",
     "test:all": "npm test && npm run test:guards && npm run test:sanitize && npm run test:color && npm run test:core && npm run test:sync && npm run test:ext",
     "dqa": "node src/node/run.js",
-    "sync:ext": "node scripts/sync-extension.js"
+    "sync:ext": "node scripts/sync-extension.js",
+    "tokens:extract": "node scripts/extract-tokens.mjs"
   },
   "devDependencies": {
     "playwright": "^1.47.0"

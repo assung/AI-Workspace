@@ -1,5 +1,5 @@
 {
-  "_comment": "把這份換成你們專案真實的 spacing scale。這是 token 逆映射的唯一權威,不准讓 AI 猜。",
+  "_comment": "仍是 placeholder。對照基準 @qijenchen/design-system 沒有數字階梯的 spacing scale —— 間距來自語意 token(--layout-space-loose 16/24,隨 density 變)、family 尺寸、Tailwind 4px 倍數三個來源,「16px 是哪個 token」沒有唯一答案。不要把它硬壓成平表填進來,見 docs/DESIGN-SYSTEM.md 與 docs/TASKS.md 的 T0。",
   "unit": "px",
   "scale": {
     "space-0": 0,

@@ -76,8 +76,9 @@ function validateColors(doc) {
   const entries = Object.entries(scale).filter(([k]) => !k.startsWith('_'));
   if (!entries.length) errs.push('color primitives 是空的');
   for (const [k, v] of entries) {
-    if (typeof v !== 'string' || !/^#[0-9a-f]{6}$/.test(v)) {
-      errs.push(`${k}:值必須是小寫 #rrggbb`);
+    // #rrggbbaa 是必要的:alpha 不同的兩個 token 是兩個不同的顏色,壓成 6 碼會被合併
+    if (typeof v !== 'string' || !/^#[0-9a-f]{6}([0-9a-f]{2})?$/.test(v)) {
+      errs.push(`${k}:值必須是小寫 #rrggbb 或 #rrggbbaa`);
     }
   }
   return errs;

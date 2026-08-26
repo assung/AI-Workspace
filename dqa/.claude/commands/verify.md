@@ -14,7 +14,8 @@ description: 完整驗證(確定性引擎 + guard + 脫敏)
 
 有瀏覽器的話再跑一次端對端(不含在 `test:all`):
 
-8. `DQA_CHROMIUM=<chrome> xvfb-run -a npm run test:e2e`
+8. `DQA_CHROMIUM=<chrome> xvfb-run -a npm run test:e2e` — 擴充套件端對端
+9. `DQA_CHROMIUM=<chrome> xvfb-run -a npm run test:tokens` — token 抽取
 
 任何一項失敗,**先讀 `docs/DECISIONS.md` 對應的 ADR 再動手**。
 很多「修好測試」的直覺做法其實是回退掉一個已經辯論過的決定。
@@ -26,3 +27,5 @@ description: 完整驗證(確定性引擎 + guard + 脫敏)
 - 手改 `extension/` 底下的複製品讓 `test:sync` 過 → 違反 ADR-011(要改的是 `src/`,然後 `npm run sync:ext`)
 - 在 core 裡加 `require` / `fs` 讓 Node 那條路徑好寫 → 違反 ADR-011,擴充套件會直接壞掉
 - 在 core 裡自己實作 oklch → sRGB 讓 Node 也能轉色 → 違反 ADR-014,色域外的答案會跟瀏覽器不一致
+- 手改 `tokens/color-primitives.json` 讓某個色對上 → 違反 ADR-016,那是產生檔,要改抽取參數重跑
+- 把 8 碼 hex 改回 6 碼「簡化」→ 違反 ADR-017,DS 的整條 neutral scale 會被壓成一個 token
