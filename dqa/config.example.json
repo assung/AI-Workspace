@@ -1,13 +1,17 @@
 {
+  "_comment": "對照基準 = @qijenchen/design-system 的 Storybook。story id 取自該 repo 的 packages/design-system/ds-story-manifest.json(65 元件 / 947 story 的 canonical 清單)。",
   "viewport": { "width": 1280, "height": 900 },
-  "themeAttrs": ["data-theme", "data-color-mode"],
+  "_themeAttrs_note": "Storybook 的 decorator 把 theme 與 density 寫在 documentElement 上(packages/storybook-config/preview.tsx)。density 會整組換掉 --layout-space-* 的值,兩側不一致時每一個間距都會差 —— 這是環境變因,不是實作錯誤,所以必須列進來比對。",
+  "themeAttrs": ["data-theme", "data-density", "data-layout-space"],
   "storybook": {
-    "url": "http://storybook.internal.corp/iframe.html?id=issue-property-row--default&viewMode=story",
-    "selector": "#storybook-root [data-component='property-row']"
+    "_comment": "用 iframe.html 直接開,不要開外層 UI。globals 明確指定 theme 與 density,不要依賴預設值。",
+    "url": "https://ajenchen-design-system.netlify.app/iframe.html?id=design-system-components-descriptionlist-展示--user-profile&viewMode=story&globals=theme:light;density:md",
+    "_selector_note": "decorator 會包一層 margin:-1rem/padding:1rem 的 wrapper。目標節點要選得夠深,否則鄰域的 G 會抓到那層 wrapper 而不是真正的列表容器。",
+    "selector": "#storybook-root dl > div:first-of-type"
   },
   "production": {
-    "url": "https://stg.internal.corp/browse/PROJ-1234",
-    "selector": "[data-component='property-row']",
-    "waitFor": "[data-testid='issue-detail-loaded']"
+    "url": "https://stg.internal.corp/your-page",
+    "selector": "[data-component='description-list'] > div:first-of-type",
+    "waitFor": "[data-testid='page-loaded']"
   }
 }

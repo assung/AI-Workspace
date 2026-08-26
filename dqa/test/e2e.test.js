@@ -83,9 +83,24 @@ async function main() {
 
     const page = await ctx.newPage();
     await page.goto(`${base}/storybook.html`, { waitUntil: 'load' });
-    // 安裝時會自動打開設定頁;關掉,否則 chrome.tabs.query 的作用中分頁會是它
-    for (const p of ctx.pages()) if (p !== page) await p.close();
-    await page.bringToFront();
+
+    /**
+     * 安裝時 onInstalled 會自動打開設定頁,而且是非同步的 —— 它可能在我們關完分頁之後才出現。
+     * 作用中分頁若是 chrome-extension:// 的設定頁,executeScript 會被擋下並丟出
+     * 「Cannot access contents of the page」,看起來像權限設錯,其實是選錯分頁。
+     */
+    async function ensureActive() {
+      for (let i = 0; i < 10; i += 1) {
+        for (const p of ctx.pages()) if (p !== page && p !== report) await p.close();
+        await page.bringToFront();
+        const url = await sw.evaluate(async () => (await DQA_CAPTURE.activeTab()).url || '');
+        if (url.startsWith('http://127.0.0.1:')) return;
+        await page.waitForTimeout(200);
+      }
+      throw new Error('無法讓 fixture 分頁成為作用中分頁');
+    }
+    let report = null;
+    await ensureActive();
 
     const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
     await sw.evaluate(async (w) => {
@@ -102,15 +117,15 @@ async function main() {
       await DQA_STORE.setSettings({ viewportWidth: 999 });
       try {
         await DQA_CAPTURE.captureSide('A');
-        return null;
+        return { captured: true };
       } catch (e) {
-        return e.reasons;
+        return { reasons: e.reasons || null, message: e.message };
       }
     });
     check(
-      Array.isArray(wrongWidth) && wrongWidth.some((r) => /viewport/.test(r)),
+      Array.isArray(wrongWidth.reasons) && wrongWidth.reasons.some((r) => /viewport/.test(r)),
       'viewport 寬度不符時拒絕擷取(ADR-009)',
-      wrongWidth ? wrongWidth[0] : '(竟然擷取成功了)'
+      wrongWidth.captured ? '(竟然擷取成功了)' : (wrongWidth.reasons ? wrongWidth.reasons[0] : `其他錯誤:${wrongWidth.message}`)
     );
     await sw.evaluate(async (w) => DQA_STORE.setSettings({ viewportWidth: w }), clientWidth);
 
@@ -169,7 +184,7 @@ async function main() {
 
     console.log('\n=== 擷取 B(Production)===');
     await page.goto(`${base}/production.html`, { waitUntil: 'load' });
-    await page.bringToFront();
+    await ensureActive();
     const b = await sw.evaluate(async () => (await DQA_CAPTURE.captureSide('B')).record);
     check(b.extraction.nodes.length === a.extraction.nodes.length,
       '兩側節點數一致', `${b.extraction.nodes.length}`);
@@ -182,7 +197,7 @@ async function main() {
     /* ---------------------------------------------------------- 5. 報告頁 */
 
     console.log('\n=== 報告頁 ===');
-    const report = await ctx.newPage();
+    report = await ctx.newPage();
     await report.goto(`chrome-extension://${extId}/report/report.html`, { waitUntil: 'load' });
     await report.waitForSelector('.finding', { timeout: 10000 });
 

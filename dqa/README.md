@@ -2,6 +2,9 @@
 
 工程完成 → 設計師 review 之間的第一道 gate。不碰原始碼、不依賴 CI、payload 脫敏。
 
+對照基準:**[@qijenchen/design-system](https://github.com/ajenchen/design-system)** 的 Storybook
+(<https://ajenchen-design-system.netlify.app/>)。規則依據與已知不相容見 [`docs/DESIGN-SYSTEM.md`](docs/DESIGN-SYSTEM.md)。
+
 ## 兩種跑法
 
 **A. Playwright CLI** —— 內網可直連、要批次跑的時候。

@@ -35,6 +35,15 @@
     'alignItems', 'justifyContent', 'textAlign',
   ]);
 
+  /**
+   * 會整組換掉間距 token 值的屬性。
+   *
+   * @qijenchen/design-system 的 `--layout-space-loose` 在 md 是 16px、lg 是 24px;
+   * `tight` 是 12px / 16px。兩側 density 不同時,鄰域裡每一個間距都會差 ——
+   * 而那個差來自環境,不是實作。這正是 ADR-009 的環境鎖要擋的東西。
+   */
+  const LAYOUT_ATTRS = ['data-density', 'data-layout-space'];
+
   function envConsistency(sbEnv, prodEnv) {
     const errors = [];
     if (sbEnv.viewportWidth !== prodEnv.viewportWidth) {
@@ -47,6 +56,15 @@
     const prodTheme = JSON.stringify(prodEnv.theme['data-theme'] ?? prodEnv.theme['prefers-color-scheme']);
     if (sbTheme !== prodTheme) {
       errors.push({ code: 'ENV_THEME_MISMATCH', sb: sbTheme, prod: prodTheme });
+    }
+
+    // 只在兩側都明確宣告時比對。有一側沒宣告 = 它的有效 density 量不到,
+    // 不去猜「沒宣告就是預設值」—— 那個預設值是 design system 的知識,不是 DQA 的(ADR-006)。
+    for (const attr of LAYOUT_ATTRS) {
+      const a = sbEnv.theme[attr];
+      const b = prodEnv.theme[attr];
+      if (a == null || b == null) continue;
+      if (a !== b) errors.push({ code: 'ENV_DENSITY_MISMATCH', attr, sb: a, prod: b });
     }
     return errors;
   }

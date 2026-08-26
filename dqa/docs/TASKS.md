@@ -4,16 +4,41 @@
 
 ---
 
-## T0 — 換掉 placeholder(阻擋所有後續任務)
+## T0 — 對齊真實 design system(阻擋所有後續任務)
 
-`tokens/*.json` 與 `rubric.json` 的 `source` 目前是假的。
+對照基準已確定:**@qijenchen/design-system**(<https://github.com/ajenchen/design-system>)。
+完整對照與證據見 `docs/DESIGN-SYSTEM.md`。
 
-- [ ] `tokens/spacing-scale.json` 換成專案真實 scale
-- [ ] `tokens/color-primitives.json` 換成真實 primitives
-- [ ] `rubric.json` 每條的 `source` 指到真實 spec 路徑或 URL
-- [ ] 若某條規則找不到真實 source → **從 rubric 移除**,不要留著(ADR-007)
+已完成:
 
-**驗收**:`npm test` 仍全綠(fixture 的數值可能要跟著調整,這是預期的)。
+- [x] `rubric.json` 每條的 `source` 指到該 repo 的實際 spec 檔(全部可點開)
+- [x] `config.example.json` 換成真實 Storybook URL + 真實 story id + density globals
+- [x] `envConsistency` 比對 `data-density` / `data-layout-space`(density 會整組換掉間距值)
+
+仍未完成 —— 這三項是三個不同性質的問題,不要混在一起處理:
+
+- [ ] **色彩 parser 支援 oklch**(這是 bug,不是決策)
+      DS 的色票全是 oklch,Chromium 的 computed value 保留 oklch 不轉 rgb。
+      `rgbToHex()` 回 null → 色彩 token 全失效 → `emphasis` 全 null → **EMPHASIS-001 永遠不觸發,且無錯誤訊息**。
+      修法:oklch → oklab → linear sRGB → gamma;另外 `--foreground` 本身帶 alpha(85% 黑),
+      `contrastRatio` 必須先把前景 alpha 合成到有效背景上。
+      **驗收**:對 `oklch(0.54 0.22 258)` 解析出的 hex 與 Chromium 實際渲染值誤差 < 1/255;
+      拿 DS 的 `--foreground` on `--canvas` 算出的對比度落在 spec 宣稱的範圍內。
+
+- [ ] **決定 spacing 逆映射怎麼做**(這是設計,不是填值)
+      DS 沒有數字階梯。間距來自語意 token(隨 density 變)、family 尺寸、Tailwind 4px 倍數三個來源。
+      「16px 是哪個 token」沒有唯一答案(md 的 loose = lg 的 tight = 16)。
+      **不要**把它硬壓成一張平表填進 `tokens/spacing-scale.json` —— 那是 ADR-006 明令禁止的推測值。
+      **驗收**:`resolveSpacing` 吃得到 density,且對「md 16px」與「lg 16px」給出不同的 token 名。
+
+- [ ] **裁決 TOKEN-001 的去留**
+      DS 的判準是「同值在 ≥ 2 處需同步 → 必開 token」,單一 consumer 的 hardcode 合法。
+      DQA 量的是「值有沒有名字」,兩者不是同一條規則 → 系統性誤報。
+      三個選項(降級成提示 / 改判鄰域內同語意位置的值不一致 / 依 ADR-007 移除)見 `docs/DESIGN-SYSTEM.md`。
+      **驗收**:對 DS Storybook 的任一 story 跑一次,TOKEN-001 的誤報率可被說明,而不是「看起來很多」。
+
+**目前可用的規則**:GESTALT-001 / ALIGN-001 / TRUNC-001 / ELEVATION-001(純幾何或字串比對)。
+TOKEN-002 / RENDER-001 要等 spacing 逆映射;EMPHASIS-001 要等 oklch。
 
 ---
 

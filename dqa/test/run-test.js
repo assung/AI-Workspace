@@ -1,6 +1,6 @@
 'use strict';
 
-const { buildPayload } = require('../src/core/payload');
+const { buildPayload, envConsistency } = require('../src/core/payload');
 const { loadData } = require('../src/node/data');
 const { storybook, production } = require('./fixture');
 
@@ -49,6 +49,45 @@ console.log(`  ${emphasisIsAi ? '✓' : '✗'} EMPHASIS-001 留在 unresolved,�
 
 const nodesSent = payload.nodes.length > 0 && payload.nodes_storybook.length > 0;
 console.log(`  ${nodesSent ? '✓' : '✗'} 完整鄰域脈絡照送(nodes ${payload.nodes.length} 筆)`);
+
+/* ------------------------------------------------------------- 環境鎖 */
+
+const baseEnv = (theme) => ({ viewportWidth: 1280, dpr: 1, theme });
+const envCases = [
+  {
+    name: 'density 兩側都宣告且不同 → 擋下',
+    sb: baseEnv({ 'data-theme': 'light', 'data-density': 'md' }),
+    prod: baseEnv({ 'data-theme': 'light', 'data-density': 'lg' }),
+    expect: 'ENV_DENSITY_MISMATCH',
+  },
+  {
+    name: 'density 兩側相同 → 放行',
+    sb: baseEnv({ 'data-theme': 'light', 'data-density': 'md' }),
+    prod: baseEnv({ 'data-theme': 'light', 'data-density': 'md' }),
+    expect: null,
+  },
+  {
+    name: 'production 沒宣告 density → 量不到,不猜預設值(ADR-006)',
+    sb: baseEnv({ 'data-theme': 'light', 'data-density': 'md' }),
+    prod: baseEnv({ 'data-theme': 'light' }),
+    expect: null,
+  },
+];
+
+console.log('\n=== 環境鎖 ===');
+let envFailed = 0;
+for (const c of envCases) {
+  const errs = envConsistency(c.sb, c.prod);
+  const got = errs.length ? errs[0].code : null;
+  const ok = got === c.expect;
+  if (!ok) envFailed += 1;
+  console.log(`  ${ok ? '✓' : '✗'} ${c.name.padEnd(46)} ${got || '(無)'}`);
+}
+
+if (envFailed) {
+  console.error(`\n環境鎖 ${envFailed} 項失敗。`);
+  process.exit(1);
+}
 
 if (missing.length) {
   console.error(`\n漏抓: ${missing.join(', ')}`);

@@ -19,7 +19,9 @@ var DQA_STORE = (function () {
    */
   const DEFAULT_SETTINGS = {
     viewportWidth: 1280,
-    themeAttrs: ['data-theme', 'data-color-mode'],
+    // data-density / data-layout-space 會整組換掉間距 token 的值(md 16px / lg 24px),
+    // 兩側不一致時每個間距都會差,而且差在環境不在實作 —— 必須記進 env 才比對得到
+    themeAttrs: ['data-theme', 'data-density', 'data-layout-space'],
     fontSettleMs: 120,
     affordanceAttrs: ['title', 'aria-label', 'data-tooltip'],
     maxNodes: 120,

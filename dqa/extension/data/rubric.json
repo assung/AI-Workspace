@@ -12,7 +12,8 @@
       "severity": "medium",
       "delta_independent": true,
       "_why_delta_independent": "13px 與 40px 同樣是繞過設計系統的約束。1px 偏離最容易被複製繁殖,降級成雜訊等於放行。",
-      "source": "tokens/spacing-scale.json",
+      "source": "https://github.com/ajenchen/design-system/blob/main/packages/design-system/src/tokens/token-system.spec.md",
+      "_source_section": "Token vs Hardcode 判斷 —— 「同值在 ≥ 2 處需要保持同步 → 必開 token」。反過來說單一 consumer 的 padding / gap 是合法 hardcode,只要有註解。",
       "description": "使用了未定義於 spacing scale 的魔術數字"
     },
     {
@@ -22,7 +23,8 @@
       "evaluator": "deterministic",
       "condition": "sb.token !== null && prod.token !== null && sb.token !== prod.token",
       "severity": "high",
-      "source": "tokens/spacing-scale.json",
+      "source": "https://github.com/ajenchen/design-system/blob/main/packages/design-system/src/tokens/layoutSpace/layoutSpace.spec.md",
+      "_source_section": "Token 表(--layout-space-loose / tight / bottom,md 與 lg 兩組值)",
       "description": "實作與元件規格使用了不同的 spacing token"
     },
     {
@@ -32,7 +34,8 @@
       "evaluator": "deterministic",
       "condition": "sb.token === prod.token && sb.exact && prod.exact && |sb.px - prod.px| < 2",
       "severity": "info",
-      "source": "tokens/spacing-scale.json",
+      "source": "https://github.com/ajenchen/design-system/blob/main/packages/design-system/src/tokens/layoutSpace/layoutSpace.spec.md",
+      "_source_section": "Token 表",
       "description": "兩側解析到同一 token,數值差異屬渲染誤差,可忽略"
     },
     {
@@ -44,7 +47,8 @@
       "condition": "intra_gap !== null && inter_gap !== null && intra_gap >= inter_gap",
       "severity": "high",
       "guard": "僅在 parent 為 flex/grid、且子節點無 absolute/fixed 脫離文件流時採集;其餘一律 intra_gap = null 跳過",
-      "source": "tokens/spacing-scale.json#proximity",
+      "source": "https://github.com/ajenchen/design-system/blob/main/packages/design-system/src/tokens/layoutSpace/layoutSpace.spec.md",
+      "_source_section": "親疏 3 級 —— 跨範疇且有 functional 交互 = tight;parallel / independent = loose。這比「群組內 < 群組間」更明確:它直接指定了該用哪個 token。",
       "description": "Proximity 失效:群組內外間距無法區分,結構不可解析"
     },
     {
@@ -56,7 +60,8 @@
       "condition": "同一列(垂直重疊 > 50%)的兩節點 |baselineY 差| ∈ [0.5, 4]",
       "severity": "high",
       "_why_upper_bound": "差距大於 4px 通常是刻意的不同層級,不是對齊 bug。近似而未命中才是最傷的那種。",
-      "source": "spec/typography.md#baseline-alignment",
+      "source": "https://github.com/ajenchen/design-system/blob/main/packages/design-system/src/patterns/element-anatomy/item-anatomy.spec.md",
+      "_source_section": "「左側有兩個元素(control + prefix),它們必須在同一條 baseline 上」+ prefix 用 h-[1lh] wrapper 對齊第一行 baseline 而非 label top",
       "description": "文字 baseline 近似但未對齊,視覺上讀作歪斜"
     },
     {
@@ -68,7 +73,8 @@
       "condition": "text.truncated === true && text.hasAffordance === false",
       "severity": "high",
       "_why_single_side": "Storybook 容器通常寬鬆,兩側 truncated 狀態不同是預期而非 bug。放進 comparative 就是誤報來源。",
-      "source": "spec/content.md#truncation",
+      "source": "https://github.com/ajenchen/design-system/blob/main/packages/design-system/src/patterns/element-anatomy/truncated-text.spec.md",
+      "_source_section": "單行截斷必配「僅實際截斷時顯示」的 tooltip 補全(引擎 SSOT = useTruncated;宿主規則見 item-anatomy.spec.md「單行截斷 → tooltip」)",
       "description": "內容被截斷且無 tooltip/aria-label,資訊不可取得"
     },
     {
@@ -80,7 +86,8 @@
       "_why_ai": "emphasis 的門檻值不存在於任何既有 spec。程式把分數當事實算出來,由 AI 依鄰域脈絡判斷是否構成倒置,不得自行發明門檻。",
       "fact_provided": "每個節點的 emphasisScore = f(fontSize, fontWeight, contrastVsParentBg)",
       "severity": "medium",
-      "source": "spec/typography.md#hierarchy",
+      "source": "https://github.com/ajenchen/design-system/blob/main/packages/design-system/src/tokens/typography/typography.spec.md",
+      "_source_section": "「同尺寸但不同角色的選法」—— 16px 與 14px 各有段落 / 標題兩種 token,標題另加 font-medium/semibold。視覺重量倒置就是這張表被違反。",
       "description": "次要元素的視覺重量超過同層標題"
     },
     {
@@ -90,8 +97,10 @@
       "evaluator": "ai",
       "_why_ai": "elevation 是相對量,需要鄰域全部節點的 shadow/zIndex 才能判斷,無法用單一屬性門檻定讞。",
       "severity": "medium",
-      "source": "spec/elevation.md",
+      "source": "https://github.com/ajenchen/design-system/blob/main/packages/design-system/src/tokens/elevation/elevation.spec.md",
+      "_source_section": "層級表 + 「與 Surface 的配對規則」(elevation-100 配 bg-surface、elevation-200 配 bg-surface-raised)",
       "description": "陰影或堆疊層級的變更改變了元件的層次歸屬"
     }
-  ]
+  ],
+  "_source_base": "https://github.com/ajenchen/design-system —— 對照基準與規則依據都在這個 repo。source 為可點開的檔案連結,_source_section 指出該讀哪一段。"
 }

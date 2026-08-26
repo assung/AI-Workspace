@@ -8,6 +8,11 @@
 
 **決定**:Storybook canvas 提供「元件被正確消費時該長什麼樣」的可執行規格,不會 stale。
 
+**哪一份 Storybook**(2026-08 確定):`@qijenchen/design-system`
+(<https://github.com/ajenchen/design-system>,Storybook 部署於 <https://ajenchen-design-system.netlify.app/>)。
+story id 的 canonical 清單在該 repo 的 `packages/design-system/ds-story-manifest.json`。
+規則依據與三個已知不相容見 `docs/DESIGN-SYSTEM.md`。
+
 **否決的替代**:以 Figma 為 ground truth。
 
 **理由**:Figma 檔案有 staleness 風險,且需要 MCP 往返。但要清楚知道 Storybook 只驗**元件契約**,不驗**頁面設計意圖**——「元件沒壞但用錯 / 組合錯」這類問題不在它的覆蓋範圍。

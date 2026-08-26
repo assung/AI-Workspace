@@ -117,5 +117,12 @@ viewport 不符時擷取確實被擋下。
 
 ## 接手時第一件事
 
-`tokens/*.json` 與 `rubric.json` 的 `source` 目前是 placeholder。
-換成真值之前,任何違規報告都不具說服力。
+讀 `docs/DESIGN-SYSTEM.md`。
+
+對照基準是 [@qijenchen/design-system](https://github.com/ajenchen/design-system)。
+`rubric.json` 的 `source` 已經指到它的實際 spec,但 **`tokens/*.json` 仍是 placeholder**,
+而且不能直接填 —— 那個 DS 沒有數字階梯的 spacing scale,色票全是 oklch 而 DQA 的 parser 讀不到。
+三個不相容的性質不同(一個是 bug、一個是設計、一個是規則裁決),見 `docs/TASKS.md` 的 T0。
+
+**現在可用**:GESTALT-001 / ALIGN-001 / TRUNC-001 / ELEVATION-001(純幾何或字串比對)。
+**現在不可用**:TOKEN-001 / TOKEN-002 / RENDER-001 / EMPHASIS-001。
