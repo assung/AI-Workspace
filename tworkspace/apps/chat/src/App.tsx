@@ -1,0 +1,3540 @@
+// Chat prototype — 3-column messaging UI(Nav rail / Chat list / Conversation + Thread panel)
+// v3.1: tooltip fix / overflow fix / header mute / status outside bubble / reaction menus / thread panel cleanup
+
+import { Fragment, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import {
+  TooltipProvider,
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  Button,
+  Avatar,
+  ProfileCard,
+  ProfileCardDefaultActions,
+  Badge,
+  Separator,
+  ScrollArea,
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  ResizeHandle,
+  Input,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  Switch,
+  Empty,
+  ChromeHeader,
+  AppShell,
+  AppShellAside,
+  useAppShell,
+  SidebarProvider,
+  Sidebar,
+  SidebarTrigger,
+} from '@qijenchen/design-system'
+import {
+  Home,
+  MessageCircle,
+  ListChecks,
+  FileText,
+  HardDrive,
+  Sparkles,
+  MoreHorizontal,
+  Plus,
+  Search,
+  PanelLeftClose,
+  PanelLeftOpen,
+  ChevronDown,
+  ChevronRight,
+  Users,
+  Video,
+  Pencil,
+  Smile,
+  Type,
+  Send,
+  SmilePlus,
+  MessagesSquare,
+  Reply,
+  BellOff,
+  Bell,
+  Star,
+  ExternalLink,
+  AppWindow,
+  LogOut,
+  Maximize2,
+  Minimize2,
+  Settings,
+  HelpCircle,
+  Clock,
+  Check,
+  CheckCheck,
+  X,
+  Copy,
+  Pin,
+  Forward,
+  Trash2,
+  ChevronRight as SubArrow,
+} from 'lucide-react'
+import { FormatToolbar, RichTextArea, textToHtml, hasRichMarkup, type RichEditorHandle } from './RichTextEditor'
+import { TAgentDock, TAgentRailIcon, TAGENT_LABEL, useTAgentEngine } from './TAgent'
+import { TAgentPage, type TAgentRoute } from './TAgentPage'
+import { CHROME_RAIL_BG, CHROME_SIDEBAR_BG, NO_MOUNT_PANEL_TRANSITION, SHELL_SETTLE_MS } from './chrome'
+import photoSunsetLake from './assets/photos/sunset-lake.jpg'
+import photoRockyCoast from './assets/photos/rocky-coast.jpg'
+import photoAutumnAvenue from './assets/photos/autumn-avenue.jpg'
+
+// ── Shared button primitives ──────────────────────────────────────────────────
+function NavBtn({
+  icon,
+  label,
+  active,
+  onClick,
+  overlayBadge,
+  indicator = false,
+}: {
+  icon: React.ComponentProps<typeof Button>['startIcon']
+  label: string
+  active?: boolean
+  onClick?: () => void
+  overlayBadge?: React.ReactNode
+  /**
+   * 分頁式樣(tWorkspace,2026-10-24 user「類似 Teams 的 tab 樣式」):選中 = 左側直線(與按鈕同高、primary),不鋪底;
+   * 未選 icon = neutral-7(`fg-muted`);滑過 = 原本的淺灰底(Button text variant)+ 字色轉深。
+   * 線的寬度、primary 色與 150ms 色彩過渡沿用 DS Tabs 選中底線(tabs.js `after:h-0.5` / `after:bg-primary` / `after:transition-colors after:duration-150`),
+   * 只是從底部轉到左側(垂直的分頁列)。字色三態也照 DS Tabs:未選 → 滑過 / 選中 = `text-foreground`。
+   */
+  indicator?: boolean
+}) {
+  // DS Button auto-adds a TOP tooltip when iconOnly + a *string* aria-label is passed.
+  // To keep a single RIGHT-side tooltip (and overlayBadge, which needs iconOnly), we avoid
+  // the string aria-label and supply the accessible name via aria-labelledby → sr-only span.
+  const labelId = useId()
+  const stateClass = indicator
+    ? (active ? '!text-foreground' : '!text-fg-muted hover:!text-foreground')
+    : (active ? '!bg-neutral-selected' : '')
+  const button = (
+    <Button
+      variant="text"
+      size="md"
+      iconOnly
+      startIcon={icon}
+      aria-labelledby={labelId}
+      aria-current={indicator && active ? 'page' : undefined}
+      onClick={onClick}
+      overlayBadge={overlayBadge}
+      className={`!h-8 !w-8 !min-w-0 !p-0 ${stateClass}`}
+    />
+  )
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {indicator ? (
+          // 線緊貼按鈕左緣(2026-10-24 user「那條線貼在按鈕的左側」):外層 = 按鈕大小,線 right-full 落在按鈕外、與按鈕同高
+          <div className="relative flex w-12 justify-center" data-nav-tab={active ? 'active' : undefined}>
+            <span className="relative flex">
+              <span
+                aria-hidden
+                className={`absolute inset-y-0 right-full w-0.5 transition-colors duration-150 ${active ? 'bg-primary' : 'bg-transparent'}`}
+              />
+              {button}
+            </span>
+          </div>
+        ) : button}
+      </TooltipTrigger>
+      {/* avoidCollisions=false forces right side always — prevents Radix from flipping to top */}
+      <TooltipContent side="right" avoidCollisions={false}>{label}</TooltipContent>
+      <span id={labelId} className="sr-only">{label}</span>
+    </Tooltip>
+  )
+}
+
+function ListBtn({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: React.ComponentProps<typeof Button>['startIcon']
+  label: string
+  onClick?: () => void
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button variant="text" size="sm" iconOnly startIcon={icon} aria-label={label} title="" onClick={onClick} />
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  )
+}
+
+function IconBtnSm({
+  icon,
+  label,
+  onClick,
+  className,
+  style,
+}: {
+  icon: React.ComponentProps<typeof Button>['startIcon']
+  label: string
+  onClick?: () => void
+  className?: string
+  style?: React.CSSProperties
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button variant="text" size="sm" iconOnly startIcon={icon} aria-label={label} title="" onClick={onClick} className={className} style={style} />
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  )
+}
+
+// ── Data model ────────────────────────────────────────────────────────────────
+type Presence = 'online' | 'away' | 'busy' | 'offline'
+type Color = 'blue' | 'green' | 'purple' | 'magenta' | 'turquoise' | 'indigo' | 'red'
+type MsgStatus = 'sending' | 'sent' | 'read'
+
+type Person = {
+  name: string
+  color: Color
+  status: Presence
+  role: string
+  email: string
+  avatar: string
+}
+
+type Reaction = { emoji: string; count: number }
+type Message = {
+  id: string
+  author: 'me' | string
+  text: string
+  // Rich editor(Teams 風格 format toolbar)送出的 HTML 內容;有值時 bubble 以
+  // rich-text 樣式渲染 html,text 仍存純文字(供列表 preview / 搜尋用)。
+  html?: string
+  // 訊息被編輯過(bubble 時間戳旁顯示「Edited」,對齊 Teams)。
+  edited?: boolean
+  time: string
+  reactions?: Reaction[]
+  replies?: number
+  msgStatus?: MsgStatus
+  threadMessages?: Message[]
+  images?: string[]
+  table?: string[][]
+  // Set on a main-area copy of a thread reply (when "Also send to chatroom" is on).
+  // Points at the thread's root message; drives the "replied to a thread" link.
+  repliedToThreadParentId?: string
+  // ISO 'YYYY-MM-DD' send date, used to group bubbles under a date divider.
+  // Omitted = defaults to "today" (most demo messages only carry a HH:MM time).
+  date?: string
+}
+
+type Room = {
+  id: string
+  type: 'dm' | 'general'
+  // Rooms migrated from Microsoft Teams. Teams DMs are converted to general
+  // group chatrooms too, so origin==='teams' always pairs with type:'general'.
+  origin?: 'teams'
+  title: string
+  section: 'favorites' | 'chats'
+  unread: boolean
+  person?: Person
+  memberKeys?: string[]
+  messages: Message[]
+}
+
+const PEOPLE: Record<string, Person> = {
+  shinichi: { name: 'Kudo Shinichi 工藤新一', color: 'blue', status: 'online', role: 'Detective', email: 'shinichi@teachat.app', avatar: 'https://i.pravatar.cc/96?img=12' },
+  ai: { name: 'Haibara Ai 灰原哀', color: 'purple', status: 'busy', role: 'Researcher', email: 'ai@teachat.app', avatar: 'https://i.pravatar.cc/96?img=5' },
+  ran: { name: 'Mouri Ran 毛利蘭', color: 'magenta', status: 'away', role: 'Karate Captain', email: 'ran@teachat.app', avatar: 'https://i.pravatar.cc/96?img=9' },
+  guanyu: { name: 'Chen Guan-Yu 陳冠宇', color: 'green', status: 'online', role: 'Product Manager', email: 'guanyu@teachat.app', avatar: 'https://i.pravatar.cc/96?img=13' },
+  yating: { name: 'Lin Ya-Ting 林雅婷', color: 'turquoise', status: 'offline', role: 'Designer', email: 'yating@teachat.app', avatar: 'https://i.pravatar.cc/96?img=16' },
+  kenji: { name: 'Takahashi Kenji 高橋健二', color: 'indigo', status: 'online', role: 'Engineer', email: 'kenji@teachat.app', avatar: 'https://i.pravatar.cc/96?img=33' },
+  yui: { name: 'Watanabe Yui 渡邊結衣', color: 'red', status: 'away', role: 'QA Lead', email: 'yui@teachat.app', avatar: 'https://i.pravatar.cc/96?img=20' },
+}
+
+// tAgent 首頁問候用的名字(2026-10-23 user 同意「Good afternoon, Aaron」這種帶名字的問候)
+const ME_GREETING_NAME = 'Aaron'
+const ME: Person = { name: 'Me 我', color: 'green', status: 'online', role: 'You', email: 'me@teachat.app', avatar: 'https://i.pravatar.cc/96?img=8' }
+
+// 20 unique 1-on-1 DM partners. Registered into PEOPLE below so message author
+// lookups (PEOPLE[author]) resolve name + avatar in the conversation view.
+const GENERATED_DM_PEOPLE: { key: string; person: Person }[] = [
+  { key: 'g-rei', person: { name: 'Aoki Rei 青木玲', color: 'blue', status: 'online', role: 'Account Exec', email: 'rei@teachat.app', avatar: 'https://i.pravatar.cc/96?img=25' } },
+  { key: 'g-marco', person: { name: 'Marco Bianchi', color: 'green', status: 'away', role: 'Logistics Lead', email: 'marco@teachat.app', avatar: 'https://i.pravatar.cc/96?img=15' } },
+  { key: 'g-mei', person: { name: 'Zhao Mei 趙美', color: 'magenta', status: 'busy', role: 'Buyer', email: 'mei@teachat.app', avatar: 'https://i.pravatar.cc/96?img=24' } },
+  { key: 'g-tom', person: { name: 'Tom Becker', color: 'indigo', status: 'online', role: 'Sales Eng', email: 'tom@teachat.app', avatar: 'https://i.pravatar.cc/96?img=51' } },
+  { key: 'g-hana', person: { name: 'Sato Hana 佐藤花', color: 'purple', status: 'offline', role: 'Coordinator', email: 'hana@teachat.app', avatar: 'https://i.pravatar.cc/96?img=44' } },
+  { key: 'g-leo', person: { name: 'Leo Fernandez', color: 'turquoise', status: 'online', role: 'Analyst', email: 'leo@teachat.app', avatar: 'https://i.pravatar.cc/96?img=52' } },
+  { key: 'g-jing', person: { name: 'Wu Jing 吳靜', color: 'red', status: 'away', role: 'Ops', email: 'jing@teachat.app', avatar: 'https://i.pravatar.cc/96?img=45' } },
+  { key: 'g-erik', person: { name: 'Erik Lund', color: 'blue', status: 'online', role: 'Vendor Mgr', email: 'erik@teachat.app', avatar: 'https://i.pravatar.cc/96?img=53' } },
+  { key: 'g-yuki', person: { name: 'Kimura Yuki 木村雪', color: 'green', status: 'busy', role: 'Designer', email: 'yuki@teachat.app', avatar: 'https://i.pravatar.cc/96?img=26' } },
+  { key: 'g-priya', person: { name: 'Priya Nair', color: 'purple', status: 'online', role: 'PM', email: 'priya@teachat.app', avatar: 'https://i.pravatar.cc/96?img=27' } },
+  { key: 'g-chen', person: { name: 'Chen Wei 陳偉', color: 'indigo', status: 'away', role: 'Engineer', email: 'chenwei@teachat.app', avatar: 'https://i.pravatar.cc/96?img=54' } },
+  { key: 'g-sara', person: { name: 'Sara Olsen', color: 'magenta', status: 'online', role: 'Marketing', email: 'sara@teachat.app', avatar: 'https://i.pravatar.cc/96?img=28' } },
+  { key: 'g-ken', person: { name: 'Yamada Ken 山田健', color: 'turquoise', status: 'offline', role: 'Support', email: 'yamada@teachat.app', avatar: 'https://i.pravatar.cc/96?img=55' } },
+  { key: 'g-nina', person: { name: 'Nina Costa', color: 'red', status: 'busy', role: 'Finance', email: 'nina@teachat.app', avatar: 'https://i.pravatar.cc/96?img=29' } },
+  { key: 'g-feng', person: { name: 'Li Feng 李峰', color: 'blue', status: 'online', role: 'Sourcing', email: 'lifeng@teachat.app', avatar: 'https://i.pravatar.cc/96?img=56' } },
+  { key: 'g-omar', person: { name: 'Omar Haddad', color: 'green', status: 'away', role: 'Retail', email: 'omar@teachat.app', avatar: 'https://i.pravatar.cc/96?img=57' } },
+  { key: 'g-aiko', person: { name: 'Mori Aiko 森愛子', color: 'purple', status: 'online', role: 'QA', email: 'aiko@teachat.app', avatar: 'https://i.pravatar.cc/96?img=30' } },
+  { key: 'g-paul', person: { name: 'Paul Meyer', color: 'indigo', status: 'busy', role: 'Data', email: 'paul@teachat.app', avatar: 'https://i.pravatar.cc/96?img=58' } },
+  { key: 'g-xia', person: { name: 'Deng Xia 鄧霞', color: 'magenta', status: 'online', role: 'Brand', email: 'xia@teachat.app', avatar: 'https://i.pravatar.cc/96?img=31' } },
+  { key: 'g-ivan', person: { name: 'Ivan Petrov', color: 'turquoise', status: 'offline', role: 'Warehouse', email: 'ivan@teachat.app', avatar: 'https://i.pravatar.cc/96?img=59' } },
+]
+GENERATED_DM_PEOPLE.forEach(({ key, person }) => { PEOPLE[key] = person })
+
+// 20 unique group chat topics (no overlap with INITIAL_ROOMS' existing names).
+const GENERATED_GROUP_TOPICS = [
+  'Marketing Sync', 'Design Review', 'Sourcing Updates', 'Logistics 物流', 'Customer Feedback',
+  'Roadmap Planning', 'QA Handoff', 'Packaging Vendors', 'Retail Partners', 'Finance Q&A',
+  'Brewing Lab 茶研室', 'Supply Chain', 'Event Planning', 'Tasting Notes 品評', 'Inventory Check',
+  'Cold Brew Project', 'Seasonal Blends', 'Export Compliance', 'Storefront Refresh', 'Wholesale Orders',
+]
+const GENERATED_GROUP_MEMBERS = ['shinichi', 'ai', 'ran', 'guanyu', 'yating', 'kenji', 'yui']
+const GENERATED_MSG_LINES = [
+  "Quick update on this — let's sync this week.",
+  'Sounds good, I will take a look today.',
+  'Can we push the deadline by a day?',
+  'Yes, that works on my end.',
+  'Just sent over the latest file, please check.',
+  'Thanks! Reviewing now.',
+  'One thing to flag — the numbers shifted slightly.',
+  'Got it, will adjust the plan accordingly.',
+  'Should we loop in the rest of the team?',
+  "Let's keep it small for now.",
+  'I added some notes in the doc.',
+  'Looks great, no further comments from me.',
+  'Quick question — is this ready for review?',
+  'Almost there, give me an hour.',
+  'No rush, take your time.',
+  'Following up on this thread.',
+  "Apologies for the delay, here's the update.",
+  'Perfect, that resolves it.',
+  'Let me know if anything else is needed.',
+  'Closing this out — thanks everyone!',
+]
+// 20 alternating back-and-forth messages: even slots = other party, odd = me.
+function makeGeneratedMessages(roomId: string, speakers: string[]) {
+  return Array.from({ length: 20 }, (_, j) => ({
+    id: `${roomId}-m${j + 1}`,
+    author: j % 2 === 1 ? 'me' : speakers[Math.floor(j / 2) % speakers.length],
+    text: GENERATED_MSG_LINES[j % GENERATED_MSG_LINES.length],
+    time: `${9 + (j % 8)}:${String((j * 3) % 60).padStart(2, '0')}`,
+  }))
+}
+
+// Natural, irregular interleave of the two queues (run lengths sum to 20 each):
+// dm5, grp3, dm3, grp4, dm6, grp2, dm2, grp5, dm4, grp6
+const GENERATED_RUNS: [('dm' | 'group'), number][] = [
+  ['dm', 5], ['group', 3], ['dm', 3], ['group', 4], ['dm', 6],
+  ['group', 2], ['dm', 2], ['group', 5], ['dm', 4], ['group', 6],
+]
+const GENERATED_CHAT_ROOMS: Room[] = (() => {
+  const rooms: Room[] = []
+  let dmIdx = 0
+  let groupIdx = 0
+  let n = 0
+  for (const [kind, len] of GENERATED_RUNS) {
+    for (let k = 0; k < len; k++) {
+      const id = `gen-${n}`
+      const unread = n % 3 === 0
+      if (kind === 'dm') {
+        const { key, person } = GENERATED_DM_PEOPLE[dmIdx++]
+        rooms.push({ id, type: 'dm', title: person.name, section: 'chats', unread, person, messages: makeGeneratedMessages(id, [key]) })
+      } else {
+        const members = [
+          GENERATED_GROUP_MEMBERS[groupIdx % GENERATED_GROUP_MEMBERS.length],
+          GENERATED_GROUP_MEMBERS[(groupIdx + 1) % GENERATED_GROUP_MEMBERS.length],
+          GENERATED_GROUP_MEMBERS[(groupIdx + 2) % GENERATED_GROUP_MEMBERS.length],
+        ]
+        rooms.push({ id, type: 'general', title: GENERATED_GROUP_TOPICS[groupIdx++], section: 'chats', unread, memberKeys: members, messages: makeGeneratedMessages(id, members) })
+      }
+      n++
+    }
+  }
+  return rooms
+})()
+
+// Inline message photos — bundled local files (Vite asset imports), not hotlinks.
+// 2026-10-23 user:「傳送圖片的對話框裡面破圖」→ the Unsplash hotlinks broke (blocked / dead outside the
+// author's network), so the photos now ship with the app. Source: Swiper demo images
+// (github.com/nolimits4web/swiper demos/images, MIT), cropped to 3:2 at 600×400 (= 200px bubble @3x).
+
+const INITIAL_ROOMS: Room[] = [
+  {
+    id: 'shinichi',
+    type: 'dm',
+    title: PEOPLE.shinichi.name,
+    section: 'favorites',
+    unread: true,
+    person: PEOPLE.shinichi,
+    messages: [
+      { id: 'm1', author: 'shinichi', text: 'Morning! Is the oolong tasting flight ready?', time: '09:12', date: '2026-06-22', reactions: [{ emoji: '👍', count: 8 }], threadMessages: [
+        { id: 'm1-t1', author: 'me', text: "I'll confirm with the sourcing team first.", time: '09:13' },
+        { id: 'm1-t2', author: 'shinichi', text: 'The Dong Ding batch or the High Mountain?', time: '09:13' },
+        { id: 'm1-t3', author: 'me', text: 'Both — 4 samples each.', time: '09:13' },
+        { id: 'm1-t4', author: 'guanyu', text: 'Should I bring the aroma wheel?', time: '09:14' },
+        { id: 'm1-t5', author: 'me', text: 'Yes please, and the scoring sheets too.', time: '09:14' },
+        { id: 'm1-t6', author: 'yating', text: 'I can bring extra cups.', time: '09:15' },
+        { id: 'm1-t7', author: 'shinichi', text: 'Perfect. See everyone at 10:30.', time: '09:15' },
+        { id: 'm1-t8', author: 'me', text: '👍 See you there.', time: '09:15' },
+      ] },
+      { id: 'm2', author: 'me', text: 'All set — 10:30 in tasting room No.3.', time: '09:14', date: '2026-06-24', msgStatus: 'sent' },
+      { id: 'm3', author: 'shinichi', text: 'Great, I will prepare the scoring sheet.', time: '09:15', date: '2026-06-24' },
+      {
+        id: 'm4', author: 'shinichi', time: '09:18',
+        text: "Just finished reviewing the Dong Ding samples from the Lugu Co-op. The spring harvest this year is noticeably lighter in body than last year — likely due to the unusually dry March. The roast on batch #3 is particularly interesting though; it has this subtle honey-caramel finish that lingers for almost a minute. I think it could be a strong candidate for the premium single-origin line. Can you pull the moisture readings and compare against the Q1 benchmark?",
+      },
+      {
+        id: 'm5', author: 'me', time: '09:21', msgStatus: 'read',
+        text: 'Here are the moisture readings from the lab — batch #3 is definitely the standout.',
+        images: [photoSunsetLake, photoRockyCoast],
+      },
+      {
+        id: 'm6', author: 'shinichi', time: '09:23',
+        text: "These look really promising. The color on batch #3 is exactly what we want — golden amber, no greenish tint. I also noticed in the second photo that the leaf unfurl looks very even, which usually correlates with consistent steeping performance. Let's reserve at least 20 kg for the premium line and run a blind comparison with last year's Alishan at Friday's session.",
+      },
+      {
+        id: 'm7', author: 'me', time: '09:25', msgStatus: 'read',
+        text: "Agreed. I'll block the 20 kg now. Should we invite the retail buyers to Friday's tasting, or keep it internal this round?",
+      },
+    ],
+  },
+  {
+    id: 'tea-team',
+    type: 'general',
+    title: 'Tea Tasting 品茶小組',
+    section: 'favorites',
+    unread: false,
+    memberKeys: ['shinichi', 'guanyu', 'yating', 'kenji'],
+    messages: [
+      { id: 'g1', author: 'guanyu', text: 'Cupcake ipsum: the tasting report is updated, please take a look on Figma.', time: '08:40', reactions: [{ emoji: '👍', count: 8 }, { emoji: '🍵', count: 3 }], threadMessages: [
+        { id: 'g1-t1', author: 'yating', text: 'Left comments on the color section.', time: '08:41' },
+        { id: 'g1-t2', author: 'shinichi', text: 'The typography looks great.', time: '08:41' },
+        { id: 'g1-t3', author: 'me', text: 'Agreed, nice work.', time: '08:42' },
+        { id: 'g1-t4', author: 'kenji', text: 'Component specs are clear, easy to implement.', time: '08:42' },
+        { id: 'g1-t5', author: 'yating', text: 'Updated the spacing tokens too.', time: '08:43' },
+        { id: 'g1-t6', author: 'me', text: 'The grid system looks clean.', time: '08:43' },
+        { id: 'g1-t7', author: 'guanyu', text: 'Thanks everyone! Will sync with PM after.', time: '08:44' },
+        { id: 'g1-t8', author: 'me', text: 'Great, see you at standup.', time: '08:44' },
+      ] },
+      { id: 'g2', author: 'me', text: 'Got it, reviewing now.', time: '08:42', msgStatus: 'read' },
+      {
+        id: 'g3', author: 'yating', time: '08:50',
+        text: "I updated the tasting room layout — we now have a dedicated aroma station near the window for better lighting conditions. Here's how it looks:",
+        images: [photoAutumnAvenue],
+      },
+      {
+        id: 'g4', author: 'kenji', time: '08:52',
+        text: 'Nice setup! One thing — the infra for the water temperature controllers is finally stable. We had the 95°C drift issue last week where the PID loop was overshooting by about 3°C before stabilising. I pushed a firmware fix and ran 50 cycles overnight; max deviation is now under 0.5°C. Should be solid for Friday.',
+      },
+      {
+        id: 'g5', author: 'me', time: '08:55', msgStatus: 'read',
+        text: 'Great news on the temp fix, Kenji. I will add that to the session notes so the buyers know we hit spec.',
+      },
+    ],
+  },
+  {
+    id: 'ai',
+    type: 'dm',
+    title: PEOPLE.ai.name,
+    section: 'chats',
+    unread: true,
+    person: PEOPLE.ai,
+    messages: [
+      { id: 'a1', author: 'ai', text: 'The new supplier samples arrived.', time: '15:20', date: '2026-05-28', threadMessages: [
+        { id: 'a1-t1', author: 'ai', text: 'Three oolong, two green tea varieties.', time: '15:22', date: '2026-05-28' },
+        { id: 'a1-t2', author: 'me', text: 'I will set up the cupping station.', time: '15:24', date: '2026-05-28' },
+      ] },
+      { id: 'a2', author: 'me', text: 'Perfect, let us cup them tomorrow.', time: '15:30', date: '2026-05-28', msgStatus: 'read' },
+    ],
+  },
+  {
+    id: 'ran',
+    type: 'dm',
+    title: PEOPLE.ran.name,
+    section: 'chats',
+    unread: false,
+    person: PEOPLE.ran,
+    messages: [{ id: 'r1', author: 'ran', text: 'Thanks! Have a great weekend 🍵', time: '17:45', date: '2026-05-25' }],
+  },
+  {
+    id: 'product-team',
+    type: 'general',
+    title: 'Product Team 產品團隊',
+    section: 'chats',
+    unread: true,
+    memberKeys: ['guanyu', 'yating', 'kenji', 'yui', 'ran'],
+    messages: [
+      { id: 'p1', author: 'kenji', text: 'Deploy is green. Shipping to staging now.', time: '11:02', reactions: [{ emoji: '🚀', count: 4 }] },
+      { id: 'p2', author: 'me', text: 'Nice work team.', time: '11:05', msgStatus: 'read' },
+    ],
+  },
+  {
+    id: 'semi-sales',
+    type: 'general',
+    title: 'IT Sales - Table格式範例',
+    section: 'chats',
+    unread: false,
+    memberKeys: ['guanyu', 'kenji', 'yui', 'shinichi'],
+    messages: [
+      {
+        id: 'sc1', author: 'guanyu', time: '14:02',
+        text: 'Q3 wafer demand forecast by key account — please review before the QBR with the foundry.',
+        table: [
+          ['Customer', 'Node', 'Q3 Wafers', 'Q4 Wafers', 'Status'],
+          ['Apex Systems', 'N5', '12,000', '14,500', 'Confirmed'],
+          ['Nimbus AI', 'N3', '8,200', '11,000', 'Pending PO'],
+          ['Orion Devices', 'N7', '5,600', '5,400', 'Confirmed'],
+          ['Vega Mobile', 'N5', '9,800', '10,200', 'Forecast'],
+          ['Helix Auto', 'N12', '3,400', '3,900', 'Confirmed'],
+        ],
+      },
+      {
+        id: 'sc2', author: 'kenji', time: '14:08',
+        text: 'N3 capacity is tight for Q4 — Nimbus may need an allocation review before we commit the PO.',
+      },
+      {
+        id: 'sc3', author: 'me', time: '14:10', msgStatus: 'read',
+        text: 'Here is the current N3 line utilization snapshot:',
+        table: [
+          ['Line', 'Utilization'],
+          ['Fab 18 P1', '94%'],
+          ['Fab 18 P2', '88%'],
+        ],
+      },
+      {
+        id: 'sc4', author: 'yui', time: '14:15',
+        text: 'Yield on N3 P2 climbed to 71% last week, so we should free up a bit of capacity for Nimbus.',
+        reactions: [{ emoji: '🎉', count: 3 }],
+      },
+      {
+        id: 'sc5', author: 'guanyu', time: '14:22',
+        text: 'Weekly wafer starts by product × week (WW22–WW27, all nodes) — full view for capacity planning:',
+        table: [
+          ['Product', 'Node', 'WW22 Plan', 'WW22 Act', 'WW23 Plan', 'WW23 Act', 'WW24 Plan', 'WW24 Act', 'WW25 Plan', 'WW25 Act', 'WW26 Plan', 'WW26 Act', 'WW27 Plan', 'Cum Plan', 'Cum Act', 'Δ', 'Yield%', 'Die/Wfr', 'Good Die', 'Scrap', 'On Hold', 'Rework', 'Priority', 'PM', 'Customer', 'Ship Wk', 'Rev $K', 'ASP', 'Margin%', 'Risk'],
+          ['APX-V3', 'N5', '800', '812', '820', '805', '830', '831', '840', '829', '850', '–', '860', '5000', '4807', '-193', '92%', '320', '259K', '18', '0', '5', 'High', 'Kenji', 'Apex', 'WW29', '4,128', '$15.9', '38%', 'Low'],
+          ['NIM-A1', 'N3', '600', '590', '620', '614', '640', '–', '650', '–', '660', '–', '670', '3840', '1818', '-282', '71%', '280', '128K', '42', '12', '8', 'Critical', 'Yui', 'Nimbus', 'WW30', '2,899', '$22.6', '41%', 'High'],
+          ['ORI-7X', 'N7', '400', '402', '410', '408', '420', '419', '430', '427', '440', '–', '450', '2550', '2083', '-47', '88%', '410', '183K', '9', '0', '0', 'Normal', 'Shinichi', 'Orion', 'WW28', '3,294', '$18.0', '36%', 'Low'],
+          ['VGA-M2', 'N5', '700', '695', '710', '708', '720', '715', '730', '–', '740', '–', '750', '4350', '2844', '-156', '90%', '350', '256K', '14', '4', '2', 'High', 'Kenji', 'Vega', 'WW29', '4,608', '$18.0', '39%', 'Med'],
+          ['HLX-A12', 'N12', '300', '305', '310', '311', '315', '314', '320', '319', '325', '–', '330', '1900', '1574', '+24', '95%', '520', '149K', '4', '0', '0', 'Normal', 'Guanyu', 'Helix', 'WW27', '2,682', '$18.0', '34%', 'Low'],
+          ['APX-V4', 'N5', '200', '198', '210', '207', '220', '219', '230', '–', '240', '–', '250', '1350', '831', '-19', '91%', '318', '264K', '7', '0', '2', 'High', 'Kenji', 'Apex', 'WW30', '1,056', '$16.0', '37%', 'Low'],
+          ['NIM-B2', 'N3', '150', '148', '160', '–', '170', '–', '180', '–', '190', '–', '200', '1050', '296', '-6', '70%', '275', '206K', '10', '2', '0', 'Critical', 'Yui', 'Nimbus', 'WW31', '740', '$22.0', '40%', 'High'],
+          ['ORI-9X', 'N7', '250', '252', '260', '258', '270', '269', '280', '279', '290', '–', '300', '1650', '1307', '+8', '87%', '405', '231K', '6', '0', '1', 'Normal', 'Shinichi', 'Orion', 'WW29', '2,358', '$18.1', '35%', 'Low'],
+          ['VGA-M3', 'N5', '350', '346', '360', '357', '370', '368', '380', '–', '390', '–', '400', '2250', '1439', '-21', '89%', '345', '311K', '11', '1', '3', 'High', 'Kenji', 'Vega', 'WW30', '2,592', '$18.0', '38%', 'Med'],
+          ['HLX-B6', 'N12', '180', '182', '185', '184', '190', '191', '195', '194', '200', '–', '205', '1155', '944', '+6', '94%', '515', '178K', '3', '0', '0', 'Normal', 'Guanyu', 'Helix', 'WW28', '1,692', '$18.0', '33%', 'Low'],
+          ['SXR-10', 'N3', '100', '98', '110', '–', '120', '–', '130', '–', '140', '–', '150', '750', '196', '-6', '68%', '260', '133K', '15', '5', '4', 'Critical', 'Yui', 'Nimbus', 'WW32', '534', '$22.5', '42%', 'High'],
+          ['MTX-V1', 'N7', '220', '221', '230', '228', '240', '239', '250', '249', '260', '–', '270', '1470', '1156', '+7', '86%', '400', '192K', '5', '0', '0', 'Normal', 'Shinichi', 'Orion', 'WW29', '1,920', '$18.0', '35%', 'Low'],
+          ['PHX-A5', 'N5', '430', '428', '440', '437', '450', '449', '460', '–', '470', '–', '480', '2730', '1762', '-14', '91%', '330', '266K', '9', '2', '1', 'High', 'Kenji', 'Apex', 'WW30', '2,838', '$15.9', '38%', 'Low'],
+          ['QNT-C3', 'N3', '80', '78', '90', '–', '100', '–', '110', '–', '120', '–', '130', '630', '156', '-6', '69%', '270', '108K', '12', '3', '2', 'Critical', 'Yui', 'Nimbus', 'WW32', '432', '$22.0', '41%', 'High'],
+          ['RVX-D7', 'N7', '160', '161', '170', '169', '180', '179', '190', '189', '200', '–', '210', '1110', '867', '+8', '88%', '415', '149K', '4', '0', '0', 'Normal', 'Shinichi', 'Orion', 'WW29', '1,490', '$18.0', '36%', 'Low'],
+          ['STR-E9', 'N5', '560', '554', '570', '565', '580', '577', '590', '–', '600', '–', '610', '3510', '2253', '-27', '90%', '340', '204K', '16', '3', '2', 'High', 'Kenji', 'Vega', 'WW30', '3,672', '$18.0', '39%', 'Med'],
+          ['TRX-F2', 'N12', '140', '142', '145', '144', '148', '149', '150', '150', '155', '–', '160', '898', '728', '+5', '96%', '530', '140K', '2', '0', '0', 'Normal', 'Guanyu', 'Helix', 'WW27', '1,260', '$18.0', '34%', 'Low'],
+          ['ULT-G4', 'N3', '120', '118', '130', '–', '140', '–', '150', '–', '160', '–', '170', '870', '236', '-6', '72%', '285', '170K', '8', '1', '0', 'Critical', 'Yui', 'Nimbus', 'WW31', '612', '$22.3', '41%', 'High'],
+          ['VRX-H8', 'N7', '190', '191', '200', '198', '210', '209', '220', '219', '230', '–', '240', '1290', '1006', '+8', '87%', '408', '159K', '5', '0', '1', 'Normal', 'Shinichi', 'Orion', 'WW29', '1,590', '$18.0', '35%', 'Low'],
+          ['WVE-I6', 'N5', '480', '475', '490', '486', '500', '497', '510', '–', '520', '–', '530', '3030', '1955', '-22', '91%', '325', '289K', '13', '2', '1', 'High', 'Kenji', 'Apex', 'WW30', '3,204', '$15.9', '37%', 'Low'],
+          ['XPR-J3', 'N3', '90', '88', '100', '–', '110', '–', '120', '–', '130', '–', '140', '690', '176', '-6', '70%', '275', '123K', '10', '2', '2', 'Critical', 'Yui', 'Nimbus', 'WW32', '493', '$22.0', '40%', 'High'],
+        ],
+      },
+    ],
+  },
+  {
+    id: 'engineering',
+    type: 'general',
+    title: 'Engineering',
+    section: 'chats',
+    unread: false,
+    memberKeys: ['kenji', 'yui'],
+    messages: [{ id: 'e1', author: 'kenji', text: 'PR merged. Closing the ticket.', time: '18:10', date: '2025-05-26' }],
+  },
+  ...GENERATED_CHAT_ROOMS,
+]
+
+// ── Microsoft Teams 匯入 demo 資料 ───────────────────────────────────────────
+// 只在 config.includeTeamsRooms(Teams 整合 prototype)時注入,base story 不受影響。
+// Teams 匯入的 room 一律歸類為 general chatroom —— 連 Teams DM 也轉換成
+// general group chatroom(title = 對方名字、成員 1 人),origin:'teams' 驅動 TeamsAvatar 標示。
+//
+// 人名刻意與既有 DM room 重複(2026-07-06 user 指定):同一個人在本 chat app 有
+// chatroom,在 Teams 平台也有 —— 搜尋該人名時 People tab 看到本人、Chatroom tab
+// 同時看到同名的原生 DM room 與 Teams 匯入 room(後者掛 TeamsAvatar 標示來源)。
+// Room name 僅含中文 / 英文(user 指定,不用日文假名或日製異體字)。
+const TEAMS_MIGRATED_ROOMS: Room[] = [
+  {
+    id: 'teams-tea-ops', type: 'general', origin: 'teams', title: 'Tea Ops Weekly', section: 'favorites', unread: true,
+    memberKeys: ['guanyu', 'kenji', 'yui', 'shinichi'],
+    messages: [
+      { id: 'to1', author: 'guanyu', text: 'This channel moved over from Teams — full history is preserved below.', time: '08:20' },
+      { id: 'to2', author: 'kenji', text: 'Ops review stays 10:00 every Monday, same as before the migration.', time: '08:24' },
+      { id: 'to3', author: 'me', text: 'Great, agenda doc is pinned. See everyone Monday.', time: '08:31', msgStatus: 'read' },
+    ],
+  },
+  {
+    // 原 Teams 1:1 DM(與工藤新一)→ 轉換後成為 general group chatroom;
+    // 與既有 favorites DM「Kudo Shinichi 工藤新一」同名,展示同一人雙平台並存
+    id: 'teams-shinichi', type: 'general', origin: 'teams', title: PEOPLE.shinichi.name, section: 'chats', unread: true,
+    memberKeys: ['shinichi'],
+    messages: [
+      { id: 'tsh1', author: 'shinichi', text: 'This is our old Teams thread — history is all here after the migration.', time: '09:02' },
+      { id: 'tsh2', author: 'me', text: 'Looks complete, thanks! Even the older attachments came through.', time: '09:05', msgStatus: 'read' },
+      { id: 'tsh3', author: 'shinichi', text: 'The Teams desktop client will be retired at the end of the month.', time: '09:06' },
+    ],
+  },
+  {
+    // 原 Teams 1:1 DM(與灰原哀)→ general group chatroom,與既有 DM 同名
+    id: 'teams-ai', type: 'general', origin: 'teams', title: PEOPLE.ai.name, section: 'chats', unread: false,
+    memberKeys: ['ai'],
+    messages: [
+      { id: 'tai1', author: 'ai', text: 'Resending the supplier sample log here since we moved off Teams.', time: '10:05', date: '2026-05-30' },
+      { id: 'tai2', author: 'me', text: 'Received — I will fold it into the Q3 cupping plan.', time: '10:12', date: '2026-05-30', msgStatus: 'read' },
+    ],
+  },
+  {
+    // 原 Teams 1:1 DM(與毛利蘭)→ general group chatroom,與既有 DM 同名
+    id: 'teams-ran', type: 'general', origin: 'teams', title: PEOPLE.ran.name, section: 'chats', unread: false,
+    memberKeys: ['ran'],
+    messages: [
+      { id: 'tra1', author: 'ran', text: 'Archiving our Teams chat here — see you on TeaChat from now on!', time: '16:40', date: '2026-05-27' },
+      { id: 'tra2', author: 'me', text: 'Welcome aboard 🍵', time: '16:45', date: '2026-05-27', msgStatus: 'read' },
+    ],
+  },
+  {
+    id: 'teams-vendor', type: 'general', origin: 'teams', title: 'Vendor Onboarding (Teams)', section: 'chats', unread: false,
+    memberKeys: ['guanyu', 'yating', 'kenji'],
+    messages: [
+      { id: 'tv1', author: 'yating', text: 'Checklist template is in the pinned tab, same structure as the Teams wiki.', time: '11:20', date: '2026-05-29' },
+      { id: 'tv2', author: 'me', text: 'Perfect, onboarding for the new cup supplier starts next week.', time: '11:28', date: '2026-05-29', msgStatus: 'read' },
+    ],
+  },
+]
+
+const COMMON_EMOJI = ['👍', '❤️', '😂', '🎉']
+
+// ── Status dot ────────────────────────────────────────────────────────────────
+function StatusDot({ status, size = 8 }: { status: Presence; size?: number }) {
+  const base = 'flex items-center justify-center rounded-full ring-1 ring-surface'
+  const dim = { width: size, height: size }
+  if (status === 'online') return <span className={`${base} bg-green-500`} style={dim} />
+  if (status === 'busy') return <span className={`${base} bg-red-500`} style={dim} />
+  if (status === 'away') {
+    return (
+      <span className={`${base} bg-yellow-400`} style={dim}>
+        <Clock size={Math.round(size * 0.67)} className="text-white" strokeWidth={2.5} />
+      </span>
+    )
+  }
+  return <span className={`${base} border-2 border-neutral-400 bg-transparent`} style={dim} />
+}
+
+// ── Avatar helpers ────────────────────────────────────────────────────────────
+function makeProfileCard(p: Person) {
+  return (
+    <ProfileCard
+      name={p.name}
+      subtitle={p.role}
+      status={p.status}
+      avatar={{ alt: p.name, color: p.color, src: p.avatar }}
+      fields={[
+        { label: 'Role', value: p.role },
+        { label: 'Email', value: p.email },
+      ]}
+      actions={<ProfileCardDefaultActions />}
+    />
+  )
+}
+
+function PersonAvatar({ person, size = 32, dotSize = 8 }: { person: Person; size?: number; dotSize?: number }) {
+  return (
+    <div className="relative inline-flex shrink-0">
+      <Avatar src={person.avatar} alt={person.name} color={person.color} size={size} hoverCard={makeProfileCard(person)} />
+      <span className="absolute -bottom-0.5 -right-0.5 z-10">
+        <StatusDot status={person.status} size={dotSize} />
+      </span>
+    </div>
+  )
+}
+
+function GroupAvatar({ size = 32 }: { size?: number }) {
+  return (
+    <Avatar
+      icon={MessagesSquare}
+      size={size}
+      shape="circle"
+      className="[&>div]:!bg-[var(--color-neutral-6)] [&>div]:!text-[var(--on-emphasis)]"
+    />
+  )
+}
+
+// Microsoft Teams 匯入聊天室頭像 — 圓形底色 = Teams 品牌色 brand80 #5B5FC7
+// (source: microsoft/fluentui packages/tokens/src/global/brandColors.ts,brandTeams[80]),
+// icon 為白色 Teams logo 線條(rounded-square「T」+ 人形剪影的簡化單色版)。
+const TEAMS_BRAND = '#5B5FC7'
+function TeamsAvatar({ size = 32 }: { size?: number }) {
+  const icon = Math.round(size * 0.62)
+  return (
+    <div
+      className="flex shrink-0 items-center justify-center rounded-full"
+      style={{ width: size, height: size, backgroundColor: TEAMS_BRAND }}
+      role="img"
+      aria-label="Migrated from Microsoft Teams"
+    >
+      <svg width={icon} height={icon} viewBox="0 0 24 24" aria-hidden="true">
+        {/* person silhouette (head + shoulder), right side */}
+        <circle cx="17.4" cy="7.3" r="2.5" fill="white" />
+        <path d="M14.6 11.2h5.1c.5 0 .9.4.9.9v4.2c0 2.4-1.9 4.3-4.3 4.3-.6 0-1.2-.1-1.7-.4V11.2Z" fill="white" />
+        {/* rounded square with the "T" knocked out in the brand color */}
+        <rect x="2.4" y="6.2" width="11.2" height="11.2" rx="2" fill="white" />
+        <path d="M5.4 9.8h5.2M8 9.8v5.9" stroke={TEAMS_BRAND} strokeWidth="1.8" strokeLinecap="round" fill="none" />
+      </svg>
+    </div>
+  )
+}
+
+// 字母頭像 — 取名稱首字(大寫)+ 由名稱雜湊出的穩定顏色(各室不同色,不會每次 render 變動)。
+// 供 usability test 變體 C 用(多人聊天室);DM 不受影響。
+function hashString(s: string) {
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0
+  return Math.abs(h)
+}
+function InitialAvatar({ name, size = 32 }: { name: string; size?: number }) {
+  const letter = (name.trim()[0] ?? '#').toUpperCase()
+  const hue = hashString(name) % 360
+  return (
+    <div
+      className="flex shrink-0 items-center justify-center rounded-full font-semibold text-white"
+      style={{ width: size, height: size, backgroundColor: `hsl(${hue} 58% 50%)`, fontSize: Math.round(size * 0.45) }}
+    >
+      {letter}
+    </div>
+  )
+}
+
+function MutedAvatar({ size = 32 }: { size?: number }) {
+  return (
+    <div
+      className="flex shrink-0 items-center justify-center rounded-full border border-divider bg-white"
+      style={{ width: size, height: size }}
+    >
+      <BellOff size={Math.round(size * 0.5)} className="text-fg-secondary" />
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Settings modal
+// ════════════════════════════════════════════════════════════════════════════
+function SettingsModal({
+  open,
+  onOpenChange,
+  showPreview,
+  onConfirm,
+}: {
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  showPreview: boolean
+  onConfirm: (v: boolean) => void
+}) {
+  const [draft, setDraft] = useState(showPreview)
+  useEffect(() => { if (open) setDraft(showPreview) }, [open, showPreview])
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl h-[480px] p-0 overflow-hidden">
+        <div className="flex h-full min-h-0">
+          <nav className="flex w-44 shrink-0 flex-col gap-0.5 border-r border-divider bg-surface p-3">
+            <p className="px-2 pb-1 pt-0.5 text-caption font-semibold uppercase tracking-wide text-fg-secondary">Settings</p>
+            <button type="button" className="flex w-full items-center gap-2 rounded-md bg-neutral-selected px-2 py-1.5 text-left text-body font-medium text-foreground">
+              <MessagesSquare size={15} />
+              Chats
+            </button>
+          </nav>
+          <div className="flex min-w-0 min-h-0 flex-1 flex-col">
+            <DialogHeader className="border-b border-divider px-6 py-4">
+              <DialogTitle>Chats list</DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <div className="flex items-center justify-between gap-4 rounded-lg py-3">
+                <div>
+                  <p className="text-body font-medium">Show message previews for chats</p>
+                  <p className="text-caption text-fg-secondary mt-0.5">Display the latest message below each chat name</p>
+                </div>
+                <Switch checked={draft} onCheckedChange={setDraft} aria-label="Show message previews for chats" />
+              </div>
+            </div>
+            <DialogFooter className="border-t border-divider px-6 py-3">
+              <Button variant="text" onClick={() => onOpenChange(false)}>Cancel</Button>
+              <Button variant="primary" onClick={() => { onConfirm(draft); onOpenChange(false) }}>Save changes</Button>
+            </DialogFooter>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 1. Nav rail
+// ════════════════════════════════════════════════════════════════════════════
+function Logo() {
+  return (
+    <svg width={28} height={28} viewBox="0 0 32 32" aria-label="TeaChat" role="img">
+      <defs>
+        <linearGradient id="teachat-logo" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#22d3ee" />
+          <stop offset="100%" stopColor="#1e3a8a" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M16 3.2 Q16.9 3.2 17.7 3.7 L26.3 8.6 Q27.1 9.1 27.1 10.1 L27.1 21.9 Q27.1 22.9 26.3 23.4 L17.7 28.3 Q16.9 28.8 16 28.8 Q15.1 28.8 14.3 28.3 L5.7 23.4 Q4.9 22.9 4.9 21.9 L4.9 10.1 Q4.9 9.1 5.7 8.6 L14.3 3.7 Q15.1 3.2 16 3.2 Z"
+        fill="url(#teachat-logo)"
+      />
+    </svg>
+  )
+}
+
+type NavTab = 'home' | 'chat' | 'tasks' | 'docs' | 'drive' | 'agent'
+
+/**
+ * tWorkspace NavRail 分頁(2026-10-24 user 指定順序與 lucide icon:Chat → message-circle、Task → list-checks、
+ * Doc → file-text、Drive → hard-drive、Agent → sparkles)。標籤用英文 UI 字;Agent 沿用產品名 tAgent。
+ */
+const WORKSPACE_NAV_ITEMS: { tab: Exclude<NavTab, 'home'>; icon: React.ComponentProps<typeof Button>['startIcon']; label: string }[] = [
+  { tab: 'chat', icon: MessageCircle, label: 'Chat' },
+  { tab: 'tasks', icon: ListChecks, label: 'Tasks' },
+  { tab: 'docs', icon: FileText, label: 'Docs' },
+  { tab: 'drive', icon: HardDrive, label: 'Drive' },
+  { tab: 'agent', icon: Sparkles, label: TAGENT_LABEL },
+]
+
+function NavRail({
+  unreadCount,
+  onOpenSettings,
+  tab: tabProp,
+  onTabChange,
+  showAgent = false,
+  backgroundClassName = 'bg-surface',
+  showHome = true,
+  variant = 'default',
+}: {
+  unreadCount: number
+  onOpenSettings: () => void
+  /** 受控分頁(config.agent:App 依分頁切換整頁內容);省略 = 只在 NavRail 內記住高亮(base 行為) */
+  tab?: NavTab
+  onTabChange?: (tab: NavTab) => void
+  /** tAgent 分頁(config.agent;2026-10-23 起是導覽分頁 → tAgent 整頁,不再是開合側邊面板的切換鈕) */
+  showAgent?: boolean
+  /** 底色 utility;預設 `bg-surface`(base)。tWorkspace 傳 chrome.ts 的淺灰 */
+  backgroundClassName?: string
+  /** Home 入口;預設顯示(base)。tWorkspace 傳 false:2026-10-23 user「nav bar 上移除 home 的入口,chat 當作首頁」 */
+  showHome?: boolean
+  /**
+   * `workspace`(tWorkspace,2026-10-24):分頁 = WORKSPACE_NAV_ITEMS、分頁式樣(NavBtn `indicator`);
+   * Logo 列高 48 = 右側 Menu 標題列高(ChatList「Chats」/ tAgent 側欄標題),Logo 與標題垂直置中對齊(user:「logo 往上移,垂直置中右側的 Chats title」)。
+   * 此模式下 showAgent / showHome 不作用。
+   */
+  variant?: 'default' | 'workspace'
+}) {
+  const [internalTab, setInternalTab] = useState<NavTab>('chat')
+  const tab = tabProp ?? internalTab
+  const setTab = (next: NavTab) => {
+    setInternalTab(next)
+    onTabChange?.(next)
+  }
+  const moreLabelId = useId()
+
+  const chatBadge = unreadCount > 0 ? <Badge variant="critical" count={unreadCount} max={99} className="!bg-[#EC540F]" /> : undefined
+  const workspace = variant === 'workspace'
+
+  return (
+    <nav className={`flex w-12 shrink-0 flex-col items-center border-r border-divider ${backgroundClassName} ${workspace ? 'pb-2' : 'px-2 py-2'}`}>
+      {workspace ? (
+        // Logo 列 = 一條頁首:高 --chrome-header-height(48,含底線)、內容區扣掉底線 1px(pb-px)→ Logo 中心與右側頁首標題同一條水平線,
+        // 分隔線(32 寬,沿用 base 的 w-8)貼列底 = 與右側頁首底線同一條(2026-10-24 user「logo 下方的 divider 需要跟右側 Chats 下的線水平對齊」)
+        <div className="relative flex h-[var(--chrome-header-height)] w-full shrink-0 items-center justify-center pb-px">
+          <Logo />
+          <div className="absolute bottom-0 left-2 w-8"><Separator /></div>
+        </div>
+      ) : (
+        <>
+          <div className="flex h-10 items-center justify-center">
+            <Logo />
+          </div>
+          <div className="w-8 py-1"><Separator /></div>
+        </>
+      )}
+      {workspace ? (
+        // 線下到第一顆鈕 8px = base(分隔線 py-1 下半 4 + 清單 py-1 4)
+        <div className="flex w-full flex-col gap-1 pt-2 pb-1">
+          {WORKSPACE_NAV_ITEMS.map((item) => (
+            <NavBtn
+              key={item.tab}
+              indicator
+              icon={item.icon}
+              label={item.label}
+              active={tab === item.tab}
+              onClick={() => setTab(item.tab)}
+              overlayBadge={item.tab === 'chat' ? chatBadge : undefined}
+            />
+          ))}
+        </div>
+      ) : (
+      <div className="flex flex-col gap-1 py-1">
+        {showHome && <NavBtn icon={Home} label="Home" active={tab === 'home'} onClick={() => setTab('home')} />}
+        <NavBtn
+          icon={MessageCircle}
+          label="Chat"
+          active={tab === 'chat'}
+          onClick={() => setTab('chat')}
+          overlayBadge={chatBadge}
+        />
+        {showAgent && (
+          <NavBtn
+            // AgentLogo 同一造型(agent-panel-logo.spec.md);Button 以 icon tier 16 呼叫它
+            icon={TAgentRailIcon as unknown as React.ComponentProps<typeof Button>['startIcon']}
+            label={TAGENT_LABEL}
+            active={tab === 'agent'}
+            onClick={() => setTab('agent')}
+          />
+        )}
+      </div>
+      )}
+      <div className="mt-auto flex flex-col items-center gap-1 py-1">
+        {/* More menu — single RIGHT tooltip; aria-labelledby (not string aria-label) avoids DS auto top-tooltip */}
+        <DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button variant="text" size="md" iconOnly startIcon={MoreHorizontal} aria-labelledby={moreLabelId} className="!h-8 !w-8 !min-w-0 !p-0" />
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="right" avoidCollisions={false}>More</TooltipContent>
+            <span id={moreLabelId} className="sr-only">More</span>
+          </Tooltip>
+          <DropdownMenuContent align="end" side="right" sideOffset={8}>
+            <DropdownMenuItem startIcon={Settings} onSelect={onOpenSettings}>Settings</DropdownMenuItem>
+            <DropdownMenuItem startIcon={HelpCircle}>Help</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem startIcon={LogOut}>Sign out</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <Avatar src={ME.avatar} alt={ME.name} color={ME.color} size={32} hoverCard={makeProfileCard(ME)} />
+      </div>
+    </nav>
+  )
+}
+
+/**
+ * Tasks / Docs / Drive 分頁的佔位頁(2026-10-24 NavRail 加入這三個分頁時,內容尚未設計)。
+ * 頁首 = DS ChromeHeader + h1(與 tAgent 頁同款);內容 = DS Empty,icon 與 NavRail 同一顆。
+ */
+const WORKSPACE_PLACEHOLDER: Record<'tasks' | 'docs' | 'drive', { title: string; description: string }> = {
+  tasks: { title: 'Tasks', description: 'Track work assigned to you and your team.' },
+  docs: { title: 'Docs', description: 'Write and share documents with your team.' },
+  drive: { title: 'Drive', description: 'Find every file shared across your chats and docs.' },
+}
+
+function WorkspacePlaceholderPage({ tab }: { tab: 'tasks' | 'docs' | 'drive' }) {
+  const copy = WORKSPACE_PLACEHOLDER[tab]
+  const icon = WORKSPACE_NAV_ITEMS.find((i) => i.tab === tab)?.icon as React.ComponentProps<typeof Empty>['icon']
+  return (
+    <div className="flex h-full min-h-0 flex-col bg-surface">
+      <ChromeHeader className="bg-surface">
+        <h1 className="flex-1 truncate text-body-lg font-medium">{copy.title}</h1>
+      </ChromeHeader>
+      <div className="flex min-h-0 flex-1 items-center justify-center px-[var(--layout-space-loose)]">
+        <Empty icon={icon} title={`${copy.title} is coming soon`} description={copy.description} />
+      </div>
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 1a. Top search bar(chrome='top-search',Teams 整合 prototype)
+// NavRail 移除後的頂部 chrome:universal search 置中(controlled input),
+// NavRail 原有的 More DropdownMenu + 我的頭像移到最右(由右至左:PersonAvatar
+// → DropdownMenu)。左欄留空(logo 已移除,2026-07-06),1fr 佔位維持置中。
+// - Focus 且無關鍵字 → input 正下方浮出提示 panel(原 SearchModal empty state;
+//   panel 內的 search bar 那排已移除,輸入都在頂部這個 input 完成)
+// - 有關鍵字 → App 把 Conversation view 整個換成 SearchPageView(頁面一部分,非浮窗)
+// grid-cols-[1fr_auto_1fr] 讓 search bar 永遠落在視窗正中間,不受左右內容寬度影響。
+// ════════════════════════════════════════════════════════════════════════════
+function TopSearchBar({
+  onOpenSettings,
+  query,
+  onQueryChange,
+}: {
+  onOpenSettings: () => void
+  query: string
+  onQueryChange: (v: string) => void
+}) {
+  const moreLabelId = useId()
+  const [focused, setFocused] = useState(false)
+  const showHint = focused && query.trim() === ''
+  return (
+    // @layout-space-magic-ok: 48px = top chrome 固定高度(對齊 Microsoft Teams 48px top bar),非 layout-space 親疏 gap 語境
+    <header className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-divider bg-surface px-[var(--layout-space-loose)]" style={{ height: 48 }}>
+      <div />
+      {/* 正中間的 universal search input */}
+      <div className="relative" style={{ width: 'min(480px, 40vw)' }}>
+        <Input
+          startIcon={Search}
+          placeholder="search"
+          aria-label="Search"
+          className="w-full"
+          value={query}
+          onChange={(e) => onQueryChange(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          onKeyDown={(e) => { if (e.key === 'Escape') { onQueryChange(''); (e.target as HTMLInputElement).blur() } }}
+          endAction={query ? { icon: X, label: 'Clear search', onClick: () => onQueryChange('') } : undefined}
+        />
+        {/* Active(focus)+ 無關鍵字 → input 正下方的提示 panel(原 search icon + 提示字串);
+            spacing 走 layout-space token、陰影走 overlay elevation token */}
+        {showHint && (
+          <div className="absolute inset-x-0 top-full z-40 mt-[var(--layout-space-tight)] flex flex-col items-center gap-[var(--layout-space-tight)] rounded-2xl border border-divider bg-surface px-[var(--layout-space-loose)] py-[var(--layout-space-loose)] text-center shadow-[var(--elevation-200)]">
+            <Search size={28} style={{ color: 'var(--color-neutral-5)' }} />
+            <p style={{ fontSize: 13, color: 'var(--color-neutral-7)' }}>Search for people, chat rooms, or messages</p>
+          </div>
+        )}
+      </div>
+      <div className="flex items-center justify-end gap-1">
+        {/* More menu — same items as the NavRail version; aria-labelledby (not string aria-label)
+            avoids the DS iconOnly auto-tooltip so we keep a single bottom-side tooltip */}
+        <DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button variant="text" size="md" iconOnly startIcon={MoreHorizontal} aria-labelledby={moreLabelId} className="!h-8 !w-8 !min-w-0 !p-0" />
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">More</TooltipContent>
+            <span id={moreLabelId} className="sr-only">More</span>
+          </Tooltip>
+          <DropdownMenuContent align="end" side="bottom" sideOffset={8}>
+            <DropdownMenuItem startIcon={Settings} onSelect={onOpenSettings}>Settings</DropdownMenuItem>
+            <DropdownMenuItem startIcon={HelpCircle}>Help</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem startIcon={LogOut}>Sign out</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <Avatar src={ME.avatar} alt={ME.name} color={ME.color} size={32} hoverCard={makeProfileCard(ME)} />
+      </div>
+    </header>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 1b. Collapsed list rail(chrome='top-search',2026-07-06)
+// ChatList 收合後,最左側出現獨立一排垂直 bar,只有最頂部一顆 Expand sidebar
+// 按鈕;點擊展開 ChatList。取代原本 ConversationHeader 內的 Expand 按鈕 + 分割線
+// (top-search chrome 下該按鈕與分割線移除,由本 rail 接手)。
+// ════════════════════════════════════════════════════════════════════════════
+function CollapsedListRail({ onExpand }: { onExpand: () => void }) {
+  return (
+    <div className="flex w-12 shrink-0 flex-col items-center border-r border-divider bg-surface py-[var(--layout-space-tight)]">
+      <ListBtn icon={PanelLeftOpen} label="Expand sidebar" onClick={onExpand} />
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 2. Chat list
+// ════════════════════════════════════════════════════════════════════════════
+function AddPopover() {
+  return (
+    <Popover>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <Button variant="text" size="sm" iconOnly startIcon={Plus} aria-label="Add" title="" />
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent>Add</TooltipContent>
+      </Tooltip>
+      <PopoverContent align="end" sideOffset={8} className="w-52 p-1">
+        <button type="button" className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-body hover:bg-neutral-hover">
+          <Plus size={16} /> Create new chat
+        </button>
+        <button type="button" className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-body hover:bg-neutral-hover">
+          <Plus size={16} /> Create new section
+        </button>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+function Section({ label, open, onToggle, trailing }: { label: string; open: boolean; onToggle: () => void; trailing?: React.ReactNode }) {
+  return (
+    <div className="mt-2 flex items-center gap-1 p-1">
+      <IconBtnSm
+        icon={open ? ChevronDown : ChevronRight}
+        label={open ? 'Collapse' : 'Expand'}
+        onClick={onToggle}
+        className="!h-5 !w-5 !min-w-0 !p-0"
+        style={{ color: 'var(--color-neutral-7)' }}
+      />
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex-1 truncate text-left hover:text-foreground"
+        style={{ fontSize: 12, fontWeight: 500, lineHeight: '130%', color: 'var(--color-neutral-7)' }}
+      >
+        {label}
+      </button>
+      {trailing}
+    </div>
+  )
+}
+
+function RoomMoreMenu({
+  room,
+  isMuted,
+  isFavorite,
+  onToggleMute,
+  onToggleFavorite,
+}: {
+  room: Room
+  isMuted: boolean
+  isFavorite: boolean
+  onToggleMute: () => void
+  onToggleFavorite: () => void
+}) {
+  return (
+    <DropdownMenu>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger asChild>
+            <Button variant="text" size="sm" iconOnly startIcon={MoreHorizontal} aria-label="More" title="" className="!h-6 !w-6 !min-w-0 !p-0" />
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
+        <TooltipContent>More</TooltipContent>
+      </Tooltip>
+      {/* side="bottom" sideOffset=8 — dropdown below trigger with 8px gap; collision avoidance keeps it on-screen near viewport edges */}
+      <DropdownMenuContent align="end" side="bottom" sideOffset={8}>
+        <DropdownMenuItem startIcon={isMuted ? Bell : BellOff} onSelect={onToggleMute}>
+          {isMuted ? 'Unmute' : 'Mute'}
+        </DropdownMenuItem>
+        <DropdownMenuItem startIcon={Star} onSelect={onToggleFavorite}>
+          {isFavorite ? 'Unfavorite' : 'Favorite'}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem startIcon={ExternalLink}>Open in new tab</DropdownMenuItem>
+        <DropdownMenuItem startIcon={AppWindow}>Open in new window</DropdownMenuItem>
+        {room.type === 'general' && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem startIcon={LogOut} className="text-error">Leave</DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+// RoomRow — two-line preview. Right-side time + badge are shrink-0 to prevent clipping on resize.
+function RoomRow({
+  room,
+  active,
+  isMuted,
+  isFavorite,
+  onSelect,
+  onToggleMute,
+  onToggleFavorite,
+  showPreview,
+  groupAvatarMode = 'icon',
+}: {
+  room: Room
+  active: boolean
+  isMuted: boolean
+  isFavorite: boolean
+  onSelect: (id: string) => void
+  onToggleMute: (id: string) => void
+  onToggleFavorite: (id: string) => void
+  showPreview: boolean
+  groupAvatarMode?: 'icon' | 'initial'
+}) {
+  const now = new Date()
+  const latestMsg = room.messages[room.messages.length - 1]
+  const latestAuthor = latestMsg?.author === 'me' ? 'You' : (PEOPLE[latestMsg?.author]?.name.split(' ')[0] ?? '')
+  const previewText = latestMsg ? `${latestAuthor}: ${latestMsg.text}` : ''
+  const avatarSize = showPreview ? 32 : 20
+  const isUnread = room.unread && !isMuted
+  const titleStyle: React.CSSProperties = isUnread
+    ? { fontSize: 14, fontWeight: 700, lineHeight: '150%', color: 'var(--color-neutral-9)' }
+    : { fontSize: 14, fontWeight: 400, lineHeight: '150%', color: 'var(--color-neutral-8)' }
+  const timeStyle: React.CSSProperties = { fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)' }
+  const subtitleStyle: React.CSSProperties = isUnread
+    ? { fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-9)' }
+    : { fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-8)' }
+
+  return (
+    <div
+      className={`group relative flex cursor-pointer items-center gap-2 rounded-[4px] px-2 ${
+        showPreview ? 'py-2' : 'py-1.5'
+      } ${active ? 'bg-neutral-selected' : 'hover:bg-neutral-hover'}`}
+      onClick={() => onSelect(room.id)}
+    >
+      {/* Avatar — muted > teams > dm > group */}
+      {isMuted ? (
+        <MutedAvatar size={avatarSize} />
+      ) : room.origin === 'teams' ? (
+        <TeamsAvatar size={avatarSize} />
+      ) : room.type === 'dm' && room.person ? (
+        <PersonAvatar person={room.person} size={avatarSize} dotSize={showPreview ? 8 : 6} />
+      ) : groupAvatarMode === 'initial' ? (
+        <InitialAvatar name={room.title} size={avatarSize} />
+      ) : (
+        <GroupAvatar size={avatarSize} />
+      )}
+
+      {/* Text content — min-w-0 flex-1 allows truncation without clipping right-side items.
+          group-hover:pr-6 reserves the 24px more-button footprint so text truncates at the
+          button's left edge instead of being overlapped by it. */}
+      {showPreview ? (
+        <div className="min-w-0 flex-1 group-hover:pr-6">
+          {/* Line 1: name (flex-1 truncate) + time (shrink-0; invisible on hover — keeps its
+              box so row height is identical across initial/hover/clicked) */}
+          <div className="flex items-baseline gap-1">
+            <span className="min-w-0 flex-1 truncate" style={titleStyle}>
+              {room.title}
+            </span>
+            <span className="shrink-0 group-hover:invisible" style={timeStyle}>
+              {latestMsg ? formatListTime(latestMsg, now) : ''}
+            </span>
+          </div>
+          {/* Line 2: preview (flex-1 truncate) + unread dot (shrink-0; invisible on hover) */}
+          <div className="flex items-center gap-1">
+            <p className="min-w-0 flex-1 truncate" style={subtitleStyle}>
+              {previewText}
+            </p>
+            {isUnread && (
+              <span className="shrink-0 group-hover:invisible">
+                <Badge dot variant="critical" className="!bg-[#EC540F]" />
+              </span>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="flex min-w-0 flex-1 items-center gap-1 group-hover:pr-6">
+          <span className="min-w-0 flex-1 truncate" style={titleStyle}>
+            {room.title}
+          </span>
+          {isUnread && (
+            <span className="shrink-0 group-hover:invisible">
+              <Badge dot variant="critical" className="!bg-[#EC540F]" />
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Hover: 24×24 more button, box right edge 12px from divider (right-1 = 4px inside the row's 8px right padding).
+          invisible (not hidden) keeps a measurable box so Radix anchors the dropdown correctly; overlays date/time + badge. */}
+      <div
+        className="absolute right-1 top-1/2 -translate-y-1/2 invisible group-hover:visible [&:has([data-state=open])]:visible"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <RoomMoreMenu
+          room={room}
+          isMuted={isMuted}
+          isFavorite={isFavorite}
+          onToggleMute={() => onToggleMute(room.id)}
+          onToggleFavorite={() => onToggleFavorite(room.id)}
+        />
+      </div>
+    </div>
+  )
+}
+
+// Small floor only (avatar + padding) so RoomRow width adapts freely to the ResizeHandle drag
+// Thread panel 寬度範圍(舊版 ThreadPanel 與 AppShell 版 Thread 共用)
+const THREAD_MIN = 320
+const THREAD_MAX = 720
+const CHAT_LIST_MIN = 120
+const CHAT_LIST_MAX = 480
+
+type ChatListBodyProps = {
+  rooms: Room[]
+  activeId: string
+  onSelect: (id: string) => void
+  /** 省略 = 不渲染 Collapse 鈕(AppShell 版:開關是 Main 頁首最左的 SidebarTrigger,sidebar.spec.md Pattern A) */
+  onCollapse?: () => void
+  showPreview: boolean
+  mutedIds: Set<string>
+  favOrder: string[]
+  onToggleMute: (id: string) => void
+  onToggleFavorite: (id: string) => void
+  groupAvatarMode?: 'icon' | 'initial'
+  onSearch?: () => void
+  openFav: boolean
+  onToggleFav: () => void
+  openChats: boolean
+  onToggleChats: () => void
+  /**
+   * 頁首高 = DS `--chrome-header-height`(48,含底線;chrome-header.tsx 同款),取代內容撐出的 49。
+   * tWorkspace 傳 true(2026-10-24):與 tAgent 頁(DS ChromeHeader)同高,NavRail Logo 下的分隔線才能與兩個分頁的頁首底線同一條。
+   */
+  chromeHeight?: boolean
+}
+
+// ChatList 內容(header + 兩個 section)。舊版 aside(ChatList)與 AppShell 的 Menu(ChatListMenu)共用同一份。
+function ChatListBody({
+  rooms,
+  activeId,
+  onSelect,
+  onCollapse,
+  showPreview,
+  mutedIds,
+  favOrder,
+  onToggleMute,
+  onToggleFavorite,
+  groupAvatarMode = 'icon',
+  onSearch,
+  openFav,
+  onToggleFav,
+  openChats,
+  onToggleChats,
+  chromeHeight = false,
+}: ChatListBodyProps) {
+  const favSet = new Set(favOrder)
+  const favorites = favOrder.map((id) => rooms.find((r) => r.id === id)!).filter(Boolean)
+  const chats = rooms.filter((r) => !favSet.has(r.id))
+
+  return (
+    <>
+      <header
+        className={`flex items-center border-b border-divider px-3 ${chromeHeight ? 'h-[var(--chrome-header-height)] shrink-0' : ''}`}
+        style={chromeHeight ? undefined : { paddingTop: 10, paddingBottom: 10 }}
+      >
+        <h2 className="flex-1 truncate" style={{ fontSize: 16, fontWeight: 500, lineHeight: '130%', color: 'var(--color-neutral-9)' }}>Chats</h2>
+        {/* @layout-space-magic-ok: gap-2=8px 既有 header icon 按鈕群間距(STRUCTURE.md ChatList header spec),非 layout-space 巨觀 gap */}
+        <div className="flex items-center gap-2">
+          <AddPopover />
+          {/* top-search chrome 不傳 onSearch(universal search 在頂部 bar)→ 不渲染 Search 按鈕 */}
+          {onSearch && <ListBtn icon={Search} label="Search" onClick={onSearch} />}
+          {onCollapse && <ListBtn icon={PanelLeftClose} label="Collapse sidebar" onClick={onCollapse} />}
+        </div>
+      </header>
+
+      {/* [&_[data-radix-scroll-area-viewport]>div]:!block — override Radix's inner display:table wrapper
+          so rows are constrained to the aside width and truncate instead of overflowing past the divider */}
+      <ScrollArea className="min-h-0 flex-1 [&_[data-radix-scroll-area-viewport]>div]:!block">
+        {/* px-2 container + row's px-2 → date/time & badge sit 16px from the right divider */}
+        <div className="px-2 pb-3">
+          <Section label="Favorites" open={openFav} onToggle={onToggleFav} />
+          {openFav && favorites.map((r) => (
+            <RoomRow
+              key={r.id} room={r} active={r.id === activeId}
+              isMuted={mutedIds.has(r.id)} isFavorite={true}
+              onSelect={onSelect} onToggleMute={onToggleMute} onToggleFavorite={onToggleFavorite}
+              showPreview={showPreview} groupAvatarMode={groupAvatarMode}
+            />
+          ))}
+          <Section
+            label="Chats" open={openChats} onToggle={onToggleChats}
+            trailing={<IconBtnSm icon={Plus} label="Add chat" className="!h-6 !w-6 !min-w-0 !p-0" style={{ color: 'var(--color-neutral-7)' }} />}
+          />
+          {openChats && chats.map((r) => (
+            <RoomRow
+              key={r.id} room={r} active={r.id === activeId}
+              isMuted={mutedIds.has(r.id)} isFavorite={false}
+              onSelect={onSelect} onToggleMute={onToggleMute} onToggleFavorite={onToggleFavorite}
+              showPreview={showPreview} groupAvatarMode={groupAvatarMode}
+            />
+          ))}
+        </div>
+      </ScrollArea>
+    </>
+  )
+}
+
+type ChatListProps = Omit<ChatListBodyProps, 'openFav' | 'onToggleFav' | 'openChats' | 'onToggleChats' | 'onCollapse'>
+
+function ChatList({
+  width,
+  onWidthChange,
+  onCollapse,
+  ...body
+}: ChatListProps & { onCollapse: () => void; width: number; onWidthChange: (w: number) => void }) {
+  const [openFav, setOpenFav] = useState(true)
+  const [openChats, setOpenChats] = useState(true)
+
+  return (
+    <aside className="relative flex shrink-0 flex-col bg-surface" style={{ width }}>
+      <ChatListBody
+        {...body}
+        onCollapse={onCollapse}
+        openFav={openFav}
+        onToggleFav={() => setOpenFav((v) => !v)}
+        openChats={openChats}
+        onToggleChats={() => setOpenChats((v) => !v)}
+      />
+
+      {/* DS ResizeHandle(beta.147+)自管拖曳與鍵盤 ←/→;idle 線 = --divider(= neutral-4),hover / 拖曳中狀態色由 DS 畫 */}
+      <ResizeHandle
+        direction="horizontal"
+        position="end"
+        value={width}
+        min={CHAT_LIST_MIN}
+        max={CHAT_LIST_MAX}
+        ariaLabel="拖曳調整聊天列表寬度"
+        onValueChange={onWidthChange}
+      />
+    </aside>
+  )
+}
+
+// ── AppShell 四區版(config.agent,tWorkspace)──────────────────────────────
+// DS AppShell「版面規則」(app-shell.spec.md,beta.148):Menu = ChatList、Main = Conversation、
+// Right panel = Thread、AI agent = tAgent;NavRail 在 AppShell 外(全域 app rail,AppShell 只量自己的根節點寬)。
+// 各區寬度(最小 / 初始 / 最大):Main 600 = DS AppShell 展示的示範值;Menu / Thread 沿用本 app 既有寬
+// (ChatList 初始 320、最大 480;Thread 320–720、初始 480);Menu 最小取 DS `--sidebar-width-min` 240。
+// tAgent 用 DS 預設 360 / 400 / 640。
+const SHELL_MAIN_MIN_WIDTH = 600
+const SHELL_MENU_WIDTH = { min: 240, initial: 320, max: CHAT_LIST_MAX }
+const SHELL_THREAD_WIDTH = { min: THREAD_MIN, initial: 480, max: THREAD_MAX }
+
+// Menu:Sidebar 在 Menu 浮層時會把 children 畫兩份(並排那份 + 浮層那份,sidebar.spec.md「同一份內容、畫兩份」)
+// → section 展開狀態放在 Sidebar 外面,兩份共用。收合 = offcanvas(無細列;2026-10-22 user 選)。
+function ChatListMenu(props: ChatListProps) {
+  const [openFav, setOpenFav] = useState(true)
+  const [openChats, setOpenChats] = useState(true)
+  return (
+    <Sidebar collapsible="offcanvas" contentType="chats" widthRange={SHELL_MENU_WIDTH} className={CHROME_SIDEBAR_BG}>
+      <ChatListBody
+        {...props}
+        chromeHeight
+        openFav={openFav}
+        onToggleFav={() => setOpenFav((v) => !v)}
+        openChats={openChats}
+        onToggleChats={() => setOpenChats((v) => !v)}
+      />
+    </Sidebar>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 3. Conversation
+// ════════════════════════════════════════════════════════════════════════════
+function TeamsCallButton() {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {/* 28px tall, 4px side padding, 18px icons */}
+        <button
+          type="button"
+          aria-label="Teams call"
+          className="flex h-7 items-center gap-1 rounded-md px-1 text-fg-secondary hover:bg-neutral-hover"
+        >
+          <Video size={18} />
+          <ChevronDown size={18} />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>Teams call</TooltipContent>
+    </Tooltip>
+  )
+}
+
+function RoomInfoButton({ count }: { count: number }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {/* 28px tall, 4px side padding, 18px icon; badge h20 px4 py2 12px/130% medium */}
+        <button
+          type="button"
+          aria-label="Room information"
+          className="flex h-7 items-center gap-1 rounded-md px-1 text-fg-secondary hover:bg-neutral-hover"
+        >
+          <Users size={18} />
+          <span
+            className="flex h-5 items-center rounded-md bg-muted font-medium text-fg-secondary"
+            style={{ paddingLeft: 4, paddingRight: 4, paddingTop: 2, paddingBottom: 2, fontSize: 12, lineHeight: '130%' }}
+          >
+            {count}
+          </span>
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>Room information</TooltipContent>
+    </Tooltip>
+  )
+}
+
+// Header more menu — mute/unmute + full-width toggle aware
+function HeaderMoreMenu({
+  type,
+  isMuted,
+  onToggleMute,
+  isFullWidth,
+  onToggleFullWidth,
+}: {
+  type: 'dm' | 'general'
+  isMuted: boolean
+  onToggleMute: () => void
+  isFullWidth: boolean
+  onToggleFullWidth: () => void
+}) {
+  return (
+    <DropdownMenu>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger asChild>
+            <Button variant="text" size="sm" iconOnly startIcon={MoreHorizontal} aria-label="More" title="" />
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
+        <TooltipContent>More</TooltipContent>
+      </Tooltip>
+      <DropdownMenuContent align="end" side="bottom" sideOffset={8}>
+        {type === 'general' && (
+          <>
+            <DropdownMenuItem startIcon={Users}>Room information</DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
+        {/* Full width — inline Switch toggle; onSelect prevents menu close on click */}
+        <DropdownMenuItem
+          startIcon={Maximize2}
+          onSelect={(e) => { e.preventDefault(); onToggleFullWidth() }}
+        >
+          <span className="flex flex-1 items-center justify-between gap-6">
+            Full width
+            <Switch
+              checked={isFullWidth}
+              onCheckedChange={onToggleFullWidth}
+              aria-label="Full width"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </span>
+        </DropdownMenuItem>
+        <DropdownMenuItem startIcon={isMuted ? Bell : BellOff} onSelect={onToggleMute}>
+          {isMuted ? 'Unmute' : 'Mute'}
+        </DropdownMenuItem>
+        <DropdownMenuItem startIcon={Star}>Favorite</DropdownMenuItem>
+        {type === 'general' && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem startIcon={LogOut} className="text-error">Leave</DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+// ConversationHeader — shows mute overlay on avatar when room is muted
+function ConversationHeader({
+  room,
+  listOpen,
+  onExpandList,
+  isMuted,
+  onToggleMute,
+  isFullWidth,
+  onToggleFullWidth,
+  groupAvatarMode = 'icon',
+  hideExpandControl = false,
+  leading,
+  chromeHeight = false,
+}: {
+  room: Room
+  listOpen: boolean
+  onExpandList: () => void
+  isMuted: boolean
+  onToggleMute: () => void
+  isFullWidth: boolean
+  onToggleFullWidth: () => void
+  groupAvatarMode?: 'icon' | 'initial'
+  /** top-search chrome:收合時的 Expand 改由 CollapsedListRail 提供 → header 內按鈕 + 分割線移除 */
+  hideExpandControl?: boolean
+  /** 最左常駐控制(AppShell 版 = DS SidebarTrigger;任何 Menu 狀態下都看得到,sidebar.spec.md「SidebarTrigger 位置」)。給了就取代收合時才出現的 Expand 鈕 */
+  leading?: React.ReactNode
+  /** 頁首高 = DS `--chrome-header-height`(見 ChatListBody 同名 prop) */
+  chromeHeight?: boolean
+}) {
+  const memberCount = room.memberKeys?.length ?? 0
+
+  // When muted: 32×32 white bg + gray BellOff icon fully replaces the avatar
+  const roomAvatar = isMuted ? (
+    <MutedAvatar size={32} />
+  ) : room.origin === 'teams' ? (
+    <TeamsAvatar size={32} />
+  ) : room.type === 'dm' && room.person ? (
+    <PersonAvatar person={room.person} size={32} />
+  ) : groupAvatarMode === 'initial' ? (
+    <InitialAvatar name={room.title} size={32} />
+  ) : (
+    <GroupAvatar size={32} />
+  )
+
+  return (
+    <header className={`flex items-center gap-2 px-4 border-b border-divider bg-surface shrink-0 ${chromeHeight ? 'h-[var(--chrome-header-height)]' : 'py-2'}`}>
+      {leading && (
+        <>
+          {leading}
+          <Separator orientation="vertical" className="h-6" />
+        </>
+      )}
+      {!leading && !listOpen && !hideExpandControl && (
+        <>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="text" size="sm" iconOnly startIcon={PanelLeftOpen} aria-label="Expand sidebar" title="" onClick={onExpandList} />
+            </TooltipTrigger>
+            <TooltipContent>Expand sidebar</TooltipContent>
+          </Tooltip>
+          <Separator orientation="vertical" className="h-6" />
+        </>
+      )}
+      {roomAvatar}
+      <div className="flex min-w-0 flex-1 items-center gap-1.5">
+        <h1 className="truncate" style={{ fontSize: 16, fontWeight: 500, lineHeight: '130%' }}>{room.title}</h1>
+        {room.type === 'general' && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="text" size="sm" iconOnly startIcon={Pencil} aria-label="Edit chatroom name" title="" />
+            </TooltipTrigger>
+            <TooltipContent>Edit name</TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+      <div className="flex items-center gap-2">
+        <TeamsCallButton />
+        {room.type === 'general' && <RoomInfoButton count={memberCount} />}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="text" size="sm" iconOnly startIcon={Search} aria-label="Search" title="" />
+          </TooltipTrigger>
+          <TooltipContent>Search</TooltipContent>
+        </Tooltip>
+        <HeaderMoreMenu type={room.type} isMuted={isMuted} onToggleMute={onToggleMute} isFullWidth={isFullWidth} onToggleFullWidth={onToggleFullWidth} />
+      </div>
+    </header>
+  )
+}
+
+// Message status icon (outside bubble)
+function MsgStatusIcon({ status }: { status: MsgStatus }) {
+  if (status === 'sending') return <Clock size={16} className="text-fg-secondary" />
+  if (status === 'sent') return <Check size={16} className="text-fg-secondary" />
+  return <CheckCheck size={16} className="text-primary" />
+}
+
+// Reaction bar more menu — different actions for mine vs other
+function ReactionMoreMenu({
+  mine,
+  room,
+  onEdit,
+}: {
+  mine: boolean
+  room: Room
+  // 自己的訊息 → Edit 選項(bubble 進入編輯狀態,對齊 Teams hover → More → Edit)
+  onEdit?: () => void
+}) {
+  // Derive member count and read members for "Read by" (prototype: all non-me members read)
+  const memberCount = room.type === 'general'
+    ? (room.memberKeys?.length ?? 1)
+    : 1
+  const readCount = memberCount  // prototype: everyone has read
+
+  const readMembers = room.type === 'general'
+    ? (room.memberKeys ?? []).map((k) => PEOPLE[k]?.name.split(' ')[0]).filter(Boolean)
+    : room.person ? [room.person.name.split(' ')[0]] : []
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="text" size="sm" iconOnly startIcon={MoreHorizontal} aria-label="More actions" title="" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" side="bottom" sideOffset={8}>
+        {mine ? (
+          <>
+            <DropdownMenuItem startIcon={Pencil} onSelect={onEdit}>Edit</DropdownMenuItem>
+            <DropdownMenuItem startIcon={Reply}>Reply with quote</DropdownMenuItem>
+            <DropdownMenuItem startIcon={Copy}>Copy</DropdownMenuItem>
+            <DropdownMenuItem startIcon={Pin}>Pin</DropdownMenuItem>
+            <DropdownMenuItem startIcon={Forward}>Forward</DropdownMenuItem>
+            <DropdownMenuItem startIcon={Trash2} className="text-error">Delete</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            {/* Read by — hover opens submenu with reader list */}
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                Read by {readCount} of {memberCount}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent sideOffset={8}>
+                {readMembers.map((name) => (
+                  <DropdownMenuItem key={name}>{name}</DropdownMenuItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          </>
+        ) : (
+          <>
+            <DropdownMenuItem startIcon={Copy}>Copy</DropdownMenuItem>
+            <DropdownMenuItem startIcon={Pin}>Pin</DropdownMenuItem>
+            <DropdownMenuItem startIcon={Forward}>Forward</DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+function ReactionBar({ onOpenThread, mine, room, hideReplyInThread, onEdit }: { onOpenThread: () => void; mine: boolean; room: Room; hideReplyInThread?: boolean; onEdit?: () => void }) {
+  return (
+    <div className="absolute -top-4 right-2 z-[8] flex items-center gap-0.5 rounded-lg border border-divider bg-surface-raised p-0.5 shadow-md invisible group-hover/msg:visible [&:has([data-state=open])]:visible">
+      {COMMON_EMOJI.map((e) => (
+        <Tooltip key={e}>
+          <TooltipTrigger asChild>
+            <button type="button" aria-label={`React ${e}`} className="rounded-md px-1.5 py-1 text-body hover:bg-neutral-hover">{e}</button>
+          </TooltipTrigger>
+          <TooltipContent>{e}</TooltipContent>
+        </Tooltip>
+      ))}
+      <IconBtnSm icon={SmilePlus} label="Add reaction" />
+      <Separator orientation="vertical" className="mx-0.5 h-5" />
+      {!hideReplyInThread && <IconBtnSm icon={MessagesSquare} label="Reply in thread" onClick={onOpenThread} />}
+      <IconBtnSm icon={Reply} label="Reply with quote" />
+      <ReactionMoreMenu mine={mine} room={room} onEdit={onEdit} />
+    </div>
+  )
+}
+
+// ── Edit composer — chat bubble 編輯狀態(Teams:More → Edit 後 bubble 變輸入框)──
+// 底部列:Rich editor toggle(開 = 上方浮出 format toolbar)+ 右側 ✓ 儲存 / ✕ 取消。
+// Enter 儲存(list 內 = 換 item)、Shift+Enter 換行、Escape 取消(2026-07-09 Enter 規則)。
+function EditMessageComposer({
+  message,
+  onSave,
+  onCancel,
+}: {
+  message: Message
+  onSave: (payload: { text: string; html?: string }) => void
+  onCancel: () => void
+}) {
+  const editorRef = useRef<RichEditorHandle>(null)
+  const [rich, setRich] = useState(false)
+  const [hasValue, setHasValue] = useState(true)
+
+  function save() {
+    const ed = editorRef.current
+    if (!ed || ed.isEmpty()) return
+    // 格式全被移除時不再帶 html(hasRichMarkup=false → bubble 回到純文字渲染)
+    const html = ed.getHTML()
+    onSave({ text: ed.getText().trim(), html: hasRichMarkup(html) ? html : undefined })
+  }
+
+  const btn24 = '!h-6 !w-6 !min-w-0 !p-0'
+  return (
+    <div
+      className="w-full rounded-lg border bg-canvas"
+      style={{ paddingTop: 6, paddingBottom: 6, paddingLeft: 12, paddingRight: 8, borderColor: 'var(--color-primary-hover)' }}
+    >
+      {rich && (
+        <div className="mb-1 border-b border-divider pb-1">
+          <FormatToolbar editorRef={editorRef} />
+        </div>
+      )}
+      <RichTextArea
+        ref={editorRef}
+        placeholder="Edit message"
+        ariaLabel="Edit message"
+        initialHTML={message.html ?? textToHtml(message.text)}
+        autoFocus
+        onSubmit={save}
+        onEscape={onCancel}
+        onHasContentChange={setHasValue}
+        className="max-h-[232px] overflow-y-auto"
+      />
+      <div className="mt-1.5 flex items-center gap-2">
+        <IconBtnSm icon={Type} label="Rich editor" onClick={() => setRich((v) => !v)} className={`${btn24} ${rich ? '!bg-neutral-selected' : ''}`} />
+        <div className="flex-1" />
+        <IconBtnSm icon={X} label="Cancel" onClick={onCancel} className={btn24} />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant={hasValue ? 'primary' : 'text'} size="sm" iconOnly startIcon={Check} aria-label="Save edit" title="" onClick={save} className={btn24} />
+          </TooltipTrigger>
+          <TooltipContent>Save</TooltipContent>
+        </Tooltip>
+      </div>
+    </div>
+  )
+}
+
+function MessageBubble({
+  message,
+  isLastMine,
+  onOpenThread,
+  room,
+  isInThread,
+  readOnly,
+  flashToken,
+  onEditMessage,
+}: {
+  message: Message
+  isLastMine: boolean
+  onOpenThread: (m: Message) => void
+  room: Room
+  isInThread?: boolean
+  // Search-preview panel: hides the reaction bar and disables thread navigation.
+  readOnly?: boolean
+  // Bumping this (to any truthy, distinct value) re-triggers the one-time indigo-6
+  // background flash on this bubble — used when jumping to a message from search.
+  flashToken?: number
+  // 自己的訊息 hover → More → Edit:bubble 變編輯狀態(EditMessageComposer,含 rich toolbar)。
+  onEditMessage?: (messageId: string, payload: { text: string; html?: string }) => void
+}) {
+  const [flashing, setFlashing] = useState(false)
+  const [editing, setEditing] = useState(false)
+  useEffect(() => {
+    if (!flashToken) return
+    setFlashing(true)
+    const t = setTimeout(() => setFlashing(false), 1200)
+    return () => clearTimeout(t)
+  }, [flashToken])
+  const now = new Date()
+  const mine = message.author === 'me'
+  const author = mine ? null : PEOPLE[message.author] ?? null
+  const replyCount = message.threadMessages?.length ?? message.replies ?? 0
+  const latestReplyMsg = message.threadMessages?.length
+    ? message.threadMessages[message.threadMessages.length - 1]
+    : null
+  const latestReplyTime = latestReplyMsg ? formatBubbleTime(latestReplyMsg, now) : null
+  // A main-area copy of a thread reply ("Also send to chatroom"). Its bubble gets a
+  // min-width so the "replied to a thread" link below always has room for the
+  // L-connector + icon + at least "…"; the link is width-capped to the bubble.
+  const isRepliedCopy = !isInThread && !!message.repliedToThreadParentId
+  const REPLIED_LINK_MIN_W = 120
+
+  // Bubble (shared) — text + images + reactions
+  // max-w-full (not w-fit) so the bubble never exceeds the column width; hugging
+  // for short messages comes from the column's items-start/items-end (shrink-to-
+  // fit), NOT fit-content — fit-content pulls a wide table's max-content and
+  // overflows. min-w-0 lets it shrink below content so the table scrolls inside.
+  const bubble = (
+    <div id={`msg-${message.id}`} className="relative max-w-full min-w-0" style={isRepliedCopy ? { minWidth: REPLIED_LINK_MIN_W } : undefined}>
+      {!readOnly && (
+        <ReactionBar
+          onOpenThread={() => onOpenThread(message)}
+          mine={mine}
+          room={room}
+          hideReplyInThread={isInThread}
+          onEdit={mine && onEditMessage ? () => setEditing(true) : undefined}
+        />
+      )}
+      <div
+        className={`rounded-xl p-3 text-body max-w-full min-w-0 transition-colors duration-700 ${mine ? 'text-foreground' : 'bg-muted text-foreground'}`}
+        style={{ backgroundColor: flashing ? 'var(--color-indigo-6)' : (mine ? '#EBEEFF' : undefined) }}
+      >
+        {message.html ? (
+          <div className="rich-text break-words" dangerouslySetInnerHTML={{ __html: message.html }} />
+        ) : (
+          <p className="whitespace-pre-wrap break-words">{message.text}</p>
+        )}
+        {message.images && message.images.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {message.images.map((src, i) => (
+              <img
+                key={i}
+                src={src}
+                alt=""
+                className="rounded-lg object-cover"
+                style={{ width: 200, maxWidth: '100%', aspectRatio: '3 / 2' }}
+              />
+            ))}
+          </div>
+        )}
+        {message.table && message.table.length > 0 && (() => {
+          const cols = message.table[0].length
+          const single = cols === 1
+          return (
+            <div
+              className="scroll-hover mt-2 overflow-auto rounded-lg border"
+              style={{ maxHeight: 320, width: 'fit-content', maxWidth: '100%', borderColor: 'var(--color-neutral-4)', backgroundColor: 'white' }}
+            >
+              <table className="border-collapse" style={{ width: single ? '100%' : 'max-content' }}>
+                  <tbody>
+                    {message.table.map((row, ri) => (
+                      <tr key={ri}>
+                        {row.map((cell, ci) => (
+                          <td
+                            key={ci}
+                            className="border align-top"
+                            style={{
+                              borderColor: 'var(--color-neutral-4)',
+                              padding: '4px 8px',
+                              fontSize: 12,
+                              fontWeight: ri === 0 ? 600 : 400,
+                              lineHeight: '130%',
+                              minWidth: 24,
+                              height: 24,
+                              maxWidth: single ? undefined : 120,
+                              wordBreak: 'break-word',
+                              color: 'var(--color-foreground)',
+                              backgroundColor: 'white',
+                            }}
+                          >
+                            {cell}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+            </div>
+          )
+        })()}
+        {message.reactions && message.reactions.length > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-1">
+            {message.reactions.map((r) => (
+              <button
+                key={r.emoji}
+                type="button"
+                className="flex h-6 items-center gap-1 rounded-full border bg-surface px-2 py-1 hover:bg-neutral-hover"
+                style={{ borderColor: 'var(--color-neutral-5)' }}
+              >
+                <span style={{ fontSize: 16, lineHeight: 1 }}>{r.emoji}</span>
+                <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-8)' }}>{r.count}</span>
+              </button>
+            ))}
+            <button
+              type="button"
+              aria-label="Add reaction"
+              className="flex h-6 items-center rounded-full border bg-surface px-2 py-1 hover:bg-neutral-hover"
+              style={{ borderColor: 'var(--color-neutral-5)', color: 'var(--color-neutral-7)' }}
+            >
+              <SmilePlus size={16} />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+
+  // 編輯狀態 — bubble 原位換成 EditMessageComposer(Teams:hover → More → Edit)。
+  // 編輯中隱藏 thread / replied link,存檔或取消後還原。
+  const editComposer = editing && onEditMessage ? (
+    <EditMessageComposer
+      message={message}
+      onSave={(payload) => { onEditMessage(message.id, payload); setEditing(false) }}
+      onCancel={() => setEditing(false)}
+    />
+  ) : null
+
+  // 「Edited」標記 — 編輯過的訊息時間戳旁顯示(對齊 Teams)
+  const editedTag = message.edited ? (
+    <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)' }}>Edited</span>
+  ) : null
+
+  // Thread replies link (main area only)
+  const threadLink = !isInThread && replyCount > 0 ? (
+    <div className={`mt-0.5 flex items-center gap-1 ${mine ? 'justify-end' : ''}`}>
+      {!mine && (
+        <div
+          className="shrink-0 border-l border-b rounded-bl-[8px]"
+          style={{ width: 24, height: 12, borderColor: 'var(--color-neutral-4)' }}
+        />
+      )}
+      <button
+        type="button"
+        className={`flex items-center gap-1 ${readOnly ? 'cursor-default' : 'hover:underline'}`}
+        style={{ color: 'var(--color-primary)' }}
+        onClick={readOnly ? undefined : () => onOpenThread(message)}
+      >
+        <MessagesSquare size={16} style={{ color: 'var(--color-primary)' }} />
+        <span style={{ fontSize: 12, fontWeight: 500, lineHeight: '130%', color: 'var(--color-primary)' }}>{replyCount} replies</span>
+        {latestReplyTime && (
+          <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)', marginLeft: 4 }}>{latestReplyTime}</span>
+        )}
+      </button>
+    </div>
+  ) : null
+
+  // "Replied to a thread" link — shown on a main-area copy of a thread reply
+  // ("Also send to chatroom"). Click opens that thread. The link is width-capped to
+  // the bubble (w-0 min-w-full → contributes 0 to width, renders at bubble width):
+  // the L-connector + icon stay fixed (shrink-0) and the text truncates so the row
+  // never extends past the bubble's edge. Icon = primary; text = neutral-7.
+  const repliedParent = isRepliedCopy
+    ? room.messages.find((m) => m.id === message.repliedToThreadParentId) ?? null
+    : null
+  const repliedLink = repliedParent ? (
+    <div className="mt-0.5 flex w-0 min-w-full items-center gap-1">
+      <div
+        className="shrink-0 border-l border-b rounded-bl-[8px]"
+        style={{ width: 24, height: 12, borderColor: 'var(--color-neutral-4)' }}
+      />
+      <button
+        type="button"
+        className={`flex min-w-0 flex-1 items-center gap-1 ${readOnly ? 'cursor-default' : 'hover:underline'}`}
+        onClick={readOnly ? undefined : () => onOpenThread(repliedParent)}
+      >
+        <MessagesSquare size={16} className="shrink-0" style={{ color: 'var(--color-primary)' }} />
+        <span className="min-w-0 truncate" style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)' }}>
+          replied to a thread: {repliedParent.text}
+        </span>
+      </button>
+    </div>
+  ) : null
+
+  // Group bubble + repliedLink in a shrink-to-content column so the link's
+  // min-w-full resolves to the bubble's width (the bubble drives the width via its
+  // content / min-width; the link contributes 0). Result: link never exceeds the
+  // bubble edge, and a short bubble is widened by the bubble's minWidth.
+  const bubbleBlock = repliedLink ? (
+    <div className="inline-flex max-w-full flex-col gap-1" style={{ alignItems: mine ? 'flex-end' : 'flex-start' }}>
+      {bubble}
+      {repliedLink}
+    </div>
+  ) : (
+    <>
+      {bubble}
+      {threadLink}
+    </>
+  )
+
+  // ── Thread panel layout (narrow, simpler — no MessageArea margin rules) ──
+  // 編輯中:row + column 撐滿(flex-1 / w-full),edit composer 佔滿面板寬(對齊 Teams)
+  if (isInThread) {
+    return (
+      <div className={`group/msg flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
+        <div className={`flex items-start gap-2 ${mine ? 'flex-row-reverse' : ''} ${editComposer ? 'w-full max-w-full' : 'max-w-[85%]'}`}>
+          {!mine && author && (
+            <div className="mt-0.5 shrink-0">
+              <PersonAvatar person={author} size={32} />
+            </div>
+          )}
+          <div className={`flex flex-col gap-1 min-w-0 ${editComposer ? 'flex-1' : ''}`}>
+            {mine && (
+              <div className="flex justify-end gap-2 pr-1">
+                {editedTag}
+                <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)' }}>{formatBubbleTime(message, now)}</span>
+              </div>
+            )}
+            {!mine && author && (
+              <div className="flex items-center gap-2">
+                <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)' }}>{author.name}</span>
+                <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)' }}>{formatBubbleTime(message, now)}</span>
+                {editedTag}
+              </div>
+            )}
+            {editComposer ?? bubble}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── MessageArea layout (precise margin spec 3b) ──
+  // Status icon column: 16×16, always reserved (mine). Empty box keeps the 16px width.
+  const statusCol = (
+    <div className="shrink-0 flex flex-col justify-end" style={{ width: 16, marginLeft: 4 }}>
+      <div className="pb-1 flex items-center justify-center" style={{ width: 16, height: 16 }}>
+        {isLastMine && message.msgStatus ? <MsgStatusIcon status={message.msgStatus} /> : null}
+      </div>
+    </div>
+  )
+
+  if (mine) {
+    // bubble left edge ≥ 96px from region left; status icon right edge 20px from region right
+    // 編輯中:inner row 加 flex-1,edit composer(w-full)撐滿可用寬(對齊 Teams edit box)
+    return (
+      <div className="group/msg flex w-full justify-end" style={{ paddingLeft: 96, paddingRight: 20 }}>
+        <div className={`flex items-end min-w-0 ${editComposer ? 'flex-1' : ''}`}>
+          <div className="flex flex-1 flex-col gap-1 min-w-0 items-end">
+            <div className="flex justify-end gap-2 pr-1">
+              {editedTag}
+              <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)' }}>{formatBubbleTime(message, now)}</span>
+            </div>
+            {editComposer ?? bubbleBlock}
+          </div>
+          {statusCol}
+        </div>
+      </div>
+    )
+  }
+
+  // other: avatar at region left; bubble right edge ≤ region right − 96px
+  return (
+    <div className="group/msg flex w-full" style={{ paddingRight: 96 }}>
+      <div className="flex items-start gap-2 min-w-0 flex-1">
+        {author && (
+          <div className="mt-0.5 shrink-0">
+            <PersonAvatar person={author} size={32} />
+          </div>
+        )}
+        <div className="flex flex-1 flex-col gap-1 min-w-0 items-start">
+          {author && (
+            <div className="flex items-center gap-2">
+              <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)' }}>{author.name}</span>
+              <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)' }}>{formatBubbleTime(message, now)}</span>
+              {editedTag}
+            </div>
+          )}
+          {editComposer ?? bubbleBlock}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Date divider helpers ────────────────────────────────────────────────────
+// Message.date defaults to "today" when absent (most demo messages only carry
+// a HH:MM time, implying same-day conversation).
+function startOfDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate())
+}
+
+function getMsgDate(m: Message, now: Date): Date {
+  if (!m.date) return startOfDay(now)
+  const [y, mo, d] = m.date.split('-').map(Number)
+  return new Date(y, mo - 1, d)
+}
+
+// ISO-8601 week number (1–53).
+function getISOWeek(date: Date): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+  const dayNum = d.getUTCDay() || 7
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum)
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
+}
+
+const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+// W<last digit of year><2-digit ISO week>, e.g. week 26 of 2026 → "W626".
+function weekLabel(target: Date): string {
+  const yearDigit = target.getFullYear() % 10
+  const week = String(getISOWeek(target)).padStart(2, '0')
+  return `W${yearDigit}${week}`
+}
+
+// Today → "Today, W626" · Yesterday → "Yesterday, W626" · this week (other day)
+// → "Monday, W626" · this year (earlier) → "5/25, W622" · earlier year → "5/25, 2025, W522".
+function formatDateDivider(target: Date, now: Date): string {
+  const t = startOfDay(target)
+  const n = startOfDay(now)
+  const diffDays = Math.round((n.getTime() - t.getTime()) / 86400000)
+  const week = getISOWeek(target)
+  if (diffDays === 0) return `Today, ${weekLabel(target)}`
+  if (diffDays === 1) return `Yesterday, ${weekLabel(target)}`
+  const sameWeek = diffDays > 0 && diffDays < 7 && getISOWeek(now) === week && now.getFullYear() === target.getFullYear()
+  if (sameWeek) return `${WEEKDAY_NAMES[target.getDay()]}, ${weekLabel(target)}`
+  const md = `${target.getMonth() + 1}/${target.getDate()}`
+  if (target.getFullYear() === now.getFullYear()) return `${md}, ${weekLabel(target)}`
+  return `${md}, ${target.getFullYear()}, ${weekLabel(target)}`
+}
+
+// ── Chat bubble 時間顯示規則(2026-07-06,AM/PM 制)──────────────────────────
+// message.date(缺→今天)+ message.time(HH:MM,24h)組成完整時間點。
+function msgDateTime(m: Message, now: Date): Date {
+  const base = getMsgDate(m, now) // date→當天 00:00,缺→今天 00:00
+  const hm = /^(\d{1,2}):(\d{2})$/.exec(m.time)
+  const d = new Date(base)
+  if (hm) d.setHours(Number(hm[1]), Number(hm[2]), 0, 0)
+  return d
+}
+// 12 小時 AM/PM,分鐘補零;12 AM = 午夜、12 PM = 中午。
+function fmtHM12(d: Date): string {
+  const mins = d.getMinutes()
+  const ap = d.getHours() < 12 ? 'AM' : 'PM'
+  let h = d.getHours() % 12
+  if (h === 0) h = 12
+  return `${h}:${String(mins).padStart(2, '0')} ${ap}`
+}
+// Bubble 內完整時間戳(含 hh:mm AM/PM):
+//   今天 → "3:30 PM" · 昨天 → "Yesterday 3:30 PM" · 本週其他天 → "Monday 3:30 PM"
+//   今年較早 → "05/28 3:30 PM" · 非今年 → "2025/05/26 3:30 PM"
+// 「本週」= 同一 ISO 週(避免跨週星期名歧義,與 DateDivider 同源判定)。
+function formatBubbleTime(m: Message, now: Date): string {
+  const dt = msgDateTime(m, now)
+  const diffDays = Math.round((startOfDay(now).getTime() - startOfDay(dt).getTime()) / 86400000)
+  const hm = fmtHM12(dt)
+  if (diffDays === 0) return hm
+  if (diffDays === 1) return `Yesterday ${hm}`
+  const sameWeek = diffDays > 0 && diffDays < 7 && getISOWeek(now) === getISOWeek(dt) && now.getFullYear() === dt.getFullYear()
+  if (sameWeek) return `${WEEKDAY_NAMES[dt.getDay()]} ${hm}`
+  const mm = String(dt.getMonth() + 1).padStart(2, '0')
+  const dd = String(dt.getDate()).padStart(2, '0')
+  if (dt.getFullYear() === now.getFullYear()) return `${mm}/${dd} ${hm}`
+  return `${dt.getFullYear()}/${mm}/${dd} ${hm}`
+}
+// 列表 / 搜尋結果的簡短時間(不含時分,今天例外)——配合 time 正規化後仍保留日期資訊,
+// 對齊 Teams / Slack 列表慣例:今天顯示時間、其餘顯示相對日期。分桶與 bubble 規則同源。
+function formatListTime(m: Message, now: Date): string {
+  const dt = msgDateTime(m, now)
+  const diffDays = Math.round((startOfDay(now).getTime() - startOfDay(dt).getTime()) / 86400000)
+  if (diffDays === 0) return fmtHM12(dt)
+  if (diffDays === 1) return 'Yesterday'
+  const sameWeek = diffDays > 0 && diffDays < 7 && getISOWeek(now) === getISOWeek(dt) && now.getFullYear() === dt.getFullYear()
+  if (sameWeek) return WEEKDAY_NAMES[dt.getDay()]
+  const mm = String(dt.getMonth() + 1).padStart(2, '0')
+  const dd = String(dt.getDate()).padStart(2, '0')
+  if (dt.getFullYear() === now.getFullYear()) return `${mm}/${dd}`
+  return `${dt.getFullYear()}/${mm}/${dd}`
+}
+
+function DateDivider({ label }: { label: string }) {
+  return (
+    // @layout-space-magic-ok: px-10=40px 疊在 MessageArea px-4 上 = 距視窗邊 56px(對齊 InputBox 等元素),documented STRUCTURE.md 分隔線 padding spec
+    <div className="flex items-center gap-3 px-10">
+      <div className="h-px flex-1" style={{ backgroundColor: 'var(--color-neutral-4)' }} />
+      <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--color-neutral-7)' }}>{label}</span>
+      <div className="h-px flex-1" style={{ backgroundColor: 'var(--color-neutral-4)' }} />
+    </div>
+  )
+}
+
+function LastReadDivider() {
+  return (
+    <div className="flex items-center gap-3 px-10">
+      <div className="h-px flex-1" style={{ backgroundColor: 'var(--color-primary)' }} />
+      <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-primary)' }}>Last read</span>
+      <div className="h-px flex-1" style={{ backgroundColor: 'var(--color-primary)' }} />
+    </div>
+  )
+}
+
+function MessageArea({
+  room,
+  onOpenThread,
+  fullWidth,
+  lastReadMessageId,
+  readOnly,
+  flashMessageId,
+  flashToken,
+  scrollToMessageId,
+  onEditMessage,
+}: {
+  room: Room
+  onOpenThread: (m: Message) => void
+  fullWidth: boolean
+  lastReadMessageId?: string | null
+  // Search-preview panel: hides reaction bars, disables thread navigation.
+  readOnly?: boolean
+  // 自己的訊息 More → Edit(bubble 變編輯狀態);search preview(readOnly)不傳。
+  onEditMessage?: (messageId: string, payload: { text: string; html?: string }) => void
+  // The message to flash (indigo-6, one-time) — paired with flashToken so the
+  // same message can be re-flashed on a later jump (bump flashToken).
+  flashMessageId?: string | null
+  flashToken?: number
+  // Jump straight to this message instead of the usual scroll-to-bottom.
+  scrollToMessageId?: string | null
+}) {
+  const lastMineId = [...room.messages].reverse().find((m) => m.author === 'me')?.id ?? null
+  const bottomRef = useRef<HTMLDivElement>(null)
+  const now = new Date()
+
+  // Jump-to-message scroll fires once per flashToken bump — independent of the
+  // bottom-scroll effect below, so a later new message still scrolls to bottom
+  // instead of snapping back to the old flashed message.
+  useEffect(() => {
+    if (scrollToMessageId && flashToken) {
+      document.getElementById(`msg-${scrollToMessageId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [flashToken, scrollToMessageId])
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [room.messages.length])
+
+  let prevDateKey: string | null = null
+
+  // Plain overflow div (not DS ScrollArea): Radix Viewport wraps children in a
+  // `display:table; min-width:100%` box that grows to a wide table's max-content,
+  // which defeats any percentage-based width cap on the bubble. A plain scroll
+  // container has a definite width (= its flex parent), so the min-w-0 flex chain
+  // caps each bubble and a wide table scrolls horizontally inside its own bubble.
+  return (
+    <div className="scroll-hover min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+      <div className="px-4 py-4">
+        <div
+          className="mx-auto flex flex-col gap-3 min-w-0"
+          style={fullWidth ? undefined : { maxWidth: 960 }}
+        >
+          {room.messages.map((m) => {
+            const dateKey = getMsgDate(m, now).toDateString()
+            const showDateDivider = dateKey !== prevDateKey
+            const dateLabel = showDateDivider ? formatDateDivider(getMsgDate(m, now), now) : null
+            prevDateKey = dateKey
+            return (
+              <Fragment key={m.id}>
+                {dateLabel && <DateDivider label={dateLabel} />}
+                {lastReadMessageId === m.id && <LastReadDivider />}
+                <MessageBubble
+                  message={m}
+                  isLastMine={m.id === lastMineId}
+                  onOpenThread={onOpenThread}
+                  room={room}
+                  readOnly={readOnly}
+                  flashToken={m.id === flashMessageId ? flashToken : undefined}
+                  onEditMessage={onEditMessage}
+                />
+              </Fragment>
+            )
+          })}
+          <div ref={bottomRef} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Universal search modal — triggered by ChatList's header Search button.
+// No dimmed backdrop (per spec): a transparent full-screen click-catcher behind
+// a floating card. Empty query → empty state. Query → People/Chatroom/Message
+// tabs (People default), result rows referencing Microsoft Teams' search IA.
+// Clicking a Message result opens a read-only preview pane on the right that
+// reuses MessageArea (readOnly, scrolled + flashed to that message); its header
+// swaps all normal actions for a single "View message" button.
+// ════════════════════════════════════════════════════════════════════════════
+function NoSearchResults() {
+  return (
+    <p className="px-4 py-8 text-center" style={{ fontSize: 13, color: 'var(--color-neutral-7)' }}>
+      No results found
+    </p>
+  )
+}
+
+function MessagePreviewHeader({ room, onViewMessage }: { room: Room; onViewMessage: () => void }) {
+  const roomAvatar = room.origin === 'teams' ? <TeamsAvatar size={32} /> : room.type === 'dm' && room.person ? <PersonAvatar person={room.person} size={32} /> : <GroupAvatar size={32} />
+  return (
+    <header className="flex shrink-0 items-center gap-2 border-b border-divider bg-surface px-4 py-2">
+      {roomAvatar}
+      <h1 className="min-w-0 flex-1 truncate" style={{ fontSize: 16, fontWeight: 500, lineHeight: '130%' }}>{room.title}</h1>
+      <Button variant="primary" size="sm" onClick={onViewMessage}>View message</Button>
+    </header>
+  )
+}
+
+// 共用結果欄 — People / Chatroom / Message 三 tab + 結果列表。
+// SearchModal(浮窗)與 SearchPageView(top-search 全頁結果)共用同一份 markup,
+// 避免兩份 drift。Message 結果點擊交由 onPickMessage(caller 決定 preview 行為)。
+type SearchTab = 'people' | 'chatroom' | 'message'
+// 結果 row / tab 按鈕共用 class(單一宣告,People/Chatroom/Message 三 tab 不重複)。
+// 水平 padding 與 gap 走 layout-space token;垂直 8px 為 item-level 內距(item-anatomy 語境)。
+// @layout-space-magic-ok: py=8px 是 item-level row 內距(非 layout-space 巨觀 gap),gap/px 已走 token
+const SEARCH_ROW_CLASS = 'flex w-full gap-[var(--layout-space-tight)] px-[var(--layout-space-loose)] py-2 text-left hover:bg-neutral-hover'
+// @layout-space-magic-ok: pb-2=8px 是 tab 文字與底線 active bar 的內距(tab 元件內部微間距),px 已走 token
+const SEARCH_TAB_BTN_CLASS = 'relative px-[var(--layout-space-tight)] pb-2 capitalize'
+function SearchResultsColumn({
+  rooms,
+  q,
+  tab,
+  onTabChange,
+  previewMessageId,
+  onNavigateRoom,
+  onPickMessage,
+}: {
+  rooms: Room[]
+  q: string
+  tab: SearchTab
+  onTabChange: (t: SearchTab) => void
+  previewMessageId: string | null
+  onNavigateRoom: (roomId: string) => void
+  onPickMessage: (roomId: string, messageId: string) => void
+}) {
+  const now = new Date()
+  const peopleResults = q ? rooms.filter((r) => r.type === 'dm' && r.person && r.person.name.toLowerCase().includes(q)) : []
+  // Chatroom tab 只收 group chatroom(含 Teams 匯入房)— DM 屬「人」,歸 People tab,
+  // 不重複出現在 Chatroom tab(2026-07-06 user 指定)
+  const chatroomResults = q ? rooms.filter((r) => r.type !== 'dm' && r.title.toLowerCase().includes(q)) : []
+  const messageResults = q
+    ? rooms.flatMap((r) => r.messages.filter((m) => m.text.toLowerCase().includes(q)).map((m) => ({ room: r, message: m })))
+    : []
+
+  return (
+    <>
+      {/* @layout-space-magic-ok: gap-1=4px tab 按鈕間距 + pt=8px tab strip 上內距 — tab 元件內部微間距,非 layout-space 巨觀 gap */}
+      <div className="flex items-center gap-1 border-b border-divider px-[var(--layout-space-tight)] pt-2">
+        {(['people', 'chatroom', 'message'] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => onTabChange(t)}
+            className={SEARCH_TAB_BTN_CLASS}
+            style={{ fontSize: 13, fontWeight: 500, color: tab === t ? 'var(--color-primary)' : 'var(--color-neutral-7)' }}
+          >
+            {t}
+            {tab === t && <span className="absolute inset-x-0 -bottom-px h-0.5" style={{ backgroundColor: 'var(--color-primary)' }} />}
+          </button>
+        ))}
+      </div>
+      {/* @layout-space-magic-ok: py=8px 是 unbounded list 自帶上下內距(layoutSpace spec region 子分類),非巨觀 gap */}
+      <div className="scroll-hover min-h-0 flex-1 overflow-y-auto py-2">
+        {tab === 'people' && (peopleResults.length ? peopleResults.map((r) => (
+          <button
+            key={r.id}
+            type="button"
+            onClick={() => onNavigateRoom(r.id)}
+            className={`${SEARCH_ROW_CLASS} items-center`}
+          >
+            <PersonAvatar person={r.person!} size={32} />
+            <div className="min-w-0 flex-1">
+              <div className="truncate" style={{ fontSize: 14, fontWeight: 500 }}>{r.person!.name}</div>
+              <div className="truncate" style={{ fontSize: 12, color: 'var(--color-neutral-7)' }}>{r.person!.role}</div>
+            </div>
+          </button>
+        )) : <NoSearchResults />)}
+
+        {tab === 'chatroom' && (chatroomResults.length ? chatroomResults.map((r) => (
+          <button
+            key={r.id}
+            type="button"
+            onClick={() => onNavigateRoom(r.id)}
+            className={`${SEARCH_ROW_CLASS} items-center`}
+          >
+            {r.origin === 'teams' ? <TeamsAvatar size={32} /> : <GroupAvatar size={32} />}
+            <div className="min-w-0 flex-1">
+              <div className="truncate" style={{ fontSize: 14, fontWeight: 500 }}>{r.title}</div>
+              <div className="truncate" style={{ fontSize: 12, color: 'var(--color-neutral-7)' }}>
+                {`${r.memberKeys?.length ?? 0} members`}
+              </div>
+            </div>
+          </button>
+        )) : <NoSearchResults />)}
+
+        {tab === 'message' && (messageResults.length ? messageResults.map(({ room, message }) => {
+          const author = message.author === 'me' ? ME : PEOPLE[message.author]
+          return (
+            <button
+              key={message.id}
+              type="button"
+              onClick={() => onPickMessage(room.id, message.id)}
+              className={`${SEARCH_ROW_CLASS} items-start`}
+              style={previewMessageId === message.id ? { backgroundColor: 'var(--color-neutral-3)' } : undefined}
+            >
+              {author ? <PersonAvatar person={author} size={32} /> : <GroupAvatar size={32} />}
+              <div className="min-w-0 flex-1">
+                {/* @layout-space-magic-ok: gap-1.5=6px 作者名↔時間 inline 微間距,非 layout-space 巨觀 gap */}
+                <div className="flex items-center gap-1.5">
+                  <span className="truncate" style={{ fontSize: 13, fontWeight: 500 }}>{author?.name ?? message.author}</span>
+                  <span className="truncate" style={{ fontSize: 12, color: 'var(--color-neutral-7)' }}>in {room.title}</span>
+                </div>
+                <p className="truncate" style={{ fontSize: 13, color: 'var(--color-neutral-8)' }}>{message.text}</p>
+              </div>
+              <span className="shrink-0" style={{ fontSize: 11, color: 'var(--color-neutral-6)' }}>{formatListTime(message, now)}</span>
+            </button>
+          )
+        }) : <NoSearchResults />)}
+      </div>
+    </>
+  )
+}
+
+// Top-search chrome 的全頁搜尋結果 — universal search 輸入框有值時,覆蓋整個
+// Conversation view 的位置、成為頁面的一部分(非浮窗 panel)。左欄 = 與
+// SearchModal 相同的三 tab 結果列表;Message 結果點擊後右側開唯讀 preview。
+function SearchPageView({
+  rooms,
+  query,
+  onNavigateRoom,
+  onViewMessage,
+}: {
+  rooms: Room[]
+  query: string
+  onNavigateRoom: (roomId: string) => void
+  onViewMessage: (roomId: string, messageId: string) => void
+}) {
+  const [tab, setTab] = useState<SearchTab>('people')
+  const [preview, setPreview] = useState<{ roomId: string; messageId: string; token: number } | null>(null)
+  const q = query.trim().toLowerCase()
+  // 換關鍵字即重置 preview(與 SearchModal onChange 行為一致)
+  useEffect(() => { setPreview(null) }, [query])
+  const previewRoom = preview ? rooms.find((r) => r.id === preview.roomId) ?? null : null
+  // 預設不顯示右側 preview;只有 Message tab 點了某則訊息,preview 欄位才出現
+  const previewOpen = tab === 'message' && !!previewRoom && !!preview
+
+  const resultsColumn = (
+    <SearchResultsColumn
+      rooms={rooms}
+      q={q}
+      tab={tab}
+      onTabChange={setTab}
+      previewMessageId={preview?.messageId ?? null}
+      onNavigateRoom={onNavigateRoom}
+      onPickMessage={(roomId, messageId) => setPreview({ roomId, messageId, token: Date.now() })}
+    />
+  )
+
+  return (
+    <section className="flex min-w-0 flex-1 bg-surface">
+      {previewOpen && previewRoom && preview ? (
+        <>
+          <div className="flex w-[480px] min-w-0 shrink-0 flex-col border-r border-divider">
+            {resultsColumn}
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col bg-canvas">
+            <MessagePreviewHeader room={previewRoom} onViewMessage={() => onViewMessage(preview.roomId, preview.messageId)} />
+            <MessageArea
+              room={previewRoom}
+              onOpenThread={() => {}}
+              fullWidth={false}
+              readOnly
+              flashMessageId={preview.messageId}
+              flashToken={preview.token}
+              scrollToMessageId={preview.messageId}
+            />
+          </div>
+        </>
+      ) : (
+        // 無 preview → 結果列表置中於視窗中間、左右 padding(類似 fullWidth OFF 的 880px 置中效果)
+        <div className="mx-auto flex w-full min-w-0 flex-col px-[var(--layout-space-loose)]" style={{ maxWidth: 880 }}>
+          {resultsColumn}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function SearchModal({
+  rooms,
+  onClose,
+  onNavigateRoom,
+  onViewMessage,
+}: {
+  rooms: Room[]
+  onClose: () => void
+  onNavigateRoom: (roomId: string) => void
+  onViewMessage: (roomId: string, messageId: string) => void
+}) {
+  const [query, setQuery] = useState('')
+  const [tab, setTab] = useState<SearchTab>('people')
+  const [preview, setPreview] = useState<{ roomId: string; messageId: string; token: number } | null>(null)
+  const q = query.trim().toLowerCase()
+
+  const previewRoom = preview ? rooms.find((r) => r.id === preview.roomId) ?? null : null
+
+  return (
+    <div className="fixed inset-0 z-50" onClick={onClose}>
+      <div
+        className="absolute left-1/2 flex -translate-x-1/2 overflow-hidden rounded-2xl border border-divider bg-surface shadow-2xl"
+        style={{ top: 80, width: tab === 'message' && previewRoom ? 920 : 560, maxHeight: '70vh' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex w-[560px] shrink-0 flex-col" style={{ maxHeight: '70vh' }}>
+          <div className="flex items-center gap-2 border-b border-divider px-4 py-3">
+            <Search size={18} style={{ color: 'var(--color-neutral-7)' }} />
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => { setQuery(e.target.value); setPreview(null) }}
+              placeholder="Search people, chatroom, or message…"
+              className="flex-1 bg-transparent outline-none"
+              style={{ fontSize: 14, color: 'var(--color-foreground)' }}
+            />
+            <button type="button" aria-label="Close search" onClick={onClose} className="rounded-md p-1 hover:bg-neutral-hover">
+              <X size={16} style={{ color: 'var(--color-neutral-7)' }} />
+            </button>
+          </div>
+
+          {!q ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-16 text-center">
+              <Search size={28} style={{ color: 'var(--color-neutral-5)' }} />
+              <p style={{ fontSize: 13, color: 'var(--color-neutral-7)' }}>Search for people, chatrooms, or messages</p>
+            </div>
+          ) : (
+            <SearchResultsColumn
+              rooms={rooms}
+              q={q}
+              tab={tab}
+              onTabChange={setTab}
+              previewMessageId={preview?.messageId ?? null}
+              onNavigateRoom={onNavigateRoom}
+              onPickMessage={(roomId, messageId) => setPreview({ roomId, messageId, token: Date.now() })}
+            />
+          )}
+        </div>
+
+        {tab === 'message' && previewRoom && preview && (
+          <div className="flex min-w-0 flex-1 flex-col border-l border-divider">
+            <MessagePreviewHeader room={previewRoom} onViewMessage={() => onViewMessage(preview.roomId, preview.messageId)} />
+            <MessageArea
+              room={previewRoom}
+              onOpenThread={() => {}}
+              fullWidth={false}
+              readOnly
+              flashMessageId={preview.messageId}
+              flashToken={preview.token}
+              scrollToMessageId={preview.messageId}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// InputBox — 編輯引擎常駐 rich contentEditable(2026-07-09 v4,對齊 Teams:compose box
+// 永遠是 rich editor,Type 按鈕只切換 format toolbar 顯示/隱藏)。因此鍵盤清單捷徑
+// (行首「-」/「*」/「1.」+ 空白)與 list 內 Enter 行為**不論工具列有沒有展開都可用**。
+// 佈局:單行 = 編輯區 + buttons 同排;多行(內容折行 / block 元素)或 toolbar 展開
+// = 編輯區全寬在上、buttons 獨立在下。三種狀態共用同一 DOM 結構(只換 class + 條件
+// slot),切換時編輯區不 remount、內容不丟失。
+// 送出:內容無格式標記(hasRichMarkup=false)→ 只送純文字(bubble 走原 text 渲染)。
+function InputBox({ fullWidth, onSend }: { fullWidth: boolean; onSend: (text: string, html?: string) => void }) {
+  const [multiline, setMultiline] = useState(false)
+  const [rich, setRich] = useState(false)
+  const [hasValue, setHasValue] = useState(false)
+  const richRef = useRef<RichEditorHandle>(null)
+
+  // 內容變動 → 同步 hasValue + multiline(單行高 21px,>30 = 已折行;或含 block 元素)
+  function syncFromEditor(hasContent: boolean) {
+    setHasValue(hasContent)
+    const el = richRef.current?.getElement()
+    setMultiline(!!el && (el.scrollHeight > 30 || !!el.querySelector('div,br,ul,ol,blockquote,pre')))
+  }
+
+  function send() {
+    const ed = richRef.current
+    if (!ed || ed.isEmpty()) return
+    const html = ed.getHTML()
+    onSend(ed.getText().trim(), hasRichMarkup(html) ? html : undefined)
+    ed.clear() // clear → onHasContentChange(false) → syncFromEditor 收回 hasValue/multiline
+  }
+
+  function toggleRich() {
+    setRich((v) => !v)
+    richRef.current?.focus()
+  }
+
+  // toolbar 展開或內容多行 → column 佈局(編輯區全寬、buttons 下移)
+  const column = rich || multiline
+
+  const btn24 = '!h-6 !w-6 !min-w-0 !p-0'
+  const actionButtons = (
+    <div className="flex shrink-0 items-center gap-2">
+      <IconBtnSm icon={Type} label="Rich editor" onClick={toggleRich} className={`${btn24} ${rich ? '!bg-neutral-selected' : ''}`} />
+      <IconBtnSm icon={Smile} label="Emoji" className={btn24} />
+      <IconBtnSm icon={Plus} label="Attach files" className={btn24} />
+      <Separator orientation="vertical" className="mx-1 h-5" />
+      <Tooltip>
+        <TooltipTrigger asChild>
+          {/* empty → text (no bg, dark stroke) initial state; has value → primary filled */}
+          <Button variant={hasValue ? 'primary' : 'text'} size="sm" iconOnly startIcon={Send} aria-label="Send" title="" onClick={send} className={btn24} />
+        </TooltipTrigger>
+        <TooltipContent>Send</TooltipContent>
+      </Tooltip>
+    </div>
+  )
+
+  return (
+    <div className="shrink-0 bg-surface" style={{ paddingTop: 8, paddingBottom: 16, paddingLeft: 56, paddingRight: 56 }}>
+      {/* ON: full-width, 56px sides; OFF: max 880px centered, 56px sides when narrower */}
+      <div className="mx-auto w-full" style={fullWidth ? undefined : { maxWidth: 880 }}>
+        <div
+          className="rounded-lg border bg-canvas"
+          style={{
+            paddingTop: 6, paddingBottom: 6, paddingLeft: 12, paddingRight: 8,
+            maxHeight: 280, overflow: 'hidden',
+            borderColor: hasValue ? 'var(--color-primary-hover)' : 'var(--color-border)',
+          }}
+        >
+          {/* 同一容器 + 條件 slot:children index 穩定,rich/multiline 切換時
+              RichTextArea 不 remount(contentEditable 的 DOM 內容才不會丟失) */}
+          <div className={column ? undefined : 'flex items-center gap-2'}>
+            {rich && (
+              <div className="mb-1 border-b border-divider pb-1">
+                <FormatToolbar editorRef={richRef} />
+              </div>
+            )}
+            <RichTextArea
+              ref={richRef}
+              placeholder="Type a message"
+              ariaLabel="Type a message"
+              onSubmit={send}
+              onHasContentChange={syncFromEditor}
+              className={column ? 'relative w-full max-h-[190px] overflow-y-auto' : 'relative min-w-0 flex-1 max-h-[190px] overflow-y-auto'}
+            />
+            <div className={column ? 'mt-1.5 flex items-center justify-end' : 'shrink-0'}>
+              {actionButtons}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Thread panel ──────────────────────────────────────────────────────────────
+
+// Thread panel 輸入框 — 編輯引擎常駐 rich contentEditable(2026-07-09 v4,與主輸入框
+// 同款):Type 按鈕只切換 toolbar 顯示,鍵盤清單捷徑 / list 內 Enter 行為不論工具列
+// 開關都可用;Enter 直接送出(list 內 = 換 item)、Shift+Enter 換行。
+// 送出:內容無格式標記(hasRichMarkup=false)→ 只送純文字。
+function ThreadInputBox({ onSend, onReply }: { onSend: (text: string, alsoSend: boolean, html?: string) => void; onReply?: () => void }) {
+  const [alsoSend, setAlsoSend] = useState(true)
+  const [rich, setRich] = useState(false)
+  const [hasValue, setHasValue] = useState(false)
+  const richRef = useRef<RichEditorHandle>(null)
+
+  function send() {
+    const ed = richRef.current
+    if (!ed || ed.isEmpty()) return
+    const html = ed.getHTML()
+    onSend(ed.getText().trim(), alsoSend, hasRichMarkup(html) ? html : undefined)
+    onReply?.()
+    ed.clear()
+  }
+
+  function toggleRich() {
+    setRich((v) => !v)
+    richRef.current?.focus()
+  }
+
+  return (
+    <div className="bg-surface px-3 py-2 shrink-0">
+      <div className="rounded-lg border border-border bg-canvas px-3 py-2 focus-within:border-border-hover">
+        {rich && (
+          <div className="mb-1 border-b border-divider pb-1">
+            <FormatToolbar editorRef={richRef} />
+          </div>
+        )}
+        <RichTextArea
+          ref={richRef}
+          placeholder="Reply in thread..."
+          ariaLabel="Reply in thread"
+          onSubmit={send}
+          onHasContentChange={setHasValue}
+          className="relative max-h-32 overflow-y-auto"
+        />
+        <div className="mt-1.5 flex items-center gap-2">
+          <label className="flex flex-1 cursor-pointer items-center gap-1.5 text-caption text-fg-secondary select-none">
+            <input
+              type="checkbox"
+              checked={alsoSend}
+              onChange={(e) => setAlsoSend(e.target.checked)}
+              className="rounded border-border accent-[var(--color-primary)]"
+            />
+            Also send to chatroom
+          </label>
+          <IconBtnSm icon={Type} label="Rich editor" onClick={toggleRich} className={`!h-6 !w-6 !min-w-0 !p-0 ${rich ? '!bg-neutral-selected' : ''}`} />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant={hasValue ? 'primary' : 'text'} size="sm" iconOnly startIcon={Send} aria-label="Send reply" title="" onClick={send} className="!h-6 !w-6 !min-w-0 !p-0" />
+            </TooltipTrigger>
+            <TooltipContent>Send</TooltipContent>
+          </Tooltip>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ThreadPanel({
+  message,
+  room,
+  width,
+  onWidthChange,
+  expanded,
+  onExpand,
+  onCollapse,
+  onClose,
+  onSend,
+  onReply,
+  onEditMessage,
+}: {
+  message: Message
+  room: Room
+  width?: number
+  onWidthChange: (w: number) => void
+  expanded: boolean
+  onExpand: () => void
+  onCollapse: () => void
+  onClose: () => void
+  onSend: (text: string, alsoSend: boolean, html?: string) => void
+  onReply?: () => void
+  onEditMessage?: (messageId: string, payload: { text: string; html?: string }) => void
+}) {
+  const author = message.author === 'me' ? ME : (PEOPLE[message.author] ?? null)
+  const mine = message.author === 'me'
+
+  return (
+    <div
+      className="relative flex shrink-0 flex-col bg-canvas"
+      style={expanded ? { flex: 1 } : { width: width ?? 480 }}
+    >
+      {!expanded && (
+        <ResizeHandle
+          direction="horizontal"
+          position="start"
+          value={width ?? 480}
+          min={THREAD_MIN}
+          max={THREAD_MAX}
+          ariaLabel="拖曳調整 Thread 面板寬度"
+          onValueChange={onWidthChange}
+        />
+      )}
+
+      {/* Panel header */}
+      <div className="flex items-center border-b border-divider bg-surface px-3 py-2 shrink-0">
+        <h2 className="flex-1 font-semibold" style={{ fontSize: 15 }}>Thread</h2>
+        <div className="flex items-center gap-0.5">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="text" size="sm" iconOnly startIcon={expanded ? Minimize2 : Maximize2} aria-label={expanded ? 'Collapse thread' : 'Expand thread'} title="" onClick={expanded ? onCollapse : onExpand} />
+            </TooltipTrigger>
+            <TooltipContent>{expanded ? 'Collapse' : 'Expand'}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="text" size="sm" iconOnly startIcon={X} aria-label="Close thread" title="" onClick={onClose} />
+            </TooltipTrigger>
+            <TooltipContent>Close</TooltipContent>
+          </Tooltip>
+        </div>
+      </div>
+
+      <ScrollArea className="min-h-0 flex-1">
+        <ThreadMessages message={message} room={room} onEditMessage={onEditMessage} />
+      </ScrollArea>
+
+      <ThreadInputBox onSend={onSend} onReply={onReply} />
+    </div>
+  )
+}
+
+// Thread 內容(父訊息 + 回覆)。舊版 ThreadPanel 與 AppShell 版 Thread(ThreadAsideBody)共用。
+function ThreadMessages({
+  message,
+  room,
+  onEditMessage,
+}: {
+  message: Message
+  room: Room
+  onEditMessage?: (messageId: string, payload: { text: string; html?: string }) => void
+}) {
+  const threadMsgs = message.threadMessages ?? []
+  const lastMineId = [...threadMsgs].reverse().find((m) => m.author === 'me')?.id ?? null
+  return (
+    <div className="flex flex-col gap-4 px-4 py-4">
+      {/* Parent message */}
+      <MessageBubble
+        message={message}
+        isLastMine={message.author === 'me'}
+        onOpenThread={() => {}}
+        room={room}
+        isInThread
+        onEditMessage={onEditMessage}
+      />
+      {/* Thread replies */}
+      {threadMsgs.map((tm) => (
+        <MessageBubble
+          key={tm.id}
+          message={tm}
+          isLastMine={tm.id === lastMineId}
+          onOpenThread={() => {}}
+          room={room}
+          isInThread
+          onEditMessage={onEditMessage}
+        />
+      ))}
+    </div>
+  )
+}
+
+/**
+ * AppShell 版 Thread(Right panel = DS `AppShellAside`,標題列 = DS 的「Thread + ×」,Expand 鈕移除 —— 2026-10-22 user 選)。
+ * DS 缺口:AppShellAside 的內容整塊包在 ScrollArea 裡,沒有固定在底部的 footer slot → 輸入盒會跟著捲走。
+ * 補法(app 端最小):內容至少撐滿可視高度(量 ScrollArea viewport),輸入盒 `sticky bottom-0` 釘在可視範圍底部。
+ * DS 補 footer slot 後改用之(見 STRUCTURE.md §4「DS 待補」)。
+ */
+function ThreadAsideBody({
+  message,
+  room,
+  onSend,
+  onReply,
+  onEditMessage,
+}: {
+  message: Message
+  room: Room
+  onSend: (text: string, alsoSend: boolean, html?: string) => void
+  onReply?: () => void
+  onEditMessage?: (messageId: string, payload: { text: string; html?: string }) => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [minHeight, setMinHeight] = useState<number | undefined>(undefined)
+  useEffect(() => {
+    const viewport = ref.current?.closest('[data-radix-scroll-area-viewport]')
+    if (!viewport) return
+    const ro = new ResizeObserver(() => setMinHeight(viewport.clientHeight))
+    ro.observe(viewport)
+    return () => ro.disconnect()
+  }, [])
+  return (
+    <div ref={ref} className="flex flex-col" style={{ minHeight }}>
+      <div className="flex-1">
+        <ThreadMessages message={message} room={room} onEditMessage={onEditMessage} />
+      </div>
+      <div className="sticky bottom-0">
+        <ThreadInputBox onSend={onSend} onReply={onReply} />
+      </div>
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Conversation wrapper
+// ════════════════════════════════════════════════════════════════════════════
+function Conversation({
+  room,
+  listOpen,
+  onExpandList,
+  isMuted,
+  onToggleMute,
+  fullWidth,
+  onToggleFullWidth,
+  onSend,
+  onThreadSend,
+  onEditMessage,
+  onAction,
+  groupAvatarMode = 'icon',
+  lastReadMessageId,
+  flashMessageId,
+  flashToken,
+  hideExpandControl = false,
+  headerLeading,
+  onOpenThreadExternal,
+}: {
+  room: Room
+  listOpen: boolean
+  onExpandList: () => void
+  isMuted: boolean
+  onToggleMute: () => void
+  fullWidth: boolean
+  onToggleFullWidth: () => void
+  onSend: (text: string, html?: string) => void
+  onThreadSend: (parentId: string, text: string, alsoSend: boolean, html?: string) => void
+  // 自己的訊息 More → Edit 存檔(main area + thread panel 共用)
+  onEditMessage?: (messageId: string, payload: { text: string; html?: string }) => void
+  onAction?: (a: ChatAction) => void
+  groupAvatarMode?: 'icon' | 'initial'
+  lastReadMessageId?: string | null
+  // Jump-from-search: scrolls to + one-time-flashes (indigo-6) this message.
+  flashMessageId?: string | null
+  flashToken?: number
+  hideExpandControl?: boolean
+  /** ConversationHeader 最左的開關(AppShell 版 = DS SidebarTrigger,sidebar.spec.md Pattern A) */
+  headerLeading?: React.ReactNode
+  /** AppShell 版:thread 由 AppShell 的 Right panel 承載 → 不在這裡渲染 ThreadPanel,開 thread 交給外層 */
+  onOpenThreadExternal?: (m: Message) => void
+}) {
+  // Track the thread root by id (not a snapshot) so the panel re-reads live
+  // room state and shows newly sent replies immediately.
+  const [threadParentId, setThreadParentId] = useState<string | null>(null)
+  const [threadExpanded, setThreadExpanded] = useState(false)
+  const [threadWidth, setThreadWidth] = useState(480)
+  const threadMessage = threadParentId ? room.messages.find((m) => m.id === threadParentId) ?? null : null
+
+  useEffect(() => {
+    setThreadParentId(null)
+    setThreadExpanded(false)
+  }, [room.id])
+
+  function openThread(m: Message) {
+    onAction?.({ type: 'open-thread', roomId: room.id, messageId: m.id })
+    if (onOpenThreadExternal) onOpenThreadExternal(m)
+    else setThreadParentId(m.id)
+  }
+
+  return (
+    // AppShell 版:section 住在 DS <main>(block + 自帶垂直捲動)裡 → h-full 撐滿,捲動仍交給 MessageArea
+    <section className={`flex min-w-0 flex-1 overflow-hidden bg-canvas${onOpenThreadExternal ? ' h-full' : ''}`}>
+      {!threadExpanded && (
+        <div className="flex min-w-0 flex-1 flex-col">
+          <ConversationHeader
+            room={room}
+            listOpen={listOpen}
+            onExpandList={onExpandList}
+            isMuted={isMuted}
+            onToggleMute={onToggleMute}
+            isFullWidth={fullWidth}
+            onToggleFullWidth={onToggleFullWidth}
+            groupAvatarMode={groupAvatarMode}
+            hideExpandControl={hideExpandControl}
+            leading={headerLeading}
+            chromeHeight={headerLeading != null}
+          />
+          <MessageArea
+            room={room}
+            onOpenThread={openThread}
+            fullWidth={fullWidth}
+            lastReadMessageId={lastReadMessageId}
+            flashMessageId={flashMessageId}
+            flashToken={flashToken}
+            scrollToMessageId={flashMessageId}
+            onEditMessage={onEditMessage}
+          />
+          <InputBox key={room.id} fullWidth={fullWidth} onSend={onSend} />
+        </div>
+      )}
+      {threadMessage && (
+        <ThreadPanel
+          message={threadMessage}
+          room={room}
+          width={threadExpanded ? undefined : threadWidth}
+          onWidthChange={setThreadWidth}
+          expanded={threadExpanded}
+          onExpand={() => setThreadExpanded(true)}
+          onCollapse={() => setThreadExpanded(false)}
+          onClose={() => { setThreadParentId(null); setThreadExpanded(false) }}
+          onSend={(text, alsoSend, html) => onThreadSend(threadMessage.id, text, alsoSend, html)}
+          onReply={() => onAction?.({ type: 'thread-reply', roomId: room.id, messageId: threadMessage.id })}
+          onEditMessage={onEditMessage}
+        />
+      )}
+    </section>
+  )
+}
+
+// AppShell 版 Main:Conversation + 頁首最左 DS SidebarTrigger。
+// 開 thread = 使用者主動要求 Right panel 顯示內容(app-shell.spec.md「版面規則」§4):
+// 關著 → 由 asideOpen false→true 觸發(AppShell 一律算要求);已開著換看另一串 → 同一個事件裡呼叫 requestAside()。
+function ShellConversation({
+  threadOpen,
+  onOpenThread,
+  ...props
+}: Omit<React.ComponentProps<typeof Conversation>, 'headerLeading' | 'onOpenThreadExternal'> & {
+  threadOpen: boolean
+  onOpenThread: (m: Message) => void
+}) {
+  const { requestAside } = useAppShell()
+  return (
+    <Conversation
+      {...props}
+      headerLeading={<SidebarTrigger aria-label="Toggle chat list" />}
+      onOpenThreadExternal={(m) => {
+        if (threadOpen) requestAside()
+        onOpenThread(m)
+      }}
+    />
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Variant config — 讓 A/B usability test 在「不改基底預設行為」前提下調整初始狀態。
+// 所有欄位 optional,未傳 = 與 base story(apps-chat-chat--default)完全一致。
+export type ChatVariantConfig = {
+  /** 聊天列表初始是否顯示訊息預覽(本專案 A/B 差異點)。預設 true。 */
+  initialShowPreview?: boolean
+  /** 訊息區初始全寬 / 880px 置中。預設 true(全寬)。 */
+  initialFullWidth?: boolean
+  /** 聊天列表初始是否展開。預設 true。 */
+  initialListOpen?: boolean
+  /** 多人聊天室頭像樣式:'icon'(預設,現狀)/ 'initial'(室名首字母 + 隨機色)。DM 不受影響。 */
+  groupAvatarMode?: 'icon' | 'initial'
+  /** 各版本用不同 seed 打散聊天室排序,避免受測者背誦順序影響結果(同 seed 內順序穩定)。 */
+  roomOrderSeed?: number
+  /**
+   * 頂部 chrome 佈局:'nav-rail'(預設,左側 icon 導覽欄)/ 'top-search'(Teams 整合
+   * prototype:NavRail 移除,頂部改為 universal search bar,More menu + 我的頭像移到最右)。
+   */
+  chrome?: 'nav-rail' | 'top-search'
+  /** 注入 Microsoft Teams 匯入的聊天室 demo 資料(全部 general chatroom,TeamsAvatar 標示)。預設 false。 */
+  includeTeamsRooms?: boolean
+  /**
+   * Teams 匯入房的標示方式(UT 變體用,不影響本體 prototype 預設):
+   * - 'avatar'(預設)= Teams 品牌色頭像標示(TeamsAvatar)
+   * - 'suffix' = 一般 GroupAvatar + 房名後綴「[Teams]」(origin 標記移除,標示全靠文字後綴)
+   */
+  teamsRoomMarker?: 'avatar' | 'suffix'
+  /**
+   * UT 用:把 Teams 匯入房排到「同名原生 room」正下方(id `teams-<x>` ↔ `<x>`),
+   * 讓同名的兩間聊天室在列表中相鄰、方便觀察比較。預設 false(不影響本體 prototype 排序)。
+   * 僅作用於 chats section 內同組的房;check 依 room id 判定不受排序影響。
+   */
+  adjacentTeamsNamesake?: boolean
+  /**
+   * tAgent(智慧代理,DS AgentPanel 家族):NavRail 入口鈕 + 右側內容區右下入口鈕 + 右側 AgentPanel。
+   * 預設 false(既有 Chat / Teams / Desktop / UT story 不受影響)。僅 chrome='nav-rail' 時有 NavRail 入口。
+   */
+  agent?: boolean
+  /** tAgent 面板初始是否開啟(DS 預設關閉,v14 條 F);story 截開啟態用。 */
+  initialAgentOpen?: boolean
+  /**
+   * Chat 分頁的 tAgent 側邊面板(右緣入口鈕 / FAB)。預設 false:2026-10-23 user「chat 部分請先幫我把 FAB 移除,目前先不開放 Chat 可以同時運用 ai agent」。
+   * 程式保留、只關掉入口;tAgent 只從 NavRail 的 tAgent 分頁(整頁)使用。僅 test-only story 打開它做回歸。
+   */
+  chatAgentPanel?: boolean
+  /** AppShell 版:初始開著的 thread(父訊息 id,屬於初始聊天室);story 截「Thread + tAgent 並排」用。 */
+  initialThreadId?: string
+  /** config.agent:初始分頁(預設 'chat');'agent' = tAgent 整頁。 */
+  initialTab?: 'chat' | 'agent'
+  /** config.agent:tAgent 整頁的初始位置(預設 'new' = 新對話首頁)。 */
+  initialAgentRoute?: TAgentRoute
+}
+
+// 依 seed 做穩定洗牌(各版本不同 seed → 不同排序,但同版本每次一致)。
+function seededShuffle<T>(arr: T[], seed: number): T[] {
+  let s = seed >>> 0 || 1
+  const rand = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 0xffffffff }
+  const a = arr.slice()
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+// Teams 匯入 room 注入:favorites 排在既有最愛之後;chats 穿插在既有列表前段
+// (migrated 室近期仍活躍,排前面才看得到標示),不打亂其餘既有順序。
+function withTeamsRooms(rooms: Room[], marker: 'avatar' | 'suffix' = 'avatar'): Room[] {
+  // marker='suffix'(UT 變體 B):拿掉 origin(→ 一般 GroupAvatar),房名加後綴「[Teams]」,
+  // 標示全靠文字;room id 不變,UT check 依 id 判定不受影響。
+  const teamsRooms = marker === 'suffix'
+    ? TEAMS_MIGRATED_ROOMS.map((r) => ({ ...r, origin: undefined, title: `${r.title} [Teams]` }))
+    : TEAMS_MIGRATED_ROOMS
+  const favs = rooms.filter((r) => r.section === 'favorites')
+  const chats = rooms.filter((r) => r.section !== 'favorites')
+  const tFavs = teamsRooms.filter((r) => r.section === 'favorites')
+  const tChats = teamsRooms.filter((r) => r.section !== 'favorites')
+  return [...favs, ...tFavs, ...chats.slice(0, 2), ...tChats, ...chats.slice(2)]
+}
+// 把 Teams 匯入房(id `teams-<x>`)排到同名原生 room(id `<x>`)正下方,讓同名兩間相鄰。
+// 只在兩者同屬一個陣列(同 section)時生效;找不到同名原生房的 Teams 房維持原位。
+function groupNamesakeTeams(list: Room[]): Room[] {
+  const teamsByNative = new Map<string, Room>()
+  for (const r of list) {
+    const m = /^teams-(.+)$/.exec(r.id)
+    if (m && list.some((x) => x.id === m[1])) teamsByNative.set(m[1], r)
+  }
+  if (teamsByNative.size === 0) return list
+  const pulled = new Set(teamsByNative.values())
+  const out: Room[] = []
+  for (const r of list) {
+    if (pulled.has(r)) continue // 稍後插在同名原生房下方
+    out.push(r)
+    const t = teamsByNative.get(r.id)
+    if (t) out.push(t)
+  }
+  return out
+}
+// 依 roomOrderSeed 重排 rooms(favorites / chats 各自打散,保留分組)。未給 seed → 原序。
+function orderedRooms(seed?: number, includeTeams?: boolean, teamsMarker?: 'avatar' | 'suffix', adjacentNamesake?: boolean): Room[] {
+  const base = includeTeams ? withTeamsRooms(INITIAL_ROOMS, teamsMarker) : INITIAL_ROOMS
+  if (seed == null) return base
+  const favs = seededShuffle(base.filter((r) => r.section === 'favorites'), seed)
+  let chats = seededShuffle(base.filter((r) => r.section !== 'favorites'), (seed ^ 0x9e3779b9) >>> 0)
+  if (adjacentNamesake) chats = groupNamesakeTeams(chats)
+  return [...favs, ...chats]
+}
+
+// 使用者實際操作事件 — 供 usability test 判定任務是否「真的有做對」。
+// onAction 為 optional,未傳(base story)時完全不影響行為。
+export type ChatAction =
+  | { type: 'open-room'; roomId: string; roomTitle: string; unread: boolean }
+  | { type: 'mute-room'; roomId: string; roomTitle: string }
+  | { type: 'open-thread'; roomId: string; messageId: string }
+  | { type: 'thread-reply'; roomId: string; messageId: string }
+  | { type: 'open-settings' }
+  | { type: 'toggle-preview'; value: boolean }
+  // top-search chrome:全頁搜尋結果的操作(UT 用;點結果切房 / 點「View message」跳訊息)
+  | { type: 'search-navigate'; roomId: string; roomTitle: string }
+  | { type: 'search-view-message'; roomId: string; messageId: string }
+
+export default function App({
+  config,
+  onAction,
+}: { config?: ChatVariantConfig; onAction?: (a: ChatAction) => void } = {}) {
+  const [rooms, setRooms] = useState<Room[]>(() => orderedRooms(config?.roomOrderSeed, config?.includeTeamsRooms, config?.teamsRoomMarker, config?.adjacentTeamsNamesake))
+  const [activeId, setActiveId] = useState<string>(() => orderedRooms(config?.roomOrderSeed, config?.includeTeamsRooms, config?.teamsRoomMarker, config?.adjacentTeamsNamesake)[0].id)
+  const [listOpen, setListOpen] = useState(config?.initialListOpen ?? true)
+  const [listWidth, setListWidth] = useState(320)
+  const [showPreview, setShowPreview] = useState(config?.initialShowPreview ?? true)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [mutedIds, setMutedIds] = useState<Set<string>>(new Set())
+  const [fullWidth, setFullWidth] = useState(config?.initialFullWidth ?? true)
+  const [favOrder, setFavOrder] = useState<string[]>(
+    () => orderedRooms(config?.roomOrderSeed, config?.includeTeamsRooms, config?.teamsRoomMarker, config?.adjacentTeamsNamesake).filter((r) => r.section === 'favorites').map((r) => r.id)
+  )
+  // The "Last read" divider only shows for the room/message captured at the
+  // moment an unread room is opened, and is cleared the instant the user
+  // navigates away — returning to the room later shows no divider.
+  const [lastReadDivider, setLastReadDivider] = useState<{ roomId: string; messageId: string } | null>(null)
+  const [searchOpen, setSearchOpen] = useState(false)
+  // top-search chrome 的 universal search 關鍵字(有值 → SearchPageView 覆蓋 Conversation)
+  const [topQuery, setTopQuery] = useState('')
+  // Jump-to-message from the universal search modal's "View message" button —
+  // bumping token re-triggers the one-time indigo-6 flash on the same message.
+  const [flash, setFlash] = useState<{ roomId: string; messageId: string; token: number } | null>(null)
+  const agentEnabled = config?.agent ?? false
+  const chatAgentPanel = config?.chatAgentPanel ?? false
+  const [agentOpen, setAgentOpen] = useState(chatAgentPanel && (config?.initialAgentOpen ?? false))
+  // AppShell 版 Thread(Right panel):以 id 追蹤父訊息,換聊天室即收起(與舊版 ThreadPanel 同規則)
+  const [shellThreadId, setShellThreadId] = useState<string | null>(config?.initialThreadId ?? null)
+  const [shellFrame, setShellFrame] = useState<HTMLDivElement | null>(null)
+  // NavRail 分頁(config.agent):'agent' = tAgent 整頁;其餘 = Chat 版面(Home 分頁沿用 base:只高亮)
+  const [navTab, setNavTab] = useState<NavTab>(config?.initialTab ?? 'chat')
+  // 分頁切換 = 該頁的 AppShell 重新掛載;掛載後的頭幾格 AppShell 還沒量到寬度,Menu 先當 0 寬、量到後才給 320,
+  // 中間那段 DS 寬度轉場看起來像側欄「滑出來」(2026-10-23 user:「切換 chat 跟 tAgent 的過程中一直有側面面板重複滑出的轉場」)。
+  // 只在掛載後這一小段關掉面板寬度轉場;之後使用者開合 / 視窗變窄的轉場照 DS。見 chrome.ts NO_MOUNT_PANEL_TRANSITION。
+  const [shellSettling, setShellSettling] = useState(true)
+  useLayoutEffect(() => {
+    setShellSettling(true)
+    const t = window.setTimeout(() => setShellSettling(false), SHELL_SETTLE_MS)
+    return () => window.clearTimeout(t)
+  }, [navTab])
+  const [agentRoute, setAgentRoute] = useState<TAgentRoute>(config?.initialAgentRoute ?? 'new')
+  // 側邊面板目前看的對話(點 NavRail tAgent 時整頁接著開這一則)
+  const [panelConversationId, setPanelConversationId] = useState('c-dongding')
+
+  const current = rooms.find((r) => r.id === activeId) ?? rooms[0]
+  const shellThread = shellThreadId ? current.messages.find((m) => m.id === shellThreadId) ?? null : null
+  const prevRoomRef = useRef(current.id)
+  useEffect(() => {
+    if (prevRoomRef.current !== current.id) setShellThreadId(null)
+    prevRoomRef.current = current.id
+  }, [current.id])
+  const unreadCount = rooms.filter((r) => r.unread && !mutedIds.has(r.id)).length
+  const groupAvatarMode = config?.groupAvatarMode ?? 'icon'
+  const chrome = config?.chrome ?? 'nav-rail'
+  const topSearching = chrome === 'top-search' && topQuery.trim() !== ''
+
+  function handleToggleMute(id: string) {
+    const willMute = !mutedIds.has(id)
+    setMutedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+    if (willMute) {
+      const r = rooms.find((x) => x.id === id)
+      onAction?.({ type: 'mute-room', roomId: id, roomTitle: r?.title ?? id })
+    }
+  }
+
+  function handleSelectRoom(id: string) {
+    if (id === activeId) return
+    const r = rooms.find((x) => x.id === id)
+    if (r) onAction?.({ type: 'open-room', roomId: r.id, roomTitle: r.title, unread: !!r.unread })
+    if (r?.unread) {
+      const lastMsg = r.messages[r.messages.length - 1]
+      setLastReadDivider(lastMsg ? { roomId: id, messageId: lastMsg.id } : null)
+      setRooms((prev) => prev.map((x) => (x.id === id ? { ...x, unread: false } : x)))
+    } else {
+      setLastReadDivider(null)
+    }
+    setActiveId(id)
+  }
+
+  // People/Chatroom search tabs — jump straight to the room, no preview/flash.
+  function handleSearchNavigateRoom(roomId: string) {
+    if (roomId !== activeId) handleSelectRoom(roomId)
+    setSearchOpen(false)
+  }
+
+  // Message tab's "View message" — closes the modal, opens the room (if needed),
+  // and flashes the target bubble in the real conversation view.
+  function handleSearchViewMessage(roomId: string, messageId: string) {
+    if (roomId !== activeId) handleSelectRoom(roomId)
+    setFlash({ roomId, messageId, token: Date.now() })
+    setSearchOpen(false)
+  }
+
+  // top-search chrome:全頁搜尋結果的對應 handler — 清空關鍵字即退出搜尋、回到 Conversation。
+  function handleTopNavigateRoom(roomId: string) {
+    const r = rooms.find((x) => x.id === roomId)
+    onAction?.({ type: 'search-navigate', roomId, roomTitle: r?.title ?? roomId })
+    if (roomId !== activeId) handleSelectRoom(roomId)
+    setTopQuery('')
+  }
+  function handleTopViewMessage(roomId: string, messageId: string) {
+    onAction?.({ type: 'search-view-message', roomId, messageId })
+    if (roomId !== activeId) handleSelectRoom(roomId)
+    setFlash({ roomId, messageId, token: Date.now() })
+    setTopQuery('')
+  }
+
+  function handleToggleFavorite(id: string) {
+    const isFav = favOrder.includes(id)
+    if (isFav) setFavOrder((prev) => prev.filter((x) => x !== id))
+    else setFavOrder((prev) => [...prev, id])
+  }
+
+  function handleSend(text: string, html?: string) {
+    const now = new Date()
+    const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
+    const newMsg: Message = { id: `sent-${Date.now()}`, author: 'me', text, html, time, msgStatus: 'sending' }
+    setRooms((prev) => prev.map((r) =>
+      r.id === activeId ? { ...r, messages: [...r.messages, newMsg] } : r
+    ))
+  }
+
+  // tAgent 來源連結:切到該聊天室並 flash 訊息(messageId 空 = 只切聊天室,例如點 context chip)
+  function handleAgentViewMessage(roomId: string, messageId: string) {
+    setTopQuery('')
+    if (roomId !== activeId) handleSelectRoom(roomId)
+    if (messageId) setFlash({ roomId, messageId, token: Date.now() })
+  }
+
+  // tAgent 代使用者送出(決策卡「Send now」):append 到指定聊天室,回傳訊息 id 給代理的「view message」連結
+  function handleAgentSendToRoom(roomId: string, text: string): string {
+    const now = new Date()
+    const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
+    const id = `agent-sent-${Date.now()}`
+    setRooms((prev) => prev.map((r) =>
+      r.id === roomId ? { ...r, messages: [...r.messages, { id, author: 'me', text, time, msgStatus: 'sent' } as Message] } : r
+    ))
+    return id
+  }
+  // tAgent 對話資料只有一份(側邊面板與整頁共用;TAgent.tsx useTAgentEngine)
+  const agentEngine = useTAgentEngine({ onSendToRoom: handleAgentSendToRoom })
+
+  // tAgent 整頁裡的來源連結 / 聊天室附件:回到 Chat 分頁再定位(側邊面板則留在 Chat 分頁,見 TAgentDock)
+  function handleAgentOpenInChat(roomId: string, messageId: string) {
+    setNavTab('chat')
+    handleAgentViewMessage(roomId, messageId)
+  }
+
+  // 點 NavRail tAgent 時,側邊面板開著 → 整頁接著開面板正在看的那一則,面板收起(對話搬到整頁看,2026-10-23 user 同意);
+  // 面板那一則還是空對話 → 整頁停在上次的位置。面板關著 → 整頁停在上次的位置。
+  function handleNavTabChange(next: NavTab) {
+    if (next === 'agent' && agentOpen) {
+      const panelConversation = agentEngine.listed.find((c) => c.id === panelConversationId)
+      if (panelConversation) setAgentRoute(`conversation:${panelConversation.id}`)
+      setAgentOpen(false)
+    }
+    setNavTab(next)
+  }
+
+
+  function handleThreadSend(parentId: string, text: string, alsoSend: boolean, html?: string) {
+    const now = new Date()
+    const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
+    const baseId = `t-${Date.now()}`
+    // Reply shown inside the thread panel — normal bubble, no "replied to a thread" link.
+    const threadReply: Message = { id: baseId, author: 'me', text, html, time, msgStatus: 'sent' }
+    setRooms((prev) => prev.map((r) => {
+      if (r.id !== activeId) return r
+      let messages = r.messages.map((m) =>
+        m.id === parentId ? { ...m, threadMessages: [...(m.threadMessages ?? []), threadReply] } : m
+      )
+      if (alsoSend) {
+        // Main-area copy carries the back-link to its thread root.
+        const mainCopy: Message = { id: `${baseId}-main`, author: 'me', text, html, time, msgStatus: 'sent', repliedToThreadParentId: parentId }
+        messages = [...messages, mainCopy]
+      }
+      return { ...r, messages }
+    }))
+  }
+
+  // 自己的訊息 More → Edit 存檔:同步更新 active room 的 main 訊息與 thread 回覆
+  // (兩處搜尋,messageId 全 room 唯一);標 edited(bubble 時間戳旁顯示「Edited」)。
+  function handleEditMessage(messageId: string, payload: { text: string; html?: string }) {
+    setRooms((prev) => prev.map((r) => {
+      if (r.id !== activeId) return r
+      const patch = (m: Message): Message =>
+        m.id === messageId ? { ...m, text: payload.text, html: payload.html, edited: true } : m
+      return {
+        ...r,
+        messages: r.messages.map((m) => ({
+          ...patch(m),
+          threadMessages: m.threadMessages?.map(patch),
+        })),
+      }
+    }))
+  }
+
+  // 三欄主體(chrome='top-search' 時 NavRail 移除,由頂部 TopSearchBar 取代)
+  const columns = (
+    <>
+      {chrome === 'nav-rail' && (
+        <NavRail unreadCount={unreadCount} onOpenSettings={() => { setSettingsOpen(true); onAction?.({ type: 'open-settings' }) }} />
+      )}
+        {/* top-search chrome:ChatList 收合後,最左側獨立垂直 bar 只放 Expand 按鈕 */}
+        {chrome === 'top-search' && !listOpen && (
+          <CollapsedListRail onExpand={() => setListOpen(true)} />
+        )}
+        {listOpen && (
+          <ChatList
+            rooms={rooms}
+            activeId={activeId}
+            onSelect={handleSelectRoom}
+            onCollapse={() => setListOpen(false)}
+            width={listWidth}
+            onWidthChange={setListWidth}
+            showPreview={showPreview}
+            mutedIds={mutedIds}
+            favOrder={favOrder}
+            onToggleMute={handleToggleMute}
+            onToggleFavorite={handleToggleFavorite}
+            groupAvatarMode={groupAvatarMode}
+            onSearch={chrome === 'nav-rail' ? () => setSearchOpen(true) : undefined}
+          />
+        )}
+        {topSearching ? (
+          // universal search 有值 → 全頁結果覆蓋整個 Conversation view(頁面一部分,非浮窗)
+          <SearchPageView
+            rooms={rooms}
+            query={topQuery}
+            onNavigateRoom={handleTopNavigateRoom}
+            onViewMessage={handleTopViewMessage}
+          />
+        ) : (
+          <Conversation
+            room={current}
+            listOpen={listOpen}
+            onExpandList={() => setListOpen(true)}
+            fullWidth={fullWidth}
+            onToggleFullWidth={() => setFullWidth((v) => !v)}
+            isMuted={mutedIds.has(current.id)}
+            onToggleMute={() => handleToggleMute(current.id)}
+            onSend={handleSend}
+            onThreadSend={handleThreadSend}
+            onEditMessage={handleEditMessage}
+            onAction={onAction}
+            groupAvatarMode={groupAvatarMode}
+            lastReadMessageId={lastReadDivider?.roomId === current.id ? lastReadDivider.messageId : null}
+            flashMessageId={flash?.roomId === current.id ? flash.messageId : null}
+            flashToken={flash?.roomId === current.id ? flash.token : undefined}
+            hideExpandControl={chrome === 'top-search'}
+          />
+        )}
+    </>
+  )
+
+  // ── AppShell 四區版(config.agent = tWorkspace)──────────────────────────
+  // NavRail(全域 app rail)在 AppShell 外;AppShell 量的是自己根節點的寬(app-shell.spec.md「版面規則」§1)。
+  // Menu = ChatList、Main = Conversation、Right panel = Thread、AI agent = tAgent;並排 / 浮層 / 暫藏全交給 DS 現算。
+  const shellLayout = agentEnabled && (
+    <div className="flex h-screen w-full overflow-hidden bg-canvas text-foreground">
+      <NavRail
+        unreadCount={unreadCount}
+        onOpenSettings={() => { setSettingsOpen(true); onAction?.({ type: 'open-settings' }) }}
+        tab={navTab}
+        onTabChange={handleNavTabChange}
+        variant="workspace"
+        backgroundClassName={CHROME_RAIL_BG}
+      />
+      {/* AppShell 不撐滿視窗(左邊是 NavRail)→ 這一層當 Menu 浮層的定位框:transform 讓 fixed 以它為準,
+          ChatList 左側浮層與遮罩從 AppShell 左緣起、不蓋 NavRail(app-shell.spec.md「版面規則」§9「從版面左緣開始」+
+          API `portalContainer`;DS stories-helpers/scene/simulated-browser.tsx 畫布同款 translateZ(0)) */}
+      <div ref={setShellFrame} className={`min-w-0 flex-1 ${shellSettling ? NO_MOUNT_PANEL_TRANSITION : ''}`} style={{ transform: 'translateZ(0)' }}>
+        {navTab === 'tasks' || navTab === 'docs' || navTab === 'drive' ? (
+          <WorkspacePlaceholderPage tab={navTab} />
+        ) : navTab === 'agent' ? (
+          // tAgent 整頁(TAgentPage.tsx):同一套 AppShell,不放入口鈕(這一頁本身就是代理)
+          <TAgentPage
+            engine={agentEngine}
+            route={agentRoute}
+            onRouteChange={setAgentRoute}
+            onOpenInChat={handleAgentOpenInChat}
+            mainMinWidth={SHELL_MAIN_MIN_WIDTH}
+            menuWidth={SHELL_MENU_WIDTH}
+            portalContainer={shellFrame}
+            userName={ME_GREETING_NAME}
+          />
+        ) : (
+        // SidebarProvider 預設 min-h-svh;放在有高度的父層裡改成撐滿(DS app-shell.stories.tsx FourRegionShell 同款)
+        <SidebarProvider style={{ minHeight: 'auto', height: '100%' }}>
+          <AppShell
+            layout="primary-sidebar"
+            mainMinWidth={SHELL_MAIN_MIN_WIDTH}
+            className="h-full"
+            portalContainer={shellFrame}
+            sidebar={
+              <ChatListMenu
+                rooms={rooms}
+                activeId={activeId}
+                onSelect={handleSelectRoom}
+                showPreview={showPreview}
+                mutedIds={mutedIds}
+                favOrder={favOrder}
+                onToggleMute={handleToggleMute}
+                onToggleFavorite={handleToggleFavorite}
+                groupAvatarMode={groupAvatarMode}
+                onSearch={() => setSearchOpen(true)}
+              />
+            }
+            aside={
+              shellThread ? (
+                <AppShellAside title="Thread" contentType="thread" widthRange={SHELL_THREAD_WIDTH}>
+                  <ThreadAsideBody
+                    key={shellThread.id}
+                    message={shellThread}
+                    room={current}
+                    onSend={(text, alsoSend, html) => handleThreadSend(shellThread.id, text, alsoSend, html)}
+                    onReply={() => onAction?.({ type: 'thread-reply', roomId: current.id, messageId: shellThread.id })}
+                    onEditMessage={handleEditMessage}
+                  />
+                </AppShellAside>
+              ) : undefined
+            }
+            asideOpen={!!shellThread}
+            onAsideOpenChange={(open) => { if (!open) setShellThreadId(null) }}
+            agent={chatAgentPanel ? (
+              <TAgentDock
+                open={agentOpen}
+                onOpenChange={setAgentOpen}
+                engine={agentEngine}
+                currentRoom={{ id: current.id, title: current.title }}
+                onViewMessage={handleAgentViewMessage}
+                activeId={panelConversationId}
+                onActiveIdChange={setPanelConversationId}
+              />
+            ) : undefined}
+          >
+            <ShellConversation
+              threadOpen={!!shellThread}
+              onOpenThread={(m) => setShellThreadId(m.id)}
+              room={current}
+              listOpen
+              onExpandList={() => {}}
+              fullWidth={fullWidth}
+              onToggleFullWidth={() => setFullWidth((v) => !v)}
+              isMuted={mutedIds.has(current.id)}
+              onToggleMute={() => handleToggleMute(current.id)}
+              onSend={handleSend}
+              onThreadSend={handleThreadSend}
+              onEditMessage={handleEditMessage}
+              onAction={onAction}
+              groupAvatarMode={groupAvatarMode}
+              lastReadMessageId={lastReadDivider?.roomId === current.id ? lastReadDivider.messageId : null}
+              flashMessageId={flash?.roomId === current.id ? flash.messageId : null}
+              flashToken={flash?.roomId === current.id ? flash.token : undefined}
+            />
+          </AppShell>
+        </SidebarProvider>
+        )}
+      </div>
+    </div>
+  )
+
+  return (
+    <TooltipProvider delayDuration={400} skipDelayDuration={200}>
+      {shellLayout ? shellLayout : chrome === 'top-search' ? (
+        <div className="flex h-screen w-full flex-col overflow-hidden bg-canvas text-foreground">
+          <TopSearchBar
+            onOpenSettings={() => { setSettingsOpen(true); onAction?.({ type: 'open-settings' }) }}
+            query={topQuery}
+            onQueryChange={setTopQuery}
+          />
+          <div className="flex min-h-0 flex-1">{columns}</div>
+        </div>
+      ) : (
+        <div className="flex h-screen w-full overflow-hidden bg-canvas text-foreground">{columns}</div>
+      )}
+      <SettingsModal
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        showPreview={showPreview}
+        onConfirm={(v) => { setShowPreview(v); onAction?.({ type: 'toggle-preview', value: v }) }}
+      />
+      {searchOpen && (
+        <SearchModal
+          rooms={rooms}
+          onClose={() => setSearchOpen(false)}
+          onNavigateRoom={handleSearchNavigateRoom}
+          onViewMessage={handleSearchViewMessage}
+        />
+      )}
+    </TooltipProvider>
+  )
+}

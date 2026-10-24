@@ -1,0 +1,15 @@
+{"ts":"2026-07-06T15:24:30Z","trigger":0,"topic":1,"fired":false}
+{"ts":"2026-07-06T15:25:23Z","trigger":0,"topic":1,"fired":true}
+{"ts":"2026-07-06T21:50:44Z","trigger":1,"topic":2,"fired":false}
+{"ts":"2026-07-06T21:51:28Z","trigger":1,"topic":1,"fired":true}
+{"ts":"2026-07-06T21:54:25Z","trigger":0,"topic":2,"fired":false}
+{"ts":"2026-07-06T21:55:10Z","trigger":0,"topic":2,"fired":true}
+{"ts":"2026-07-06T22:17:46Z","trigger":0,"topic":3,"fired":false}
+{"ts":"2026-07-06T22:19:06Z","trigger":0,"topic":3,"fired":true}
+{"ts":"2026-07-06T22:52:54Z","trigger":1,"topic":2,"fired":false}
+{"ts":"2026-07-06T22:53:31Z","trigger":1,"topic":2,"fired":true}
+{"ts":"2026-07-07T02:56:47Z","trigger":0,"topic":2,"fired":false}
+{"ts":"2026-07-07T02:57:20Z","trigger":0,"topic":2,"fired":true}
+{"ts":"2026-07-07T03:02:01Z","trigger":0,"topic":3,"fired":false}
+{"ts":"2026-07-07T03:02:35Z","trigger":0,"topic":3,"fired":true}
+{"ts":"2026-07-07T05:36:25Z","trigger":0,"topic":2,"fired":false}
