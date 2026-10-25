@@ -100,6 +100,8 @@ NavRail
 │       · 選中 = 緊貼按鈕左緣的 2px 直線（2026-10-24 user：「那條線貼在按鈕的左側」）、與按鈕同高、`bg-primary`（= blue-6，user 說的 primary-6）；不鋪底；icon `text-foreground`；`aria-current="page"`
 │       · 未選 = icon `text-fg-muted`（= neutral-7）；滑過 = 原本的淺灰底（Button text variant）+ icon `text-foreground`
 │       · 線寬 2px、primary、150ms 色彩過渡、字色三態照抄 DS Tabs 選中底線（tabs.js），只是從底部轉到左側
+│       · Tooltip（2026-10-25 user：「hover 套用 DS tooltip 樣式，長在圖標右側」）= DS 側欄細列同款（sidebar.js SidebarMenuButton 收合時）：錨點 = 按鈕本身、`side="right" align="center"`、DS 預設間距 8；More 同款
+│   └── 欄寬：Logo 列 / 分頁 / 底部群組都以 48 欄（w-12，nav `items-start`）置中 → 圖標 x=8、中心 24 全為整數像素（rail 扣右邊線只剩 47，在 47 裡置中會落在 7.5 半像素）
 ├── DropdownMenu (More)    → DropdownMenuItem Settings → 開 SettingsModal
 └── PersonAvatar (ME)      我的頭像
 ```

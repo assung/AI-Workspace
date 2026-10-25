@@ -135,26 +135,28 @@ function NavBtn({
       className={`!h-8 !w-8 !min-w-0 !p-0 ${stateClass}`}
     />
   )
-  return (
+  // Tooltip 照 DS 側欄細列(sidebar.js SidebarMenuButton 收合時):錨點 = 按鈕本身、side="right" align="center"、
+  // 間距用 DS 預設 sideOffset(OVERLAY_SIDE_OFFSET)。2026-10-25 user「nav bar hover 套用 DS tooltip 樣式,長在圖標右側」。
+  // (之前錨在撐滿 rail 寬的外層 → 離圖標 16px、跨過 rail 邊線;且多加 avoidCollisions=false,DS 細列沒有)
+  const withTooltip = (
     <Tooltip>
-      <TooltipTrigger asChild>
-        {indicator ? (
-          // 線緊貼按鈕左緣(2026-10-24 user「那條線貼在按鈕的左側」):外層 = 按鈕大小,線 right-full 落在按鈕外、與按鈕同高
-          <div className="relative flex w-12 justify-center" data-nav-tab={active ? 'active' : undefined}>
-            <span className="relative flex">
-              <span
-                aria-hidden
-                className={`absolute inset-y-0 right-full w-0.5 transition-colors duration-150 ${active ? 'bg-primary' : 'bg-transparent'}`}
-              />
-              {button}
-            </span>
-          </div>
-        ) : button}
-      </TooltipTrigger>
-      {/* avoidCollisions=false forces right side always — prevents Radix from flipping to top */}
-      <TooltipContent side="right" avoidCollisions={false}>{label}</TooltipContent>
+      <TooltipTrigger asChild>{button}</TooltipTrigger>
+      <TooltipContent side="right" align="center">{label}</TooltipContent>
       <span id={labelId} className="sr-only">{label}</span>
     </Tooltip>
+  )
+  if (!indicator) return withTooltip
+  return (
+    // 線緊貼按鈕左緣(2026-10-24 user「那條線貼在按鈕的左側」):線 right-full 落在按鈕外、與按鈕同高
+    <div className="relative flex w-12 justify-center" data-nav-tab={active ? 'active' : undefined}>
+      <span className="relative flex">
+        <span
+          aria-hidden
+          className={`absolute inset-y-0 right-full w-0.5 transition-colors duration-150 ${active ? 'bg-primary' : 'bg-transparent'}`}
+        />
+        {withTooltip}
+      </span>
+    </div>
   )
 }
 
@@ -853,15 +855,17 @@ function NavRail({
   }
   const moreLabelId = useId()
 
+  // workspace:Logo 列 / 分頁 / 底部群組都用 w-12(48)欄寬置中 —— rail 48 扣右邊線只剩 47,在 47 裡置中 32px 圖標會落在 x=7.5(半像素,1x 螢幕會糊);
+  // 改以 48 欄置中 → 圖標 x=8、中心 24 都是整數,選中直線 6–8、tooltip 離圖標剛好 8(2026-10-25)。欄的最後 1px 疊在右邊線下,內容到 40 為止碰不到線。
   const chatBadge = unreadCount > 0 ? <Badge variant="critical" count={unreadCount} max={99} className="!bg-[#EC540F]" /> : undefined
   const workspace = variant === 'workspace'
 
   return (
-    <nav className={`flex w-12 shrink-0 flex-col items-center border-r border-divider ${backgroundClassName} ${workspace ? 'pb-2' : 'px-2 py-2'}`}>
+    <nav className={`flex w-12 shrink-0 flex-col border-r border-divider ${backgroundClassName} ${workspace ? 'items-start pb-2' : 'items-center px-2 py-2'}`}>
       {workspace ? (
         // Logo 列 = 一條頁首:高 --chrome-header-height(48,含底線)、內容區扣掉底線 1px(pb-px)→ Logo 中心與右側頁首標題同一條水平線,
         // 分隔線(32 寬,沿用 base 的 w-8)貼列底 = 與右側頁首底線同一條(2026-10-24 user「logo 下方的 divider 需要跟右側 Chats 下的線水平對齊」)
-        <div className="relative flex h-[var(--chrome-header-height)] w-full shrink-0 items-center justify-center pb-px">
+        <div className="relative flex h-[var(--chrome-header-height)] w-12 shrink-0 items-center justify-center pb-px">
           <Logo />
           <div className="absolute bottom-0 left-2 w-8"><Separator /></div>
         </div>
@@ -909,7 +913,7 @@ function NavRail({
         )}
       </div>
       )}
-      <div className="mt-auto flex flex-col items-center gap-1 py-1">
+      <div className={`mt-auto flex flex-col items-center gap-1 py-1 ${workspace ? 'w-12' : ''}`}>
         {/* More menu — single RIGHT tooltip; aria-labelledby (not string aria-label) avoids DS auto top-tooltip */}
         <DropdownMenu>
           <Tooltip>
@@ -918,7 +922,7 @@ function NavRail({
                 <Button variant="text" size="md" iconOnly startIcon={MoreHorizontal} aria-labelledby={moreLabelId} className="!h-8 !w-8 !min-w-0 !p-0" />
               </DropdownMenuTrigger>
             </TooltipTrigger>
-            <TooltipContent side="right" avoidCollisions={false}>More</TooltipContent>
+            <TooltipContent side="right" align="center">More</TooltipContent>
             <span id={moreLabelId} className="sr-only">More</span>
           </Tooltip>
           <DropdownMenuContent align="end" side="right" sideOffset={8}>
