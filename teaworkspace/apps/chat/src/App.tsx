@@ -859,6 +859,9 @@ function NavRail({
   // 改以 48 欄置中 → 圖標 x=8、中心 24 都是整數,選中直線 6–8、tooltip 離圖標剛好 8(2026-10-25)。欄的最後 1px 疊在右邊線下,內容到 40 為止碰不到線。
   const chatBadge = unreadCount > 0 ? <Badge variant="critical" count={unreadCount} max={99} className="!bg-[#EC540F]" /> : undefined
   const workspace = variant === 'workspace'
+  // workspace:底部選單鈕 = lucide Settings、名稱「Settings and more」(2026-10-25 user;選單內容 Settings / Help / Sign out 不變)。
+  // 對照 Microsoft Teams 左下同名入口「Settings and more」;icon 依 user 指定用 Settings 齒輪。
+  const moreLabel = workspace ? 'Settings and more' : 'More'
 
   return (
     <nav className={`flex w-12 shrink-0 flex-col border-r border-divider ${backgroundClassName} ${workspace ? 'items-start pb-2' : 'items-center px-2 py-2'}`}>
@@ -919,11 +922,11 @@ function NavRail({
           <Tooltip>
             <TooltipTrigger asChild>
               <DropdownMenuTrigger asChild>
-                <Button variant="text" size="md" iconOnly startIcon={MoreHorizontal} aria-labelledby={moreLabelId} className="!h-8 !w-8 !min-w-0 !p-0" />
+                <Button variant="text" size="md" iconOnly startIcon={workspace ? Settings : MoreHorizontal} aria-labelledby={moreLabelId} className="!h-8 !w-8 !min-w-0 !p-0" />
               </DropdownMenuTrigger>
             </TooltipTrigger>
-            <TooltipContent side="right" align="center">More</TooltipContent>
-            <span id={moreLabelId} className="sr-only">More</span>
+            <TooltipContent side="right" align="center">{moreLabel}</TooltipContent>
+            <span id={moreLabelId} className="sr-only">{moreLabel}</span>
           </Tooltip>
           <DropdownMenuContent align="end" side="right" sideOffset={8}>
             <DropdownMenuItem startIcon={Settings} onSelect={onOpenSettings}>Settings</DropdownMenuItem>
