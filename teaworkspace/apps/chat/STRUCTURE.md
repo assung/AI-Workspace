@@ -397,7 +397,7 @@ TAgentPage
 | `NavBtn` / `ListBtn` / `IconBtnSm` | 共用按鈕 primitive |
 | `StatusDot` | 在線狀態圓點：online=綠實心 / busy=紅實心 / away=黃+Clock / offline=灰空心 |
 | `PersonAvatar` | DS Avatar + 自訂 StatusDot overlay |
-| `GroupAvatar` | 群組頭像 |
+| `GroupAvatar` | 群組頭像（base：neutral-6 底 + 白圖示；tWorkspace：Primary-1 `bg-primary-subtle` 底 + Primary-6 `text-primary` 圖示，2026-10-27 user；由 `GroupAvatarToneContext` 依 `config.agent` 切換） |
 | `TeamsAvatar` | Teams 匯入聊天室頭像（`TEAMS_BRAND` #5B5FC7 圓底 + 白色 Teams logo 線條）|
 | `MutedAvatar` | 靜音狀態頭像（白底 + 灰 BellOff）|
 | `makeProfileCard` | 產生 hover 用的 ProfileCard |
@@ -418,6 +418,8 @@ type Room    = { id; name; type; origin?: 'teams'; section: 'favorites' | 'chats
 ```
 
 `Room.origin === 'teams'`（2026-07-06 new）：Microsoft Teams migrated 進來的聊天室。**一律歸類為 general chatroom —— 連 Teams 1:1 DM 也轉換成 general group chatroom**（title = 對方名字、`memberKeys` 1 人），因此 `origin:'teams'` 永遠搭配 `type:'general'`。Avatar 判斷優先序 **muted > teams > dm > group**（4 個判斷點：RoomRow / ConversationHeader / MessagePreviewHeader / SearchModal chatroom tab）。
+
+成員頭像（`Person.avatar`）= 打包進 app 的本機大頭照 `src/assets/avatars/<key>.jpg`（128×128，`AVATAR` 以 `import.meta.glob` 依檔名對應成員 key）；2026-10-27 user「頭像請調整成辦公情境的大頭照」取代 `i.pravatar.cc` 外連。來源 Tabler / Flowbite Admin Dashboard 示範頭像（MIT），挑選原則與對照見該資料夾 README。全部原型共用。
 
 Inline image（`message.images`）= **打包進 app 的本機檔**（`src/assets/photos/*.jpg`，Vite asset import；`src/vite-env.d.ts` 提供 `*.jpg` 型別）：sunset-lake / rocky-coast（Shinichi m5）、autumn-avenue（Tea Tasting g3）。3:2、600×400（訊息內 200px 寬的 3 倍）。來源 Swiper demo 圖（github.com/nolimits4web/swiper `demos/images`，MIT）。歷程：`picsum.photos` 破圖 → `images.unsplash.com` 直連也破圖（2026-10-23 user：「傳送圖片的對話框裡面破圖」；外部網域會被網路 / 防火牆 / 預覽環境擋）→ 改為不依賴任何外部網域。
 

@@ -1,7 +1,7 @@
 // Chat prototype — 3-column messaging UI(Nav rail / Chat list / Conversation + Thread panel)
 // v3.1: tooltip fix / overflow fix / header mute / status outside bubble / reaction menus / thread panel cleanup
 
-import { Fragment, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { Fragment, createContext, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import {
   TooltipProvider,
   Tooltip,
@@ -255,43 +255,52 @@ type Room = {
   messages: Message[]
 }
 
+// 成員大頭照 —— 打包進 app 的本機檔(src/assets/avatars/<key>.jpg,128×128),不外連。
+// 2026-10-27 user:「chat list 中的頭像請調整成辦公情境的大頭照」;原本的 i.pravatar.cc 外連在受限網路 / artifact 會載不到。
+// 來源與授權見 src/assets/avatars/README.md(Tabler、Flowbite Admin Dashboard 的示範頭像,MIT)。
+const AVATAR: Record<string, string> = Object.fromEntries(
+  Object.entries(import.meta.glob<string>('./assets/avatars/*.jpg', { eager: true, import: 'default' })).map(
+    ([path, url]) => [path.replace(/^.*\/|\.jpg$/g, ''), url],
+  ),
+)
+
 const PEOPLE: Record<string, Person> = {
-  shinichi: { name: 'Kudo Shinichi 工藤新一', color: 'blue', status: 'online', role: 'Detective', email: 'shinichi@teachat.app', avatar: 'https://i.pravatar.cc/96?img=12' },
-  ai: { name: 'Haibara Ai 灰原哀', color: 'purple', status: 'busy', role: 'Researcher', email: 'ai@teachat.app', avatar: 'https://i.pravatar.cc/96?img=5' },
-  ran: { name: 'Mouri Ran 毛利蘭', color: 'magenta', status: 'away', role: 'Karate Captain', email: 'ran@teachat.app', avatar: 'https://i.pravatar.cc/96?img=9' },
-  guanyu: { name: 'Chen Guan-Yu 陳冠宇', color: 'green', status: 'online', role: 'Product Manager', email: 'guanyu@teachat.app', avatar: 'https://i.pravatar.cc/96?img=13' },
-  yating: { name: 'Lin Ya-Ting 林雅婷', color: 'turquoise', status: 'offline', role: 'Designer', email: 'yating@teachat.app', avatar: 'https://i.pravatar.cc/96?img=16' },
-  kenji: { name: 'Takahashi Kenji 高橋健二', color: 'indigo', status: 'online', role: 'Engineer', email: 'kenji@teachat.app', avatar: 'https://i.pravatar.cc/96?img=33' },
-  yui: { name: 'Watanabe Yui 渡邊結衣', color: 'red', status: 'away', role: 'QA Lead', email: 'yui@teachat.app', avatar: 'https://i.pravatar.cc/96?img=20' },
+  shinichi: { name: 'Kudo Shinichi 工藤新一', color: 'blue', status: 'online', role: 'Detective', email: 'shinichi@teachat.app', avatar: AVATAR['shinichi'] },
+  ai: { name: 'Haibara Ai 灰原哀', color: 'purple', status: 'busy', role: 'Researcher', email: 'ai@teachat.app', avatar: AVATAR['ai'] },
+  ran: { name: 'Mouri Ran 毛利蘭', color: 'magenta', status: 'away', role: 'Karate Captain', email: 'ran@teachat.app', avatar: AVATAR['ran'] },
+  guanyu: { name: 'Chen Guan-Yu 陳冠宇', color: 'green', status: 'online', role: 'Product Manager', email: 'guanyu@teachat.app', avatar: AVATAR['guanyu'] },
+  yating: { name: 'Lin Ya-Ting 林雅婷', color: 'turquoise', status: 'offline', role: 'Designer', email: 'yating@teachat.app', avatar: AVATAR['yating'] },
+  kenji: { name: 'Takahashi Kenji 高橋健二', color: 'indigo', status: 'online', role: 'Engineer', email: 'kenji@teachat.app', avatar: AVATAR['kenji'] },
+  yui: { name: 'Watanabe Yui 渡邊結衣', color: 'red', status: 'away', role: 'QA Lead', email: 'yui@teachat.app', avatar: AVATAR['yui'] },
 }
 
 // tAgent 首頁問候用的名字(2026-10-23 user 同意「Good afternoon, Aaron」這種帶名字的問候)
 const ME_GREETING_NAME = 'Aaron'
-const ME: Person = { name: 'Me 我', color: 'green', status: 'online', role: 'You', email: 'me@teachat.app', avatar: 'https://i.pravatar.cc/96?img=8' }
+const ME: Person = { name: 'Me 我', color: 'green', status: 'online', role: 'You', email: 'me@teachat.app', avatar: AVATAR['me'] }
 
 // 20 unique 1-on-1 DM partners. Registered into PEOPLE below so message author
 // lookups (PEOPLE[author]) resolve name + avatar in the conversation view.
 const GENERATED_DM_PEOPLE: { key: string; person: Person }[] = [
-  { key: 'g-rei', person: { name: 'Aoki Rei 青木玲', color: 'blue', status: 'online', role: 'Account Exec', email: 'rei@teachat.app', avatar: 'https://i.pravatar.cc/96?img=25' } },
-  { key: 'g-marco', person: { name: 'Marco Bianchi', color: 'green', status: 'away', role: 'Logistics Lead', email: 'marco@teachat.app', avatar: 'https://i.pravatar.cc/96?img=15' } },
-  { key: 'g-mei', person: { name: 'Zhao Mei 趙美', color: 'magenta', status: 'busy', role: 'Buyer', email: 'mei@teachat.app', avatar: 'https://i.pravatar.cc/96?img=24' } },
-  { key: 'g-tom', person: { name: 'Tom Becker', color: 'indigo', status: 'online', role: 'Sales Eng', email: 'tom@teachat.app', avatar: 'https://i.pravatar.cc/96?img=51' } },
-  { key: 'g-hana', person: { name: 'Sato Hana 佐藤花', color: 'purple', status: 'offline', role: 'Coordinator', email: 'hana@teachat.app', avatar: 'https://i.pravatar.cc/96?img=44' } },
-  { key: 'g-leo', person: { name: 'Leo Fernandez', color: 'turquoise', status: 'online', role: 'Analyst', email: 'leo@teachat.app', avatar: 'https://i.pravatar.cc/96?img=52' } },
-  { key: 'g-jing', person: { name: 'Wu Jing 吳靜', color: 'red', status: 'away', role: 'Ops', email: 'jing@teachat.app', avatar: 'https://i.pravatar.cc/96?img=45' } },
-  { key: 'g-erik', person: { name: 'Erik Lund', color: 'blue', status: 'online', role: 'Vendor Mgr', email: 'erik@teachat.app', avatar: 'https://i.pravatar.cc/96?img=53' } },
-  { key: 'g-yuki', person: { name: 'Kimura Yuki 木村雪', color: 'green', status: 'busy', role: 'Designer', email: 'yuki@teachat.app', avatar: 'https://i.pravatar.cc/96?img=26' } },
-  { key: 'g-priya', person: { name: 'Priya Nair', color: 'purple', status: 'online', role: 'PM', email: 'priya@teachat.app', avatar: 'https://i.pravatar.cc/96?img=27' } },
-  { key: 'g-chen', person: { name: 'Chen Wei 陳偉', color: 'indigo', status: 'away', role: 'Engineer', email: 'chenwei@teachat.app', avatar: 'https://i.pravatar.cc/96?img=54' } },
-  { key: 'g-sara', person: { name: 'Sara Olsen', color: 'magenta', status: 'online', role: 'Marketing', email: 'sara@teachat.app', avatar: 'https://i.pravatar.cc/96?img=28' } },
-  { key: 'g-ken', person: { name: 'Yamada Ken 山田健', color: 'turquoise', status: 'offline', role: 'Support', email: 'yamada@teachat.app', avatar: 'https://i.pravatar.cc/96?img=55' } },
-  { key: 'g-nina', person: { name: 'Nina Costa', color: 'red', status: 'busy', role: 'Finance', email: 'nina@teachat.app', avatar: 'https://i.pravatar.cc/96?img=29' } },
-  { key: 'g-feng', person: { name: 'Li Feng 李峰', color: 'blue', status: 'online', role: 'Sourcing', email: 'lifeng@teachat.app', avatar: 'https://i.pravatar.cc/96?img=56' } },
-  { key: 'g-omar', person: { name: 'Omar Haddad', color: 'green', status: 'away', role: 'Retail', email: 'omar@teachat.app', avatar: 'https://i.pravatar.cc/96?img=57' } },
-  { key: 'g-aiko', person: { name: 'Mori Aiko 森愛子', color: 'purple', status: 'online', role: 'QA', email: 'aiko@teachat.app', avatar: 'https://i.pravatar.cc/96?img=30' } },
-  { key: 'g-paul', person: { name: 'Paul Meyer', color: 'indigo', status: 'busy', role: 'Data', email: 'paul@teachat.app', avatar: 'https://i.pravatar.cc/96?img=58' } },
-  { key: 'g-xia', person: { name: 'Deng Xia 鄧霞', color: 'magenta', status: 'online', role: 'Brand', email: 'xia@teachat.app', avatar: 'https://i.pravatar.cc/96?img=31' } },
-  { key: 'g-ivan', person: { name: 'Ivan Petrov', color: 'turquoise', status: 'offline', role: 'Warehouse', email: 'ivan@teachat.app', avatar: 'https://i.pravatar.cc/96?img=59' } },
+  { key: 'g-rei', person: { name: 'Aoki Rei 青木玲', color: 'blue', status: 'online', role: 'Account Exec', email: 'rei@teachat.app', avatar: AVATAR['g-rei'] } },
+  { key: 'g-marco', person: { name: 'Marco Bianchi', color: 'green', status: 'away', role: 'Logistics Lead', email: 'marco@teachat.app', avatar: AVATAR['g-marco'] } },
+  { key: 'g-mei', person: { name: 'Zhao Mei 趙美', color: 'magenta', status: 'busy', role: 'Buyer', email: 'mei@teachat.app', avatar: AVATAR['g-mei'] } },
+  { key: 'g-tom', person: { name: 'Tom Becker', color: 'indigo', status: 'online', role: 'Sales Eng', email: 'tom@teachat.app', avatar: AVATAR['g-tom'] } },
+  { key: 'g-hana', person: { name: 'Sato Hana 佐藤花', color: 'purple', status: 'offline', role: 'Coordinator', email: 'hana@teachat.app', avatar: AVATAR['g-hana'] } },
+  { key: 'g-leo', person: { name: 'Leo Fernandez', color: 'turquoise', status: 'online', role: 'Analyst', email: 'leo@teachat.app', avatar: AVATAR['g-leo'] } },
+  { key: 'g-jing', person: { name: 'Wu Jing 吳靜', color: 'red', status: 'away', role: 'Ops', email: 'jing@teachat.app', avatar: AVATAR['g-jing'] } },
+  { key: 'g-erik', person: { name: 'Erik Lund', color: 'blue', status: 'online', role: 'Vendor Mgr', email: 'erik@teachat.app', avatar: AVATAR['g-erik'] } },
+  { key: 'g-yuki', person: { name: 'Kimura Yuki 木村雪', color: 'green', status: 'busy', role: 'Designer', email: 'yuki@teachat.app', avatar: AVATAR['g-yuki'] } },
+  { key: 'g-priya', person: { name: 'Priya Nair', color: 'purple', status: 'online', role: 'PM', email: 'priya@teachat.app', avatar: AVATAR['g-priya'] } },
+  { key: 'g-chen', person: { name: 'Chen Wei 陳偉', color: 'indigo', status: 'away', role: 'Engineer', email: 'chenwei@teachat.app', avatar: AVATAR['g-chen'] } },
+  { key: 'g-sara', person: { name: 'Sara Olsen', color: 'magenta', status: 'online', role: 'Marketing', email: 'sara@teachat.app', avatar: AVATAR['g-sara'] } },
+  { key: 'g-ken', person: { name: 'Yamada Ken 山田健', color: 'turquoise', status: 'offline', role: 'Support', email: 'yamada@teachat.app', avatar: AVATAR['g-ken'] } },
+  { key: 'g-nina', person: { name: 'Nina Costa', color: 'red', status: 'busy', role: 'Finance', email: 'nina@teachat.app', avatar: AVATAR['g-nina'] } },
+  { key: 'g-feng', person: { name: 'Li Feng 李峰', color: 'blue', status: 'online', role: 'Sourcing', email: 'lifeng@teachat.app', avatar: AVATAR['g-feng'] } },
+  { key: 'g-omar', person: { name: 'Omar Haddad', color: 'green', status: 'away', role: 'Retail', email: 'omar@teachat.app', avatar: AVATAR['g-omar'] } },
+  { key: 'g-aiko', person: { name: 'Mori Aiko 森愛子', color: 'purple', status: 'online', role: 'QA', email: 'aiko@teachat.app', avatar: AVATAR['g-aiko'] } },
+  { key: 'g-paul', person: { name: 'Paul Meyer', color: 'indigo', status: 'busy', role: 'Data', email: 'paul@teachat.app', avatar: AVATAR['g-paul'] } },
+  { key: 'g-xia', person: { name: 'Deng Xia 鄧霞', color: 'magenta', status: 'online', role: 'Brand', email: 'xia@teachat.app', avatar: AVATAR['g-xia'] } },
+  { key: 'g-ivan', person: { name: 'Ivan Petrov', color: 'turquoise', status: 'offline', role: 'Warehouse', email: 'ivan@teachat.app', avatar: AVATAR['g-ivan'] } },
 ]
 GENERATED_DM_PEOPLE.forEach(({ key, person }) => { PEOPLE[key] = person })
 
@@ -666,13 +675,24 @@ function PersonAvatar({ person, size = 32, dotSize = 8 }: { person: Person; size
   )
 }
 
+/**
+ * 群組頭像配色。base = neutral-6 底 + 白圖示;tWorkspace = Primary-1 底(`--primary-subtle` = blue-1)+ Primary-6 圖示(`--primary` = blue-6)
+ * —— 2026-10-27 user「group 的 avatar,圓形底色改成 Primary-1,Chat icon color 為 Primary-6」。由 App 依 config.agent 提供。
+ */
+const GroupAvatarToneContext = createContext<'neutral' | 'primary'>('neutral')
+
 function GroupAvatar({ size = 32 }: { size?: number }) {
+  const tone = useContext(GroupAvatarToneContext)
   return (
     <Avatar
       icon={MessagesSquare}
       size={size}
       shape="circle"
-      className="[&>div]:!bg-[var(--color-neutral-6)] [&>div]:!text-[var(--on-emphasis)]"
+      className={
+        tone === 'primary'
+          ? '[&>div]:!bg-primary-subtle [&>div]:!text-primary'
+          : '[&>div]:!bg-[var(--color-neutral-6)] [&>div]:!text-[var(--on-emphasis)]'
+      }
     />
   )
 }
@@ -3515,6 +3535,7 @@ export default function App({
   )
 
   return (
+    <GroupAvatarToneContext.Provider value={agentEnabled ? 'primary' : 'neutral'}>
     <TooltipProvider delayDuration={400} skipDelayDuration={200}>
       {shellLayout ? shellLayout : chrome === 'top-search' ? (
         <div className="flex h-screen w-full flex-col overflow-hidden bg-canvas text-foreground">
@@ -3543,5 +3564,6 @@ export default function App({
         />
       )}
     </TooltipProvider>
+    </GroupAvatarToneContext.Provider>
   )
 }
