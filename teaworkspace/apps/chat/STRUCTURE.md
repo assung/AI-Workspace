@@ -338,6 +338,16 @@ TAgentDock
 
 ---
 
+### 4.5b Tasks 分頁 keyscreen（`TasksPage.tsx`，2026-10-28，尚未加入 prototype）
+
+- user：「左側 panel 同 agent 頁，呈現 My tasks 及 Projects 區塊，預設首頁是 my tasks，右側內容頁呈現任務列表。先出 keyscreen，確認沒問題後再加入 prototype」。
+- 只在 `config.tasksPage` 時啟用（story `Apps/chat/Tasks (keyscreen)`）；主 prototype 的 Tasks 仍是佔位頁。
+- 版面同 tAgent 頁：DS AppShell + Sidebar（offcanvas、`SHELL_MENU_WIDTH`、淺灰底）；左側 My tasks + 可收合 Projects；Main 頁首 ChromeHeader + 「New task」。
+- My tasks：頁首 `tabsSlot` 分頁 Upcoming / Overdue / Completed（對照 Asana 首頁 My tasks 小工具；Asana 完整 My tasks 依到期日分段，但 DS DataTable 沒有分組列）。示範「今天」固定 `DEMO_TODAY = 2026-10-28`。
+- 列表 = DS DataTable：Task / Status（select `display="tag"`：To do neutral、In progress blue、Blocked red、Done green）/ Priority / Project / Due date（date 欄 YYYY/MM/DD）；欄寬 `meta.width`。專案頁 Project 欄換成 Assignee（person 欄）。
+- 完成狀態只用 Status 表達、列首不放勾選框（DataTable 勾選框 = 選取語意）。
+- 未做：點列開任務詳情（預計 Right panel）、新增任務、改狀態 / 到期日。
+
 ### 4.6 tWorkspace 左側 chrome 底色（`apps/chat/src/chrome.ts`，2026-10-23）
 
 - user：「左側邊面板及 nav bar 的部分我希望改成淺灰色，顏色請參照 color.spec.md 來使用，預設希望帶 opaque1 的顏色」→ DS primitive `--color-neutral-1-opaque`（淺色 = 2% 黑疊白 ≈ #FAFAFA；深色 = 2% 白疊黑，與深色 `--canvas` 同一顆）。

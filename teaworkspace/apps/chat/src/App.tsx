@@ -88,6 +88,7 @@ import {
 import { FormatToolbar, RichTextArea, textToHtml, hasRichMarkup, type RichEditorHandle } from './RichTextEditor'
 import { TAgentDock, TAgentRailIcon, TAGENT_LABEL, useTAgentEngine } from './TAgent'
 import { TAgentPage, type TAgentRoute } from './TAgentPage'
+import { TasksPage, type TasksRoute } from './TasksPage'
 import { CHROME_RAIL_BG, CHROME_SIDEBAR_BG, NO_MOUNT_PANEL_TRANSITION, SHELL_SETTLE_MS } from './chrome'
 import photoSunsetLake from './assets/photos/sunset-lake.jpg'
 import photoRockyCoast from './assets/photos/rocky-coast.jpg'
@@ -3091,10 +3092,17 @@ export type ChatVariantConfig = {
    * 程式保留、只關掉入口;tAgent 只從 NavRail 的 tAgent 分頁(整頁)使用。僅 test-only story 打開它做回歸。
    */
   chatAgentPanel?: boolean
+  /**
+   * Tasks 分頁用 TasksPage(My tasks / Projects + 任務列表)取代佔位頁。預設 false:2026-10-28 先出 keyscreen,
+   * user 確認後才加入 prototype —— 目前只有 keyscreen story 打開它。
+   */
+  tasksPage?: boolean
+  /** Tasks 頁的初始位置(keyscreen story 用;預設 My tasks) */
+  initialTasksRoute?: TasksRoute
   /** AppShell 版:初始開著的 thread(父訊息 id,屬於初始聊天室);story 截「Thread + tAgent 並排」用。 */
   initialThreadId?: string
   /** config.agent:初始分頁(預設 'chat');'agent' = tAgent 整頁。 */
-  initialTab?: 'chat' | 'agent'
+  initialTab?: 'chat' | 'tasks' | 'agent'
   /** config.agent:tAgent 整頁的初始位置(預設 'new' = 新對話首頁)。 */
   initialAgentRoute?: TAgentRoute
 }
@@ -3444,7 +3452,18 @@ export default function App({
           ChatList 左側浮層與遮罩從 AppShell 左緣起、不蓋 NavRail(app-shell.spec.md「版面規則」§9「從版面左緣開始」+
           API `portalContainer`;DS stories-helpers/scene/simulated-browser.tsx 畫布同款 translateZ(0)) */}
       <div ref={setShellFrame} className={`min-w-0 flex-1 ${shellSettling ? NO_MOUNT_PANEL_TRANSITION : ''}`} style={{ transform: 'translateZ(0)' }}>
-        {navTab === 'tasks' || navTab === 'docs' || navTab === 'drive' ? (
+        {navTab === 'tasks' && config?.tasksPage ? (
+          <TasksPage
+            mainMinWidth={SHELL_MAIN_MIN_WIDTH}
+            menuWidth={SHELL_MENU_WIDTH}
+            portalContainer={shellFrame}
+            initialRoute={config?.initialTasksRoute}
+            resolvePerson={(key) => {
+              const p = key === 'me' ? ME : PEOPLE[key]
+              return { name: p.name, avatarUrl: p.avatar, description: p.role, status: p.status }
+            }}
+          />
+        ) : navTab === 'tasks' || navTab === 'docs' || navTab === 'drive' ? (
           <WorkspacePlaceholderPage tab={navTab} />
         ) : navTab === 'agent' ? (
           // tAgent 整頁(TAgentPage.tsx):同一套 AppShell,不放入口鈕(這一頁本身就是代理)
