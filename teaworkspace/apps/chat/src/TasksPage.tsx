@@ -1,4 +1,4 @@
-// TasksPage — tWorkspace 的 Tasks 分頁(2026-10-28 keyscreen,user:「左側 panel 同 agent 頁,呈現 My tasks 及 Projects 區塊,
+// TasksPage — tWorkspace 的 Tasks 分頁(2026-10-28 keyscreen → 同日 user 確認後加入 prototype,user:「左側 panel 同 agent 頁,呈現 My tasks 及 Projects 區塊,
 // 預設首頁是 My tasks,右側內容頁呈現任務列表。先出 keyscreen,確認沒問題後再加入 prototype」)。
 //
 // 版面與 tAgent 頁(TAgentPage.tsx)同一套:DS AppShell(primary-sidebar)+ DS Sidebar(offcanvas、widthRange 與 ChatList 同組、淺灰底)
@@ -8,7 +8,7 @@
 // - My tasks:頁首分頁 Upcoming / Overdue / Completed(DS Tabs 放在 ChromeHeader `tabsSlot`)。
 //   對照 Asana 首頁「My tasks」小工具的 Upcoming / Overdue / Completed 三分頁;Asana 完整「My tasks」頁是依到期日分段
 //   (Recently assigned / Do today / Do next week / Do later),DS DataTable 沒有分組列(data-table.spec.md「何時不用」),所以這版用分頁。
-// - 列表 = DS DataTable:欄位型別照 DS(select + display="tag" 的狀態彩色標籤、date 欄 YYYY/MM/DD)。
+// - 列表 = DS DataTable(第一欄 Task no.,2026-10-28 user):欄位型別照 DS(select + display="tag" 的狀態彩色標籤、date 欄 YYYY/MM/DD)。
 //   「完成」以 Status 欄表達,不在列首放勾選框:DataTable 的勾選框是「選取」語意(data-table.spec.md L2),與「標記完成」不同件事。
 // - 專案頁:同一張表,多一欄 Assignee(DS person 欄);沒有分頁。
 // - 尚未做(keyscreen 範圍外):點列開任務詳情(預計 AppShell Right panel)、新增任務、改狀態 / 到期日。
@@ -60,12 +60,25 @@ type Task = {
 /** 示範的「今天」:分頁(Upcoming / Overdue)以此日判斷,截圖與回歸測試才穩定 */
 const DEMO_TODAY = '2026-10-28'
 
+// key = 任務編號前綴(Jira / Linear 的「專案代號-流水號」,如 LUG-24);start = 示範資料的起始流水號(專案已進行一段時間)
 export const TASK_PROJECTS = [
-  { id: 'tasting', name: 'Q4 Tasting Program' },
-  { id: 'lugu', name: 'Lugu Co-op Sourcing' },
-  { id: 'buyers', name: 'Retail Buyer Outreach' },
-  { id: 'room', name: 'Tasting Room Upgrade' },
+  { id: 'tasting', name: 'Q4 Tasting Program', key: 'TAS', start: 41 },
+  { id: 'lugu', name: 'Lugu Co-op Sourcing', key: 'LUG', start: 23 },
+  { id: 'buyers', name: 'Retail Buyer Outreach', key: 'BUY', start: 15 },
+  { id: 'room', name: 'Tasting Room Upgrade', key: 'ROOM', start: 8 },
 ]
+
+/** Task no. = 專案代號-流水號,依資料順序(= 建立順序)在各專案內遞增 */
+function taskNumbers(tasks: { id: string; projectId: string }[]) {
+  const next: Record<string, number> = {}
+  const out: Record<string, string> = {}
+  for (const t of tasks) {
+    const p = TASK_PROJECTS.find((x) => x.id === t.projectId)!
+    next[p.id] = (next[p.id] ?? p.start) + 1
+    out[t.id] = `${p.key}-${next[p.id]}`
+  }
+  return out
+}
 
 // 內容延續 Chat 示範資料:Shinichi DM(東頂 #3、20 kg 保留、水分數據)、Tea Tasting 群組(香氣台、水溫控制器)、週五品茶與買家邀請
 const TASKS: Task[] = [
@@ -87,6 +100,8 @@ const TASKS: Task[] = [
   { id: 't15', title: 'Draft buyer one-pager for the premium line', projectId: 'buyers', due: '2026-11-04', status: 'todo', priority: 'medium', assignee: 'guanyu' },
   { id: 't16', title: 'Order tasting room No.3 lighting', projectId: 'room', due: '2026-11-06', status: 'todo', priority: 'low', assignee: 'yui' },
 ]
+
+const TASK_NO = taskNumbers(TASKS)
 
 // 狀態彩色標籤:DS Select `display="tag"` + option `tagVariant`(DataTable 狀態欄 canonical,data-table.anatomy.stories 同款)
 const STATUS_OPTIONS = [
@@ -178,6 +193,8 @@ export function TasksPage({
 
   // 欄寬:DS `meta.width` = 最小保留寬,多出來的空間依比例分給各欄(data-table.spec.md「Column 寬度 API」;不用 TanStack `size`)
   const columns = (withAssignee: boolean) => [
+    // Task no. 放第一欄(2026-10-28 user);編號是識別碼,與 Jira / Linear 列表同位置
+    { id: 'no', accessorFn: (t: Task) => TASK_NO[t.id], header: 'Task no.', meta: { type: 'string' as const, width: 104 } },
     { accessorKey: 'title', header: 'Task', meta: { type: 'string' as const, width: 360 } },
     { accessorKey: 'status', header: 'Status', meta: { type: 'select' as const, options: STATUS_OPTIONS, display: 'tag' as const, width: 128 } },
     { accessorKey: 'priority', header: 'Priority', meta: { type: 'select' as const, options: PRIORITY_OPTIONS, width: 104 } },

@@ -338,15 +338,25 @@ TAgentDock
 
 ---
 
-### 4.5b Tasks 分頁 keyscreen（`TasksPage.tsx`，2026-10-28，尚未加入 prototype）
+### 4.5b Tasks 分頁（`TasksPage.tsx`，2026-10-28 keyscreen → 同日 user 確認，已加入 prototype）
 
 - user：「左側 panel 同 agent 頁，呈現 My tasks 及 Projects 區塊，預設首頁是 my tasks，右側內容頁呈現任務列表。先出 keyscreen，確認沒問題後再加入 prototype」。
-- 只在 `config.tasksPage` 時啟用（story `Apps/chat/Tasks (keyscreen)`）；主 prototype 的 Tasks 仍是佔位頁。
+- NavRail 的 Tasks 分頁即此頁（story `Apps/chat/Tasks`）。
 - 版面同 tAgent 頁：DS AppShell + Sidebar（offcanvas、`SHELL_MENU_WIDTH`、淺灰底）；左側 My tasks + 可收合 Projects；Main 頁首 ChromeHeader + 「New task」。
 - My tasks：頁首 `tabsSlot` 分頁 Upcoming / Overdue / Completed（對照 Asana 首頁 My tasks 小工具；Asana 完整 My tasks 依到期日分段，但 DS DataTable 沒有分組列）。示範「今天」固定 `DEMO_TODAY = 2026-10-28`。
-- 列表 = DS DataTable：Task / Status（select `display="tag"`：To do neutral、In progress blue、Blocked red、Done green）/ Priority / Project / Due date（date 欄 YYYY/MM/DD）；欄寬 `meta.width`。專案頁 Project 欄換成 Assignee（person 欄）。
+- 列表 = DS DataTable：Task no.（第一欄，2026-10-28 user；專案代號-流水號，如 LUG-25，同 Jira / Linear）/ Task / Status（select `display="tag"`：To do neutral、In progress blue、Blocked red、Done green）/ Priority / Project / Due date（date 欄 YYYY/MM/DD）；欄寬 `meta.width`。專案頁 Project 欄換成 Assignee（person 欄）。
 - 完成狀態只用 Status 表達、列首不放勾選框（DataTable 勾選框 = 選取語意）。
 - 未做：點列開任務詳情（預計 Right panel）、新增任務、改狀態 / 到期日。
+
+### 4.5c Drive 分頁 keyscreen（`DrivePage.tsx`，2026-10-28，尚未加入 prototype）
+
+- user：「左側側邊欄標題為 Drive，下方區分為 My drive 跟 Channel drives（會跟 chat channel 連動），首頁為 My drive。右側內容頁包含麵包屑路徑及列表呈現檔案」。
+- 只在 `config.drivePage` 時啟用（story `Apps/chat/Drive (keyscreen)`：My drive / 資料夾內 / 頻道檔案區）；主 prototype 的 Drive 仍是佔位頁。
+- 左側：My drive（HardDrive）+ 可收合 Channel drives = Chat 的群組頻道（`rooms` 中 `type: 'general'`、排除 Teams 匯入房，順序同 Chat 列表；對照 Teams 每個頻道自帶檔案區）。
+- 頁首：ChromeHeader + h1（目前資料夾名稱）+ 頻道時「Open chat」（`handleAgentOpenInChat(roomId, '')` 切到 Chat 並開該頻道）+「New」選單（New folder / Upload files，未接行為）。
+- 麵包屑：DS Breadcrumb `size="sm"` 放列表上方；末位 = h1 同字、只有一層時不顯示（breadcrumb.spec.md「Title-breadcrumb-end 同步」「單一層級禁用」）；根層帶 icon。連結與資料夾名稱共用站內路徑 `/drive/<root>/<folder>…`，由頁面攔截切換。
+- 列表：DS DataTable — Name（ItemIcon + ItemLabel；資料夾 = LinkInput 站內連結）/ Owner（person）/ Last modified（YYYY/MM/DD hh:mm AM/PM）/ File size（資料夾為「-」）；資料夾在前。沒有檔案的頻道顯示 DS Empty。
+- 未做：開檔預覽、上傳 / 新資料夾、列操作、排序切換。
 
 ### 4.6 tWorkspace 左側 chrome 底色（`apps/chat/src/chrome.ts`，2026-10-23）
 

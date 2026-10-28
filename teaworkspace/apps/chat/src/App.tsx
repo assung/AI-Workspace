@@ -89,6 +89,7 @@ import { FormatToolbar, RichTextArea, textToHtml, hasRichMarkup, type RichEditor
 import { TAgentDock, TAgentRailIcon, TAGENT_LABEL, useTAgentEngine } from './TAgent'
 import { TAgentPage, type TAgentRoute } from './TAgentPage'
 import { TasksPage, type TasksRoute } from './TasksPage'
+import { DrivePage, type DriveRoute } from './DrivePage'
 import { CHROME_RAIL_BG, CHROME_SIDEBAR_BG, NO_MOUNT_PANEL_TRANSITION, SHELL_SETTLE_MS } from './chrome'
 import photoSunsetLake from './assets/photos/sunset-lake.jpg'
 import photoRockyCoast from './assets/photos/rocky-coast.jpg'
@@ -304,6 +305,12 @@ const GENERATED_DM_PEOPLE: { key: string; person: Person }[] = [
   { key: 'g-ivan', person: { name: 'Ivan Petrov', color: 'turquoise', status: 'offline', role: 'Warehouse', email: 'ivan@teachat.app', avatar: AVATAR['g-ivan'] } },
 ]
 GENERATED_DM_PEOPLE.forEach(({ key, person }) => { PEOPLE[key] = person })
+
+/** 成員 key → DS person 欄資料(Tasks / Drive 頁的 Assignee / Owner);'me' = 目前使用者 */
+function resolveTaskPerson(key: string) {
+  const p = key === 'me' ? ME : PEOPLE[key]
+  return { name: p.name, avatarUrl: p.avatar, description: p.role, status: p.status }
+}
 
 // 20 unique group chat topics (no overlap with INITIAL_ROOMS' existing names).
 const GENERATED_GROUP_TOPICS = [
@@ -963,16 +970,15 @@ function NavRail({
 }
 
 /**
- * Tasks / Docs / Drive 分頁的佔位頁(2026-10-24 NavRail 加入這三個分頁時,內容尚未設計)。
+ * Docs / Drive 分頁的佔位頁(2026-10-24 NavRail 加入時內容尚未設計;Tasks 已於 2026-10-28 換成 TasksPage)。
  * 頁首 = DS ChromeHeader + h1(與 tAgent 頁同款);內容 = DS Empty,icon 與 NavRail 同一顆。
  */
-const WORKSPACE_PLACEHOLDER: Record<'tasks' | 'docs' | 'drive', { title: string; description: string }> = {
-  tasks: { title: 'Tasks', description: 'Track work assigned to you and your team.' },
+const WORKSPACE_PLACEHOLDER: Record<'docs' | 'drive', { title: string; description: string }> = {
   docs: { title: 'Docs', description: 'Write and share documents with your team.' },
   drive: { title: 'Drive', description: 'Find every file shared across your chats and docs.' },
 }
 
-function WorkspacePlaceholderPage({ tab }: { tab: 'tasks' | 'docs' | 'drive' }) {
+function WorkspacePlaceholderPage({ tab }: { tab: 'docs' | 'drive' }) {
   const copy = WORKSPACE_PLACEHOLDER[tab]
   const icon = WORKSPACE_NAV_ITEMS.find((i) => i.tab === tab)?.icon as React.ComponentProps<typeof Empty>['icon']
   return (
@@ -3093,16 +3099,18 @@ export type ChatVariantConfig = {
    */
   chatAgentPanel?: boolean
   /**
-   * Tasks 分頁用 TasksPage(My tasks / Projects + 任務列表)取代佔位頁。預設 false:2026-10-28 先出 keyscreen,
-   * user 確認後才加入 prototype —— 目前只有 keyscreen story 打開它。
+   * Drive 分頁用 DrivePage(My drive / Channel drives + 麵包屑 + 檔案列表)取代佔位頁。預設 false:
+   * 2026-10-28 先出 keyscreen,user 確認後才加入 prototype —— 目前只有 Drive keyscreen story 打開它。
    */
-  tasksPage?: boolean
-  /** Tasks 頁的初始位置(keyscreen story 用;預設 My tasks) */
+  drivePage?: boolean
+  /** Drive 頁的初始位置(story 用;預設 My drive 根目錄) */
+  initialDriveRoute?: DriveRoute
+  /** Tasks 頁的初始位置(story 用;預設 My tasks) */
   initialTasksRoute?: TasksRoute
   /** AppShell 版:初始開著的 thread(父訊息 id,屬於初始聊天室);story 截「Thread + tAgent 並排」用。 */
   initialThreadId?: string
   /** config.agent:初始分頁(預設 'chat');'agent' = tAgent 整頁。 */
-  initialTab?: 'chat' | 'tasks' | 'agent'
+  initialTab?: 'chat' | 'tasks' | 'drive' | 'agent'
   /** config.agent:tAgent 整頁的初始位置(預設 'new' = 新對話首頁)。 */
   initialAgentRoute?: TAgentRoute
 }
@@ -3452,18 +3460,26 @@ export default function App({
           ChatList 左側浮層與遮罩從 AppShell 左緣起、不蓋 NavRail(app-shell.spec.md「版面規則」§9「從版面左緣開始」+
           API `portalContainer`;DS stories-helpers/scene/simulated-browser.tsx 畫布同款 translateZ(0)) */}
       <div ref={setShellFrame} className={`min-w-0 flex-1 ${shellSettling ? NO_MOUNT_PANEL_TRANSITION : ''}`} style={{ transform: 'translateZ(0)' }}>
-        {navTab === 'tasks' && config?.tasksPage ? (
+        {navTab === 'tasks' ? (
           <TasksPage
             mainMinWidth={SHELL_MAIN_MIN_WIDTH}
             menuWidth={SHELL_MENU_WIDTH}
             portalContainer={shellFrame}
             initialRoute={config?.initialTasksRoute}
-            resolvePerson={(key) => {
-              const p = key === 'me' ? ME : PEOPLE[key]
-              return { name: p.name, avatarUrl: p.avatar, description: p.role, status: p.status }
-            }}
+            resolvePerson={resolveTaskPerson}
           />
-        ) : navTab === 'tasks' || navTab === 'docs' || navTab === 'drive' ? (
+        ) : navTab === 'drive' && config?.drivePage ? (
+          <DrivePage
+            mainMinWidth={SHELL_MAIN_MIN_WIDTH}
+            menuWidth={SHELL_MENU_WIDTH}
+            portalContainer={shellFrame}
+            initialRoute={config?.initialDriveRoute}
+            // Channel drives = Chat 的群組頻道(不含 Teams 匯入房),順序同 Chat 列表
+            channels={rooms.filter((r) => r.type === 'general' && r.origin !== 'teams').map((r) => ({ id: r.id, title: r.title }))}
+            onOpenChannel={(roomId) => handleAgentOpenInChat(roomId, '')}
+            resolvePerson={resolveTaskPerson}
+          />
+        ) : navTab === 'docs' || navTab === 'drive' ? (
           <WorkspacePlaceholderPage tab={navTab} />
         ) : navTab === 'agent' ? (
           // tAgent 整頁(TAgentPage.tsx):同一套 AppShell,不放入口鈕(這一頁本身就是代理)
