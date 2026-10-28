@@ -14,7 +14,8 @@
 // - 文章(Confluence 頁面):置中欄寬 880(沿用 tAgent 對話欄,2026-10-23 user 定);標題 text-h3(breadcrumb.spec.md:md 麵包屑配 h3 標題)
 //   + 作者 / 最後更新;內文區塊 = 標題 / 段落 / 清單 / DS DataTable / DS Alert(Confluence 的 info panel)。
 // - Overview(Confluence space overview):空間名稱與說明、DS DescriptionList(Owner / Pages / Last updated)、最近更新的頁(DS DataTable,頁名連到該頁)。
-// - 尚未做(keyscreen 範圍外):編輯、新增頁、頁面樹拖曳排序、留言、分享。
+// - Content 標題列右端「+」= DS SidebarGroupAction(新增頁入口,行為未接)。
+// - 尚未做(keyscreen 範圍外):編輯、新增頁的實際流程、頁面樹拖曳排序、留言、分享。
 import { useState } from 'react'
 import {
   SidebarProvider,
@@ -28,6 +29,10 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarSeparator,
+  SidebarGroupAction,
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
   SidebarTrigger,
   AppShell,
   ChromeHeader,
@@ -279,6 +284,16 @@ export function DocsPage({
         <SidebarSeparator />
         <SidebarGroup>
           <SidebarGroupLabel>Content</SidebarGroupLabel>
+          {/* 群組標題列右端的「新增頁」(2026-10-28 user:Content 那排最右邊補 +,text 樣式無框)
+              = DS SidebarGroupAction(委派 ItemInlineActionButton,無框、懸停底色;sidebar.stories「群組動作」同款位置與用法) */}
+          {/* DS 定位 `top-2` 只對齊群組上緣,按鈕(16)貼在標題列(--field-height-md = 32)的上半部、與「Content」字不置中 —— DS 待補(STRUCTURE.md §4.5)。
+              app 端補:top = 群組上邊距 0.5rem(SidebarGroup py-2)+(標題列高 − 按鈕 1rem)÷ 2 */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <SidebarGroupAction icon={Plus} aria-label="New page" className="!top-[calc(0.5rem+(var(--field-height-md)-1rem)/2)]" />
+            </TooltipTrigger>
+            <TooltipContent>New page</TooltipContent>
+          </Tooltip>
           <SidebarGroupContent>
             <TreeView
               aria-label={`${space.name} pages`}

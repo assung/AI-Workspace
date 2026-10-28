@@ -334,7 +334,8 @@ TAgentDock
 1. **AppShellAside 沒有 footer slot**：內容整塊包在 ScrollArea，Thread 輸入盒會跟著捲走。app 端最小補法（`ThreadAsideBody`）：內容最小高 = ScrollArea viewport 高（ResizeObserver），輸入盒 `sticky bottom-0`。DS 補 footer slot 後改用。
 2. **AgentPanel / AppShell 內建字串無 i18n**：思考中 / 思考過程、決策卡 其他 / (建議) / 跳過 / 下一題 / 送出、header 與工具列 tooltip、改名 / 刪除、AppShellAside × 的「關閉」、把手名稱「調整 … 寬度」。可覆寫的（panel / FAB aria-label、FAB tooltip、placeholder、歷史搜尋文字、SidebarTrigger aria-label）已給英文。
 3. **AppShell 首次排版有寬度轉場**：AppShell 掛載時 ResizeObserver 量到寬度前 Menu 外層寬 = 0，量到後變 `widthRange.initial`，而 Sidebar 外層恆掛 `transition-[width] duration-200` → 每次掛載都從 0 滑到 320。tWorkspace 的 Chat / tAgent 各是一套 AppShell，切分頁 = 重新掛載，所以每次切都滑一次（2026-10-23 user：「切換 chat 跟 tAgent 的過程中一直有側面面板重複滑出的轉場」）。app 端補法：外框掛載後 300ms 內加 `NO_MOUNT_PANEL_TRANSITION`（`chrome.ts`；只對 `[data-app-shell-panel]` 關 transition-property），之後使用者開合 / 視窗變窄的 200ms 轉場照 DS。DS 該做：首次量測前不套用寬度轉場。
-4. **DS 版本**：本版需要 0.1.0-beta.148（PR #169 尚未發版）；預覽是用 PR #169 本機打包的套件建置。
+4. **SidebarGroupAction 不與群組標題垂直置中**：DS 定位 `absolute top-2`（= 群組上邊距），按鈕高 16、標題列高 `--field-height-md`（32），所以按鈕貼在標題列上半部，比「Content」字高約 8px（2026-10-28 Docs 側欄 Content 的「+」實測）。app 端補：`!top-[calc(0.5rem+(var(--field-height-md)-1rem)/2)]`。DS 該做：top 依標題列高置中。
+5. **DS 版本**：本版需要 0.1.0-beta.148（PR #169 尚未發版）；預覽是用 PR #169 本機打包的套件建置。
 
 ---
 
@@ -366,7 +367,8 @@ TAgentDock
 - 頁首：Overview = h1「Overview」+「New page」；頁面 = DS Breadcrumb（md）放頁首（同 Drive），根層 = 空間名（連回 Overview）+「Share」「Edit」（未接行為）。
 - 文章：置中欄寬 880（沿用 tAgent 對話欄）；標題 text-h3 semibold（breadcrumb.spec.md：md 麵包屑配 h3 標題）+ 作者 / 最後更新；內文區塊 = h2（text-h4）/ 段落 / 清單 / DS DataTable（各欄 `meta.width`）/ DS Alert（Confluence info panel）。
 - Overview：空間圖示（Avatar square solid，各空間一色）+ 名稱 + 說明；DS DescriptionList（Owner / Pages / Last updated）；Recently updated（DS DataTable 前 5 筆，頁名 = LinkInput 站內連結 `/docs/<space>/<page>`，頁面攔截切換）。
-- 未做：編輯、新增頁、頁面樹拖曳、留言、分享。
+- Content 標題列右端「+」（新增頁，2026-10-28 user「text 樣式無框」）= DS SidebarGroupAction + Tooltip；行為未接。
+- 未做：編輯、新增頁流程、頁面樹拖曳、留言、分享。
 
 ### 4.6 tWorkspace 左側 chrome 底色（`apps/chat/src/chrome.ts`，2026-10-23）
 
