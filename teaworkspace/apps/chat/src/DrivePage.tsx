@@ -2,12 +2,17 @@
 // (會跟 chat channel 連動),首頁為 My drive。右側內容頁包含麵包屑路徑及列表呈現檔案」)。
 //
 // 版面與 Tasks / tAgent 頁同一套:DS AppShell(primary-sidebar)+ DS Sidebar(offcanvas、淺灰底)+ Main 頁首 DS ChromeHeader。
-// - 左側:My drive(預設)+ Channel drives(可收合群組,= Chat 的群組頻道,由 App 傳入,順序同 Chat 列表)。
-//   對照 Microsoft Teams:每個頻道自帶一個檔案區(頻道裡貼的檔案就在那);OneDrive / Google Drive 左側「我的雲端硬碟」+「共用雲端硬碟」。
-// - 頁首:SidebarTrigger + h1(目前資料夾名稱)+(頻道時)「Open chat」回到該頻道 +「New」(New folder / Upload files)。
-// - 麵包屑:DS Breadcrumb,放在列表上方;末位 = 頁首 h1 同字(breadcrumb.spec.md「Title-breadcrumb-end 同步」),
-//   只有一層(在 My drive 或頻道根目錄)時不顯示(同 spec「單一層級禁用」)。根層帶 icon(spec:首項 icon 作視覺錨點)。
-// - 列表:DS DataTable。Name = ItemIcon + ItemLabel(item-anatomy;DataTable cell icon canonical 16px + gap-2);
+// - 左側:My drive(預設)/ Pinned(釘選的頻道檔案區或資料夾)/ Channel drives(可收合;= 有檔案的 Chat 群組頻道,順序同 Chat 列表)。
+//   對照 Microsoft Teams:每個頻道自帶一個檔案區;Google Drive「Starred」、Slack 釘選區 = 常用位置置頂。
+//   釘選 / 取消釘選:列上「⋯」選單(tAgent 側欄同款);釘選後從 Channel drives 移到 Pinned(tAgent Pinned / Recents 同規則)。
+//   2026-10-28 user:「只列出有檔案的頻道,另外需要有 pin 的區塊;demo 的 drive 數量預設不要放太多」。
+// - 頁首:SidebarTrigger + 位置 +(頻道時)「Open chat」回到該頻道 +「New」(New folder / Upload files)。
+//   位置:根目錄 = h1 標題;進到資料夾 = DS Breadcrumb 直接放在頁首(app-shell.spec.md「Breadcrumb 預設位置」:
+//   primary-sidebar → Header 內,對齊 Linear local header;2026-10-28 user「header 呈現麵包屑,更精簡」)。
+//   麵包屑只有一層時不顯示(breadcrumb.spec.md「單一層級禁用」),所以根目錄維持標題。根層帶 icon(spec:首項 icon 作視覺錨點)。
+// - 列表:DS DataTable。Name = 檔案類型彩色圖示 + ItemLabel(2026-10-28 user「彩圖,類似 Google Drive」:
+//   DS ItemAvatar `shape="square"` + 分類色(檔案 `solid`)—— 資料夾 neutral 淺灰、文件 blue、試算表 green、簡報 amber、PDF / 圖片 red,
+//   Google Drive 檔案圖示的配色;尺寸由 item-anatomy 依列高自動決定);
 //   資料夾名稱 = DS LinkInput 站內連結(點了進資料夾,與 tAgent Projects 表格同一個 navigate-valued cell 做法)。
 //   Owner = DS person 欄;Last modified = YYYY/MM/DD hh:mm AM/PM;File size,資料夾為 DS 空值佔位「-」。資料夾排在前面(Drive / OneDrive 同)。
 // - 尚未做(keyscreen 範圍外):開檔預覽、上傳 / 新資料夾、列操作(下載 / 分享 / 改名)、排序切換。
@@ -30,8 +35,9 @@ import {
   Button,
   Empty,
   LinkInput,
-  ItemIcon,
+  ItemAvatar,
   ItemLabel,
+  SidebarMenuAction,
   Breadcrumb,
   BreadcrumbList,
   DropdownMenu,
@@ -52,6 +58,9 @@ import {
   Presentation,
   Plus,
   Upload,
+  MoreHorizontal,
+  Pin,
+  PinOff,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { CHROME_SIDEBAR_BG } from './chrome'
@@ -74,13 +83,15 @@ type DriveNode = {
   children?: DriveNode[]
 }
 
-const KIND_ICON: Record<Kind, LucideIcon> = {
-  folder: Folder,
-  doc: FileText,
-  pdf: FileText,
-  sheet: FileSpreadsheet,
-  slides: Presentation,
-  image: FileImage,
+// 檔案類型 → 圖示 + 分類色(Google Drive 配色:資料夾灰、Docs 藍、Sheets 綠、Slides 黃、PDF / 圖片紅)
+// 資料夾用 neutral 非 solid(淺灰底 + 深色圖示):solid neutral 是 neutral-9 近黑,比彩色檔案圖示還重;Google Drive 的資料夾也是低調的灰
+const KIND_ICON: Record<Kind, { icon: LucideIcon; color: 'neutral' | 'blue' | 'green' | 'amber' | 'red'; solid: boolean }> = {
+  folder: { icon: Folder, color: 'neutral', solid: false },
+  doc: { icon: FileText, color: 'blue', solid: true },
+  pdf: { icon: FileText, color: 'red', solid: true },
+  sheet: { icon: FileSpreadsheet, color: 'green', solid: true },
+  slides: { icon: Presentation, color: 'amber', solid: true },
+  image: { icon: FileImage, color: 'red', solid: true },
 }
 
 // 內容延續 Chat / Tasks 示範資料(東頂 #3、週五品茶、零售買家、品茶室升級)
@@ -181,6 +192,11 @@ export function DrivePage({
   initialRoute?: DriveRoute
 }) {
   const [route, setRoute] = useState<DriveRoute>(initialRoute)
+  // 釘選:存位置的站內路徑(頻道檔案區根目錄或資料夾)。示範預設釘兩個:Tea Tasting 頻道、My drive 的 Q4 Tasting Program
+  const [pinned, setPinned] = useState<string[]>([
+    routeHref({ root: 'channel:tea-team', path: [] }),
+    routeHref({ root: 'my', path: ['q4-tasting'] }),
+  ])
 
   const channelId = route.root.startsWith('channel:') ? route.root.slice('channel:'.length) : null
   const channel = channelId ? channels.find((c) => c.id === channelId) : undefined
@@ -188,16 +204,45 @@ export function DrivePage({
   const rootNodes = channelId ? CHANNEL_DRIVES[channelId] ?? [] : MY_DRIVE
 
   // 沿 path 走到目前資料夾;路徑上每一層都記下來給麵包屑
-  const trail: DriveNode[] = []
-  let nodes = rootNodes
-  for (const id of route.path) {
-    const folder = nodes.find((n) => n.id === id && n.kind === 'folder')
-    if (!folder) break
-    trail.push(folder)
-    nodes = folder.children ?? []
-  }
+  const trail = walk(rootNodes, route.path)
+  const nodes = trail.length ? trail[trail.length - 1].children ?? [] : rootNodes
   const title = trail.length ? trail[trail.length - 1].name : rootLabel
   const rows = [...nodes].sort((a, b) => Number(b.kind === 'folder') - Number(a.kind === 'folder'))
+
+  // 側欄列 = 位置的站內路徑;釘選列的名稱 = 頻道名或資料夾名
+  const labelOf = (href: string) => {
+    const r = parseHref(href)
+    if (!r) return href
+    const cid = r.root.startsWith('channel:') ? r.root.slice('channel:'.length) : null
+    const base = cid ? channels.find((c) => c.id === cid)?.title ?? cid : ROOT_LABEL_MY
+    const t = walk(cid ? CHANNEL_DRIVES[cid] ?? [] : MY_DRIVE, r.path)
+    return t.length ? t[t.length - 1].name : base
+  }
+  const myHref = routeHref({ root: 'my', path: [] })
+  // Channel drives:只列有檔案的頻道(2026-10-28 user),已釘選的移到 Pinned
+  const channelRows = channels
+    .filter((c) => (CHANNEL_DRIVES[c.id]?.length ?? 0) > 0)
+    .map((c) => ({ href: routeHref({ root: `channel:${c.id}`, path: [] }), title: c.title }))
+    .filter((c) => !pinned.includes(c.href))
+  const currentHref = routeHref(route)
+  const sidebarIds = [myHref, ...pinned, ...channelRows.map((c) => c.href)]
+  // 高亮:目前位置剛好是側欄某一列就亮那列;在資料夾深處則亮它所屬的根(My drive / 該頻道)
+  const activeId = sidebarIds.includes(currentHref) ? currentHref : routeHref({ root: route.root, path: [] })
+
+  const togglePin = (href: string) =>
+    setPinned((list) => (list.includes(href) ? list.filter((h) => h !== href) : [...list, href]))
+  const rowMenu = (href: string, label: string, isPinned: boolean) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <SidebarMenuAction icon={MoreHorizontal} showOnHover aria-label={`More actions for ${label}`} />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="right" align="start" sideOffset={8}>
+        <DropdownMenuItem startIcon={isPinned ? PinOff : Pin} onSelect={() => togglePin(href)}>
+          {isPinned ? 'Unpin' : 'Pin'}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
 
   const sidebar = (
     // 與 Tasks / tAgent 頁側欄同一組設定(收合 offcanvas、寬度、淺灰底)
@@ -210,18 +255,37 @@ export function DrivePage({
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton id="my" startIcon={HardDrive} tooltip={ROOT_LABEL_MY}>{ROOT_LABEL_MY}</SidebarMenuButton>
+                <SidebarMenuButton id={myHref} startIcon={HardDrive} tooltip={ROOT_LABEL_MY}>{ROOT_LABEL_MY}</SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        {pinned.length > 0 && (
+          <SidebarGroup collapsible value="pinned">
+            <SidebarGroupLabel>Pinned</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {pinned.map((href) => {
+                  const label = labelOf(href)
+                  return (
+                    <SidebarMenuItem key={href}>
+                      <SidebarMenuButton id={href} tooltip={label}>{label}</SidebarMenuButton>
+                      {rowMenu(href, label, true)}
+                    </SidebarMenuItem>
+                  )
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
         <SidebarGroup collapsible value="channel-drives">
           <SidebarGroupLabel>Channel drives</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {channels.map((c) => (
-                <SidebarMenuItem key={c.id}>
-                  <SidebarMenuButton id={`channel:${c.id}`} tooltip={c.title}>{c.title}</SidebarMenuButton>
+              {channelRows.map((c) => (
+                <SidebarMenuItem key={c.href}>
+                  <SidebarMenuButton id={c.href} tooltip={c.title}>{c.title}</SidebarMenuButton>
+                  {rowMenu(c.href, c.title, false)}
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
@@ -231,10 +295,38 @@ export function DrivePage({
     </Sidebar>
   )
 
+  // 麵包屑與資料夾連結都是站內路徑 → 攔截成切換位置
+  const interceptDriveLink = (e: React.MouseEvent) => {
+    const href = (e.target as Element).closest?.('a[href]')?.getAttribute('href')
+    const next = href ? parseHref(href) : null
+    if (!next) return
+    e.preventDefault()
+    e.stopPropagation()
+    setRoute(next)
+  }
+
+  const crumbs = [
+    { label: rootLabel, href: routeHref({ root: route.root, path: [] }), startIcon: channel ? MessagesSquare : HardDrive },
+    ...trail.map((f, i) => (i === trail.length - 1
+      ? { label: f.name }
+      : { label: f.name, href: routeHref({ root: route.root, path: route.path.slice(0, i + 1) }) })),
+  ]
+
   const header = (
-    <ChromeHeader className="bg-surface">
+    <ChromeHeader className="bg-surface" onClickCapture={interceptDriveLink}>
       <SidebarTrigger aria-label="Toggle drive sidebar" />
-      <h1 className="flex-1 truncate text-body-lg font-medium">{title}</h1>
+      {trail.length > 0 ? (
+        // 資料夾內:麵包屑直接當頁首的位置(app-shell.spec.md「Breadcrumb 預設位置」primary-sidebar → Header 內);
+        // 頁面標題仍以 h1 提供給螢幕閱讀器(與麵包屑末位同字)
+        <div className="min-w-0 flex-1">
+          <h1 className="sr-only">{title}</h1>
+          <Breadcrumb>
+            <BreadcrumbList items={crumbs} />
+          </Breadcrumb>
+        </div>
+      ) : (
+        <h1 className="flex-1 truncate text-body-lg font-medium">{title}</h1>
+      )}
       <div className="flex items-center gap-2">
         {channel && (
           <Button variant="tertiary" size="sm" startIcon={MessageCircle} onClick={() => onOpenChannel(channel.id)}>Open chat</Button>
@@ -252,17 +344,10 @@ export function DrivePage({
     </ChromeHeader>
   )
 
-  const crumbs = [
-    { label: rootLabel, href: routeHref({ root: route.root, path: [] }), startIcon: channel ? MessagesSquare : HardDrive },
-    ...trail.map((f, i) => (i === trail.length - 1
-      ? { label: f.name }
-      : { label: f.name, href: routeHref({ root: route.root, path: route.path.slice(0, i + 1) }) })),
-  ]
-
   type Row = DriveNode
   const nameCell = (n: Row) => (
     <span className="flex min-w-0 flex-1 items-center gap-2">
-      <ItemIcon icon={KIND_ICON[n.kind]} className="text-fg-secondary" />
+      <ItemAvatar icon={KIND_ICON[n.kind].icon} color={KIND_ICON[n.kind].color} shape="square" solid={KIND_ICON[n.kind].solid} aria-hidden />
       {n.kind === 'folder'
         ? <LinkInput mode="view" value={routeHref({ root: route.root, path: [...route.path, n.id] })} label={n.name} />
         : <ItemLabel>{n.name}</ItemLabel>}
@@ -281,39 +366,22 @@ export function DrivePage({
     : 'This folder is empty.'
 
   const main = (
-    <div
-      className="flex h-full min-h-0 flex-col gap-[var(--layout-space-tight)] px-[var(--layout-space-loose)] py-[var(--layout-space-tight)]"
-      onClickCapture={(e) => {
-        const href = (e.target as Element).closest?.('a[href]')?.getAttribute('href')
-        const next = href ? parseHref(href) : null
-        if (!next) return
-        e.preventDefault()
-        e.stopPropagation()
-        setRoute(next)
-      }}
-    >
-      {trail.length > 0 && (
-        <Breadcrumb>
-          <BreadcrumbList size="sm" items={crumbs} />
-        </Breadcrumb>
-      )}
-      <div className="min-h-0 flex-1">
-        <DataTable
-          columns={columns}
-          data={rows}
-          height="100%"
-          getRowId={(n: Row) => n.id}
-          aria-label={`Files in ${title}`}
-          emptyState={<Empty icon={FolderOpen} description={emptyCopy} />}
-        />
-      </div>
+    <div className="flex h-full min-h-0 flex-col px-[var(--layout-space-loose)] py-[var(--layout-space-tight)]" onClickCapture={interceptDriveLink}>
+      <DataTable
+        columns={columns}
+        data={rows}
+        height="100%"
+        getRowId={(n: Row) => n.id}
+        aria-label={`Files in ${title}`}
+        emptyState={<Empty icon={FolderOpen} description={emptyCopy} />}
+      />
     </div>
   )
 
   return (
     <SidebarProvider
-      activeId={route.root}
-      onActiveChange={(id) => setRoute({ root: id as DriveRoot, path: [] })}
+      activeId={activeId}
+      onActiveChange={(id) => { const next = parseHref(id); if (next) setRoute(next) }}
       style={{ minHeight: 'auto', height: '100%' }}
     >
       <AppShell
@@ -328,4 +396,17 @@ export function DrivePage({
       </AppShell>
     </SidebarProvider>
   )
+}
+
+/** 沿資料夾 id 路徑往下走,回傳路上每一層資料夾(遇到不存在的 id 就停) */
+function walk(root: DriveNode[], path: string[]) {
+  const trail: DriveNode[] = []
+  let nodes = root
+  for (const id of path) {
+    const folder = nodes.find((n) => n.id === id && n.kind === 'folder')
+    if (!folder) break
+    trail.push(folder)
+    nodes = folder.children ?? []
+  }
+  return trail
 }

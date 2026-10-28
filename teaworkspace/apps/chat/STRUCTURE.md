@@ -352,11 +352,11 @@ TAgentDock
 
 - user：「左側側邊欄標題為 Drive，下方區分為 My drive 跟 Channel drives（會跟 chat channel 連動），首頁為 My drive。右側內容頁包含麵包屑路徑及列表呈現檔案」。
 - 只在 `config.drivePage` 時啟用（story `Apps/chat/Drive (keyscreen)`：My drive / 資料夾內 / 頻道檔案區）；主 prototype 的 Drive 仍是佔位頁。
-- 左側：My drive（HardDrive）+ 可收合 Channel drives = Chat 的群組頻道（`rooms` 中 `type: 'general'`、排除 Teams 匯入房，順序同 Chat 列表；對照 Teams 每個頻道自帶檔案區）。
-- 頁首：ChromeHeader + h1（目前資料夾名稱）+ 頻道時「Open chat」（`handleAgentOpenInChat(roomId, '')` 切到 Chat 並開該頻道）+「New」選單（New folder / Upload files，未接行為）。
-- 麵包屑：DS Breadcrumb `size="sm"` 放列表上方；末位 = h1 同字、只有一層時不顯示（breadcrumb.spec.md「Title-breadcrumb-end 同步」「單一層級禁用」）；根層帶 icon。連結與資料夾名稱共用站內路徑 `/drive/<root>/<folder>…`，由頁面攔截切換。
-- 列表：DS DataTable — Name（ItemIcon + ItemLabel；資料夾 = LinkInput 站內連結）/ Owner（person）/ Last modified（YYYY/MM/DD hh:mm AM/PM）/ File size（資料夾為「-」）；資料夾在前。沒有檔案的頻道顯示 DS Empty。
-- 未做：開檔預覽、上傳 / 新資料夾、列操作、排序切換。
+- 左側：My drive（HardDrive）/ Pinned / Channel drives。Channel drives = **有檔案的** Chat 群組頻道（`type: 'general'`、排除 Teams 匯入房，順序同 Chat 列表；對照 Teams 每個頻道自帶檔案區）。Pinned = 釘選的頻道檔案區或資料夾，預設釘 Tea Tasting 頻道 + My drive 的 Q4 Tasting Program；列上「⋯」Pin / Unpin（tAgent 側欄同款），釘選後從 Channel drives 移到 Pinned。（2026-10-28 user：「只列出有檔案的頻道，另外需要有 pin 的區塊；demo 的 drive 數量預設不要放太多」）
+- 頁首：根目錄 = h1 標題；進資料夾 = DS Breadcrumb（md）直接放頁首（app-shell.spec.md「Breadcrumb 預設位置」primary-sidebar → Header 內，對齊 Linear；2026-10-28 user「header 呈現麵包屑，更精簡」），另以 sr-only h1 保留頁面標題；只有一層不顯示麵包屑（breadcrumb.spec.md）。頻道時「Open chat」（`handleAgentOpenInChat(roomId, '')`）+「New」選單（New folder / Upload files，未接行為）。
+- 列表：DS DataTable — Name（檔案類型彩色圖示 = DS ItemAvatar `shape="square"`：資料夾 neutral 淺灰、文件 blue / 試算表 green / 簡報 amber / PDF・圖片 red 為 `solid`，Google Drive 配色，2026-10-28 user「彩圖，類似 Google Drive」；資料夾名 = LinkInput 站內連結）/ Owner（person）/ Last modified（YYYY/MM/DD hh:mm AM/PM）/ File size（資料夾「-」）；資料夾在前。
+- 位置以站內路徑 `/drive/<root>/<folder>…` 表示（側欄列 id、麵包屑、資料夾連結共用），頁面攔截切換。
+- 之後再補（user：非這次 demo 重點）：開檔預覽、上傳 / 新資料夾、列操作（下載 / 分享 / 改名）、排序。
 
 ### 4.6 tWorkspace 左側 chrome 底色（`apps/chat/src/chrome.ts`，2026-10-23）
 

@@ -22,13 +22,13 @@ const meta: Meta<typeof App> = {
 export default meta
 type Story = StoryObj<typeof App>
 
-/** 首頁:My drive 根目錄。只有一層,依麵包屑規範不顯示麵包屑,頁首標題即位置。 */
+/** 首頁:My drive 根目錄。只有一層,依麵包屑規範不顯示麵包屑,頁首是標題;側欄 Pinned 預設釘兩個位置。 */
 export const MyDrive: Story = {
   name: 'My drive',
   render: () => <App config={{ agent: true, initialTab: 'drive', drivePage: true }} />,
 }
 
-/** 進到兩層資料夾:麵包屑 My drive / Q4 Tasting Program / Tasting photos,末位與頁首標題同字。 */
+/** 進到兩層資料夾:頁首直接呈現麵包屑 My drive / Q4 Tasting Program / Tasting photos(app-shell.spec.md:primary-sidebar 的麵包屑放 Header 內)。 */
 export const InFolder: Story = {
   name: '資料夾內(麵包屑)',
   render: () => <App config={{ agent: true, initialTab: 'drive', drivePage: true, initialDriveRoute: { root: 'my', path: ['q4-tasting', 'tasting-photos'] } }} />,
