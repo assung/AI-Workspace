@@ -90,6 +90,7 @@ import { TAgentDock, TAgentRailIcon, TAGENT_LABEL, useTAgentEngine } from './TAg
 import { TAgentPage, type TAgentRoute } from './TAgentPage'
 import { TasksPage, type TasksRoute } from './TasksPage'
 import { DrivePage, type DriveRoute } from './DrivePage'
+import { DocsPage, type DocsRoute } from './DocsPage'
 import { CHROME_RAIL_BG, CHROME_SIDEBAR_BG, NO_MOUNT_PANEL_TRANSITION, SHELL_SETTLE_MS } from './chrome'
 import photoSunsetLake from './assets/photos/sunset-lake.jpg'
 import photoRockyCoast from './assets/photos/rocky-coast.jpg'
@@ -3097,6 +3098,13 @@ export type ChatVariantConfig = {
    * 程式保留、只關掉入口;tAgent 只從 NavRail 的 tAgent 分頁(整頁)使用。僅 test-only story 打開它做回歸。
    */
   chatAgentPanel?: boolean
+  /**
+   * Docs 分頁用 DocsPage(空間選擇 / Overview / 頁面樹 + 文章)取代佔位頁。預設 false:
+   * 2026-10-28 先出 keyscreen,user 確認後才加入 prototype —— 目前只有 Docs keyscreen story 打開它。
+   */
+  docsPage?: boolean
+  /** Docs 頁的初始位置(story 用;預設 My space 的 Overview) */
+  initialDocsRoute?: DocsRoute
   /** Drive 頁的初始位置(story 用;預設 My drive 根目錄) */
   initialDriveRoute?: DriveRoute
   /** Tasks 頁的初始位置(story 用;預設 My tasks) */
@@ -3104,7 +3112,7 @@ export type ChatVariantConfig = {
   /** AppShell 版:初始開著的 thread(父訊息 id,屬於初始聊天室);story 截「Thread + tAgent 並排」用。 */
   initialThreadId?: string
   /** config.agent:初始分頁(預設 'chat');'agent' = tAgent 整頁。 */
-  initialTab?: 'chat' | 'tasks' | 'drive' | 'agent'
+  initialTab?: 'chat' | 'tasks' | 'docs' | 'drive' | 'agent'
   /** config.agent:tAgent 整頁的初始位置(預設 'new' = 新對話首頁)。 */
   initialAgentRoute?: TAgentRoute
 }
@@ -3471,6 +3479,14 @@ export default function App({
             // Channel drives = Chat 的群組頻道(不含 Teams 匯入房),順序同 Chat 列表
             channels={rooms.filter((r) => r.type === 'general' && r.origin !== 'teams').map((r) => ({ id: r.id, title: r.title }))}
             onOpenChannel={(roomId) => handleAgentOpenInChat(roomId, '')}
+            resolvePerson={resolveTaskPerson}
+          />
+        ) : navTab === 'docs' && config?.docsPage ? (
+          <DocsPage
+            mainMinWidth={SHELL_MAIN_MIN_WIDTH}
+            menuWidth={SHELL_MENU_WIDTH}
+            portalContainer={shellFrame}
+            initialRoute={config?.initialDocsRoute}
             resolvePerson={resolveTaskPerson}
           />
         ) : navTab === 'docs' ? (
