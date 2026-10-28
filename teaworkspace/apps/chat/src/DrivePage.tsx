@@ -1,4 +1,4 @@
-// DrivePage — tWorkspace 的 Drive 分頁(2026-10-28 keyscreen,user:「左側側邊欄標題為 Drive,下方區分為 My drive 跟 Channel drives
+// DrivePage — tWorkspace 的 Drive 分頁(2026-10-28 keyscreen → 同日 user 確認後加入 prototype,user:「左側側邊欄標題為 Drive,下方區分為 My drive 跟 Channel drives
 // (會跟 chat channel 連動),首頁為 My drive。右側內容頁包含麵包屑路徑及列表呈現檔案」)。
 //
 // 版面與 Tasks / tAgent 頁同一套:DS AppShell(primary-sidebar)+ DS Sidebar(offcanvas、淺灰底)+ Main 頁首 DS ChromeHeader。

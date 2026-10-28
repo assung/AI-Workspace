@@ -348,10 +348,10 @@ TAgentDock
 - 完成狀態只用 Status 表達、列首不放勾選框（DataTable 勾選框 = 選取語意）。
 - 未做：點列開任務詳情（預計 Right panel）、新增任務、改狀態 / 到期日。
 
-### 4.5c Drive 分頁 keyscreen（`DrivePage.tsx`，2026-10-28，尚未加入 prototype）
+### 4.5c Drive 分頁（`DrivePage.tsx`，2026-10-28 keyscreen → 同日 user 確認，已加入 prototype）
 
 - user：「左側側邊欄標題為 Drive，下方區分為 My drive 跟 Channel drives（會跟 chat channel 連動），首頁為 My drive。右側內容頁包含麵包屑路徑及列表呈現檔案」。
-- 只在 `config.drivePage` 時啟用（story `Apps/chat/Drive (keyscreen)`：My drive / 資料夾內 / 頻道檔案區）；主 prototype 的 Drive 仍是佔位頁。
+- NavRail 的 Drive 分頁即此頁（story `Apps/chat/Drive`：My drive / 資料夾內 / 頻道檔案區）。
 - 左側：My drive（HardDrive）/ Pinned / Channel drives。Channel drives = **有檔案的** Chat 群組頻道（`type: 'general'`、排除 Teams 匯入房，順序同 Chat 列表；對照 Teams 每個頻道自帶檔案區）。Pinned = 釘選的頻道檔案區或資料夾，預設釘 Tea Tasting 頻道 + My drive 的 Q4 Tasting Program；列上「⋯」Pin / Unpin（tAgent 側欄同款），釘選後從 Channel drives 移到 Pinned。（2026-10-28 user：「只列出有檔案的頻道，另外需要有 pin 的區塊；demo 的 drive 數量預設不要放太多」）
 - 頁首：根目錄 = h1 標題；進資料夾 = DS Breadcrumb（md）直接放頁首（app-shell.spec.md「Breadcrumb 預設位置」primary-sidebar → Header 內，對齊 Linear；2026-10-28 user「header 呈現麵包屑，更精簡」），另以 sr-only h1 保留頁面標題；只有一層不顯示麵包屑（breadcrumb.spec.md）。頻道時「Open chat」（`handleAgentOpenInChat(roomId, '')`）+「New」選單（New folder / Upload files，未接行為）。
 - 列表：DS DataTable — Name（檔案類型彩色圖示 = DS ItemAvatar `shape="square"`：資料夾 neutral 淺灰、文件 blue / 試算表 green / 簡報 amber / PDF・圖片 red 為 `solid`，Google Drive 配色，2026-10-28 user「彩圖，類似 Google Drive」；資料夾名 = LinkInput 站內連結）/ Owner（person）/ Last modified（YYYY/MM/DD hh:mm AM/PM）/ File size（資料夾「-」）；資料夾在前。

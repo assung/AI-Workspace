@@ -970,15 +970,14 @@ function NavRail({
 }
 
 /**
- * Docs / Drive 分頁的佔位頁(2026-10-24 NavRail 加入時內容尚未設計;Tasks 已於 2026-10-28 換成 TasksPage)。
+ * Docs 分頁的佔位頁(2026-10-24 NavRail 加入時內容尚未設計;Tasks / Drive 已於 2026-10-28 換成 TasksPage / DrivePage)。
  * 頁首 = DS ChromeHeader + h1(與 tAgent 頁同款);內容 = DS Empty,icon 與 NavRail 同一顆。
  */
-const WORKSPACE_PLACEHOLDER: Record<'docs' | 'drive', { title: string; description: string }> = {
+const WORKSPACE_PLACEHOLDER: Record<'docs', { title: string; description: string }> = {
   docs: { title: 'Docs', description: 'Write and share documents with your team.' },
-  drive: { title: 'Drive', description: 'Find every file shared across your chats and docs.' },
 }
 
-function WorkspacePlaceholderPage({ tab }: { tab: 'docs' | 'drive' }) {
+function WorkspacePlaceholderPage({ tab }: { tab: 'docs' }) {
   const copy = WORKSPACE_PLACEHOLDER[tab]
   const icon = WORKSPACE_NAV_ITEMS.find((i) => i.tab === tab)?.icon as React.ComponentProps<typeof Empty>['icon']
   return (
@@ -3098,11 +3097,6 @@ export type ChatVariantConfig = {
    * 程式保留、只關掉入口;tAgent 只從 NavRail 的 tAgent 分頁(整頁)使用。僅 test-only story 打開它做回歸。
    */
   chatAgentPanel?: boolean
-  /**
-   * Drive 分頁用 DrivePage(My drive / Channel drives + 麵包屑 + 檔案列表)取代佔位頁。預設 false:
-   * 2026-10-28 先出 keyscreen,user 確認後才加入 prototype —— 目前只有 Drive keyscreen story 打開它。
-   */
-  drivePage?: boolean
   /** Drive 頁的初始位置(story 用;預設 My drive 根目錄) */
   initialDriveRoute?: DriveRoute
   /** Tasks 頁的初始位置(story 用;預設 My tasks) */
@@ -3468,7 +3462,7 @@ export default function App({
             initialRoute={config?.initialTasksRoute}
             resolvePerson={resolveTaskPerson}
           />
-        ) : navTab === 'drive' && config?.drivePage ? (
+        ) : navTab === 'drive' ? (
           <DrivePage
             mainMinWidth={SHELL_MAIN_MIN_WIDTH}
             menuWidth={SHELL_MENU_WIDTH}
@@ -3479,7 +3473,7 @@ export default function App({
             onOpenChannel={(roomId) => handleAgentOpenInChat(roomId, '')}
             resolvePerson={resolveTaskPerson}
           />
-        ) : navTab === 'docs' || navTab === 'drive' ? (
+        ) : navTab === 'docs' ? (
           <WorkspacePlaceholderPage tab={navTab} />
         ) : navTab === 'agent' ? (
           // tAgent 整頁(TAgentPage.tsx):同一套 AppShell,不放入口鈕(這一頁本身就是代理)
