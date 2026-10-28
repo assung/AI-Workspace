@@ -359,10 +359,10 @@ TAgentDock
 - 位置以站內路徑 `/drive/<root>/<folder>…` 表示（側欄列 id、麵包屑、資料夾連結共用），頁面攔截切換。
 - 之後再補（user：非這次 demo 重點）：開檔預覽、上傳 / 新資料夾、列操作（下載 / 分享 / 改名）、排序。
 
-### 4.5d Docs 分頁 keyscreen（`DocsPage.tsx`，2026-10-28，尚未加入 prototype）
+### 4.5d Docs 分頁（`DocsPage.tsx`，2026-10-28 keyscreen → 同日 user 確認，已加入 prototype）
 
 - user：「左側欄標題為 Docs，下方為 selector，預設選在 My space（首頁），下方是 Overview（點進去看 space 的概覽資訊），接著是隔線，隔線下方區塊為 Content，呈現 pages（tree view）。右側為頁面頁，header 邏輯同 Drive 的麵包屑，下方是文章內容，類似 Confluence」。
-- 只在 `config.docsPage` 時啟用（story `Apps/chat/Docs (keyscreen)`：Overview / 頁面）；主 prototype 的 Docs 仍是佔位頁。
+- NavRail 的 Docs 分頁即此頁（story `Apps/chat/Docs`：Overview / 頁面）。五個分頁都已有正式頁面，佔位頁元件已移除。
 - 左側：空間選擇器 = DS Select（選項 icon + 說明；My space / Tea Tasting / Product Team）→ Overview（SidebarMenuButton）→ SidebarSeparator → Content（SidebarGroup + DS TreeView；sidebar.spec.md「深度 > 1、使用者自建 → TreeView」）。TreeView 單選、受控展開，到某頁時自動展開它的上層。
 - 頁首：Overview = h1「Overview」+「New page」；頁面 = DS Breadcrumb（md）放頁首（同 Drive），根層 = 空間名（連回 Overview）+「Share」「Edit」（未接行為）。
 - 文章：置中欄寬 880（沿用 tAgent 對話欄）；標題 text-h3 semibold（breadcrumb.spec.md：md 麵包屑配 h3 標題）+ 作者 / 最後更新；內文區塊 = h2（text-h4）/ 段落 / 清單 / DS DataTable（各欄 `meta.width`）/ DS Alert（Confluence info panel）。

@@ -970,29 +970,6 @@ function NavRail({
   )
 }
 
-/**
- * Docs 分頁的佔位頁(2026-10-24 NavRail 加入時內容尚未設計;Tasks / Drive 已於 2026-10-28 換成 TasksPage / DrivePage)。
- * 頁首 = DS ChromeHeader + h1(與 tAgent 頁同款);內容 = DS Empty,icon 與 NavRail 同一顆。
- */
-const WORKSPACE_PLACEHOLDER: Record<'docs', { title: string; description: string }> = {
-  docs: { title: 'Docs', description: 'Write and share documents with your team.' },
-}
-
-function WorkspacePlaceholderPage({ tab }: { tab: 'docs' }) {
-  const copy = WORKSPACE_PLACEHOLDER[tab]
-  const icon = WORKSPACE_NAV_ITEMS.find((i) => i.tab === tab)?.icon as React.ComponentProps<typeof Empty>['icon']
-  return (
-    <div className="flex h-full min-h-0 flex-col bg-surface">
-      <ChromeHeader className="bg-surface">
-        <h1 className="flex-1 truncate text-body-lg font-medium">{copy.title}</h1>
-      </ChromeHeader>
-      <div className="flex min-h-0 flex-1 items-center justify-center px-[var(--layout-space-loose)]">
-        <Empty icon={icon} title={`${copy.title} is coming soon`} description={copy.description} />
-      </div>
-    </div>
-  )
-}
-
 // ════════════════════════════════════════════════════════════════════════════
 // 1a. Top search bar(chrome='top-search',Teams 整合 prototype)
 // NavRail 移除後的頂部 chrome:universal search 置中(controlled input),
@@ -3098,11 +3075,6 @@ export type ChatVariantConfig = {
    * 程式保留、只關掉入口;tAgent 只從 NavRail 的 tAgent 分頁(整頁)使用。僅 test-only story 打開它做回歸。
    */
   chatAgentPanel?: boolean
-  /**
-   * Docs 分頁用 DocsPage(空間選擇 / Overview / 頁面樹 + 文章)取代佔位頁。預設 false:
-   * 2026-10-28 先出 keyscreen,user 確認後才加入 prototype —— 目前只有 Docs keyscreen story 打開它。
-   */
-  docsPage?: boolean
   /** Docs 頁的初始位置(story 用;預設 My space 的 Overview) */
   initialDocsRoute?: DocsRoute
   /** Drive 頁的初始位置(story 用;預設 My drive 根目錄) */
@@ -3481,7 +3453,7 @@ export default function App({
             onOpenChannel={(roomId) => handleAgentOpenInChat(roomId, '')}
             resolvePerson={resolveTaskPerson}
           />
-        ) : navTab === 'docs' && config?.docsPage ? (
+        ) : navTab === 'docs' ? (
           <DocsPage
             mainMinWidth={SHELL_MAIN_MIN_WIDTH}
             menuWidth={SHELL_MENU_WIDTH}
@@ -3489,8 +3461,7 @@ export default function App({
             initialRoute={config?.initialDocsRoute}
             resolvePerson={resolveTaskPerson}
           />
-        ) : navTab === 'docs' ? (
-          <WorkspacePlaceholderPage tab={navTab} />
+
         ) : navTab === 'agent' ? (
           // tAgent 整頁(TAgentPage.tsx):同一套 AppShell,不放入口鈕(這一頁本身就是代理)
           <TAgentPage

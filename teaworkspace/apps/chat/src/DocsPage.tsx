@@ -1,4 +1,4 @@
-// DocsPage — tWorkspace 的 Docs 分頁(2026-10-28 keyscreen,user:「左側欄標題為 Docs,下方為 selector,預設選在 My space(首頁),
+// DocsPage — tWorkspace 的 Docs 分頁(2026-10-28 keyscreen → 同日 user 確認後加入 prototype,user:「左側欄標題為 Docs,下方為 selector,預設選在 My space(首頁),
 // 下方是 Overview(點進去看 space 的概覽資訊),接著是隔線,隔線下方區塊為 Content,呈現 pages(tree view)。右側為頁面頁,
 // header 邏輯同 Drive 的麵包屑,下方是文章內容,類似 Confluence」)。
 //
