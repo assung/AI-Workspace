@@ -335,7 +335,8 @@ TAgentDock
 2. **AgentPanel / AppShell 內建字串無 i18n**：思考中 / 思考過程、決策卡 其他 / (建議) / 跳過 / 下一題 / 送出、header 與工具列 tooltip、改名 / 刪除、AppShellAside × 的「關閉」、把手名稱「調整 … 寬度」。可覆寫的（panel / FAB aria-label、FAB tooltip、placeholder、歷史搜尋文字、SidebarTrigger aria-label）已給英文。
 3. **AppShell 首次排版有寬度轉場**：AppShell 掛載時 ResizeObserver 量到寬度前 Menu 外層寬 = 0，量到後變 `widthRange.initial`，而 Sidebar 外層恆掛 `transition-[width] duration-200` → 每次掛載都從 0 滑到 320。tWorkspace 的 Chat / tAgent 各是一套 AppShell，切分頁 = 重新掛載，所以每次切都滑一次（2026-10-23 user：「切換 chat 跟 tAgent 的過程中一直有側面面板重複滑出的轉場」）。app 端補法：外框掛載後 300ms 內加 `NO_MOUNT_PANEL_TRANSITION`（`chrome.ts`；只對 `[data-app-shell-panel]` 關 transition-property），之後使用者開合 / 視窗變窄的 200ms 轉場照 DS。DS 該做：首次量測前不套用寬度轉場。
 4. **SidebarGroupAction 不與群組標題垂直置中**：DS 定位 `absolute top-2`（= 群組上邊距），按鈕高 16、標題列高 `--field-height-md`（32），所以按鈕貼在標題列上半部，比「Content」字高約 8px（2026-10-28 Docs 側欄 Content 的「+」實測）。app 端補：`!top-[calc(0.5rem+(var(--field-height-md)-1rem)/2)]`。DS 該做：top 依標題列高置中。
-5. **DS 版本**：本版需要 0.1.0-beta.148（PR #169 尚未發版）；預覽是用 PR #169 本機打包的套件建置。
+5. **Sidebar 內容會被長標題撐寬**：SidebarContent 內包 DS ScrollArea 但沒開 `fillX`，Radix 捲動區內層是 `display: table`，被最長一行（tAgent Recents「payments-api ImagePullBackOff on staging」、Docs 頁面樹的文章標題）撐成 394 > 側欄 320 → 標題不截斷、收合箭頭與 Docs 空間選擇器右緣被裁（2026-10-29 劇本演示實測）。app 端補：`CHROME_SIDEBAR_FILL_X`（`chrome.ts`，= ScrollArea `fillX` 的三個 class，以後代選擇器套到 viewport 內層），Chat / tAgent / Tasks / Drive / Docs 五個側欄都套。DS 該做：SidebarContent 傳 `fillX`。
+6. **DS 版本**：本版需要 0.1.0-beta.148（PR #169 尚未發版）；預覽是用 PR #169 本機打包的套件建置。
 
 ---
 
@@ -369,6 +370,7 @@ TAgentDock
 - Overview：空間圖示（Avatar square solid，各空間一色）+ 名稱 + 說明；DS DescriptionList（Owner / Pages / Last updated）；Recently updated（DS DataTable 前 5 筆，頁名 = LinkInput 站內連結 `/docs/<space>/<page>`，頁面攔截切換）。
 - Content 標題列右端「+」（新增頁，2026-10-28 user「text 樣式無框」）= DS SidebarGroupAction + Tooltip；行為未接。
 - 未做：編輯、新增頁流程、頁面樹拖曳、留言、分享。
+- 內文區塊另有 `ol`（有序清單）與 `code`（等寬字 `pre`，bg-muted，可水平捲動）。空間 **K8s Platform**（indigo、owner Kenji）› Known issues › 「ImagePullBackOff：registry pull secret 過期」= tAgent 劇本引用的已知問題文章（§5.1）。
 
 ### 4.6 tWorkspace 左側 chrome 底色（`apps/chat/src/chrome.ts`，2026-10-23）
 
@@ -412,6 +414,17 @@ TAgentPage
 - **對話欄寬 880**：沿用本 app 主 InputBox fullWidth OFF 的上限（常數速查；2026-10-23 user 確認沿用 880）。
 - **Projects / Artifacts 維持表格**（2026-10-23 user：DS 尚無 Card 元件，先維持表格、等 DS 出 Card）。主欄 Name = 站內連結：Project → 該專案最近一則對話（`conversationIds` 裡依 Recents 排序最前）、Artifact → 來源對話（user 選）。對話數只算還在的對話；來源對話被刪的成果物不列；專案的對話都被刪 → Name 變純文字。專案詳情頁、成果物預覽尚未設計。
 - DataTable 欄位走 DS 欄位型別（`string` / `number` / `select`）→ 單行 + ellipsis（data-table.spec.md「Cell 單行截斷原則」）。
+
+### 5.1 Demo 劇本（`tagentScripts.tsx` + `useTAgentEngine({ script })`，2026-10-29）
+
+user：「我想照我寫好的對話劇本來演示」→ 劇本 `K8S_IMAGEPULL_SCRIPT`：payments-api 部到 staging 一直 ImagePullBackOff → 代理要 Events → 認出已知問題、給 Docs 文章 → 無效 → 摘要（問題 / 影響 / 我們判斷）確認 → 開單 #SD-2318 → 值班 Bob 接手、處理完（代理主動發）→ 使用者確認 → 結案。
+
+- **台詞逐字照 user 劇本**，只修錯字（unauthourized / refistry / regitstry / 團對）。每則代理回覆前的「思考過程」步驟是補的（劇本沒寫），讓代理看起來真的去查。
+- **使用者那句預先填在輸入盒**（第一句在 tAgent 首頁；之後每輪代理回完填下一句），講者按 Enter 送出；改字也照樣推進劇本。等主動更新時輸入盒留空。
+- **主動更新**（`afterMs`，`UPDATE_GAP_MS = 4000`）：沒有思考步驟 → 不顯示思考塊（`renderTurns` 只在 `thinking || steps.length` 時渲染 AgentThinking）。
+- **文章連結** = `DocLink` → `TAgentOpenDocProvider` → App `handleAgentOpenDoc`：切到 Docs 分頁並開該頁（`docsJump` 改 DocsPage key 重掛載）。
+- 一份劇本只演一次（第一則對話）；之後的新對話走一般 fallback 回覆。重新整理頁面 = 重來。`config.agentScript: false` 關掉（回歸 story `AgentHomeNoScript`）。
+- Story：`Apps/chat/tAgent` › 「Demo 劇本：ImagePullBackOff 開單」。
 
 ---
 

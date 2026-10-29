@@ -91,7 +91,8 @@ import { TAgentPage, type TAgentRoute } from './TAgentPage'
 import { TasksPage, type TasksRoute } from './TasksPage'
 import { DrivePage, type DriveRoute } from './DrivePage'
 import { DocsPage, type DocsRoute } from './DocsPage'
-import { CHROME_RAIL_BG, CHROME_SIDEBAR_BG, NO_MOUNT_PANEL_TRANSITION, SHELL_SETTLE_MS } from './chrome'
+import { K8S_IMAGEPULL_SCRIPT } from './tagentScripts'
+import { CHROME_RAIL_BG, CHROME_SIDEBAR_BG, CHROME_SIDEBAR_FILL_X, NO_MOUNT_PANEL_TRANSITION, SHELL_SETTLE_MS } from './chrome'
 import photoSunsetLake from './assets/photos/sunset-lake.jpg'
 import photoRockyCoast from './assets/photos/rocky-coast.jpg'
 import photoAutumnAvenue from './assets/photos/autumn-avenue.jpg'
@@ -1421,7 +1422,7 @@ function ChatListMenu(props: ChatListProps) {
   const [openFav, setOpenFav] = useState(true)
   const [openChats, setOpenChats] = useState(true)
   return (
-    <Sidebar collapsible="offcanvas" contentType="chats" widthRange={SHELL_MENU_WIDTH} className={CHROME_SIDEBAR_BG}>
+    <Sidebar collapsible="offcanvas" contentType="chats" widthRange={SHELL_MENU_WIDTH} className={`${CHROME_SIDEBAR_BG} ${CHROME_SIDEBAR_FILL_X}`}>
       <ChatListBody
         {...props}
         chromeHeight
@@ -3075,6 +3076,11 @@ export type ChatVariantConfig = {
    * 程式保留、只關掉入口;tAgent 只從 NavRail 的 tAgent 分頁(整頁)使用。僅 test-only story 打開它做回歸。
    */
   chatAgentPanel?: boolean
+  /**
+   * tAgent demo 劇本(tagentScripts.tsx;2026-10-29 user:「demo 時照我寫好的對話劇本演示」)。
+   * 預設開啟(tWorkspace = demo 用 prototype):新對話首頁的輸入盒預先填好劇本第一句。false = 一般行為(回歸測試用)。
+   */
+  agentScript?: boolean
   /** Docs 頁的初始位置(story 用;預設 My space 的 Overview) */
   initialDocsRoute?: DocsRoute
   /** Drive 頁的初始位置(story 用;預設 My drive 根目錄) */
@@ -3302,7 +3308,16 @@ export default function App({
     return id
   }
   // tAgent 對話資料只有一份(側邊面板與整頁共用;TAgent.tsx useTAgentEngine)
-  const agentEngine = useTAgentEngine({ onSendToRoom: handleAgentSendToRoom })
+  const agentEngine = useTAgentEngine({
+    onSendToRoom: handleAgentSendToRoom,
+    script: agentEnabled && config?.agentScript !== false ? K8S_IMAGEPULL_SCRIPT : undefined,
+  })
+  // 代理內文的 Docs 連結:切到 Docs 分頁並開該頁(DocsPage 以 key 重新掛載、從指定位置開始)
+  const [docsJump, setDocsJump] = useState<{ n: number; route?: DocsRoute }>({ n: 0 })
+  function handleAgentOpenDoc(space: string, page: string) {
+    setDocsJump((j) => ({ n: j.n + 1, route: { space, page } }))
+    setNavTab('docs')
+  }
 
   // tAgent 整頁裡的來源連結 / 聊天室附件:回到 Chat 分頁再定位(側邊面板則留在 Chat 分頁,見 TAgentDock)
   function handleAgentOpenInChat(roomId: string, messageId: string) {
@@ -3455,10 +3470,11 @@ export default function App({
           />
         ) : navTab === 'docs' ? (
           <DocsPage
+            key={docsJump.n}
             mainMinWidth={SHELL_MAIN_MIN_WIDTH}
             menuWidth={SHELL_MENU_WIDTH}
             portalContainer={shellFrame}
-            initialRoute={config?.initialDocsRoute}
+            initialRoute={docsJump.route ?? config?.initialDocsRoute}
             resolvePerson={resolveTaskPerson}
           />
 
@@ -3473,6 +3489,7 @@ export default function App({
             menuWidth={SHELL_MENU_WIDTH}
             portalContainer={shellFrame}
             userName={ME_GREETING_NAME}
+            onOpenDoc={handleAgentOpenDoc}
           />
         ) : (
         // SidebarProvider 預設 min-h-svh;放在有高度的父層裡改成撐滿(DS app-shell.stories.tsx FourRegionShell 同款)

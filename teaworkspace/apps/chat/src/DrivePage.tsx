@@ -63,7 +63,7 @@ import {
   PinOff,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { CHROME_SIDEBAR_BG } from './chrome'
+import { CHROME_SIDEBAR_BG, CHROME_SIDEBAR_FILL_X } from './chrome'
 import type { TaskPerson } from './TasksPage'
 
 /** 'my' = My drive;`channel:<roomId>` = 該聊天頻道的檔案區 */
@@ -246,7 +246,7 @@ export function DrivePage({
 
   const sidebar = (
     // 與 Tasks / tAgent 頁側欄同一組設定(收合 offcanvas、寬度、淺灰底)
-    <Sidebar collapsible="offcanvas" contentType="drive-nav" widthRange={menuWidth} className={CHROME_SIDEBAR_BG}>
+    <Sidebar collapsible="offcanvas" contentType="drive-nav" widthRange={menuWidth} className={`${CHROME_SIDEBAR_BG} ${CHROME_SIDEBAR_FILL_X}`}>
       <SidebarHeader>
         <h2 className="flex-1 truncate text-body-lg font-medium">Drive</h2>
       </SidebarHeader>

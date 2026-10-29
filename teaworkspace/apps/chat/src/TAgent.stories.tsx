@@ -38,6 +38,23 @@ export const AgentHome: Story = {
   render: () => <App config={{ agent: true, initialTab: 'agent' }} />,
 }
 
+/**
+ * Demo 劇本(tagentScripts.tsx):payments-api 部到 staging ImagePullBackOff → 已知問題文章 → 無效 → 開單 SD-2318 → 值班接手 / 處理 → 結案。
+ * 輸入盒預先填好使用者的下一句,按 Enter 推進;「Bob 接手」「已處理」兩則是代理主動發的進度更新,隔幾秒自動出現。
+ * 劇本在 tWorkspace 預設開啟,tAgent 首頁(上一則)同樣從這裡開始;這一則只是讓演示入口在側欄好找。
+ */
+export const ScriptDemo: Story = {
+  name: 'Demo 劇本:ImagePullBackOff 開單',
+  render: () => <App config={{ agent: true, initialTab: 'agent' }} />,
+}
+
+/** test-only:劇本關閉時的一般行為(自由提問 → 通用回覆),回歸測試用。 */
+export const AgentHomeNoScript: Story = {
+  name: 'tAgent 首頁(劇本關閉,回歸用)',
+  tags: ['test-only'],
+  render: () => <App config={{ agent: true, initialTab: 'agent', agentScript: false }} />,
+}
+
 /** tAgent 整頁開著一則對話(從 Pinned 點進來):訊息與輸入盒同一欄置中;頁首可釘選、改名、刪除。 */
 export const AgentConversationPage: Story = {
   name: 'tAgent 整頁對話',

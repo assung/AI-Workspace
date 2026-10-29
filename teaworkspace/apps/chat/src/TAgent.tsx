@@ -125,6 +125,36 @@ function SourceLink({ link }: { link: Link }) {
   )
 }
 
+/** 代理內文打開 Docs 的某一頁(切到 Docs 分頁並開該頁;由 surface 提供,同 SourceLink 的導航) */
+export type TAgentOpenDoc = (space: string, page: string) => void
+const TAgentOpenDocContext = createContext<TAgentOpenDoc>(() => {})
+export function TAgentOpenDocProvider({ openDoc, children }: { openDoc: TAgentOpenDoc; children: ReactNode }) {
+  return <TAgentOpenDocContext.Provider value={openDoc}>{children}</TAgentOpenDocContext.Provider>
+}
+export function DocLink({ space, page, children }: { space: string; page: string; children: ReactNode }) {
+  const openDoc = useContext(TAgentOpenDocContext)
+  return (
+    <a
+      href={`/docs/${space}/${page}`}
+      onClick={(e) => {
+        e.preventDefault()
+        openDoc(space, page)
+      }}
+    >
+      {children}
+    </a>
+  )
+}
+
+// ── 劇本(demo 用,2026-10-29 user:「prototype 在 demo 時照我寫好的對話劇本演示」)──────────────
+// 使用者的每一句預先填進輸入盒(按 Enter 送出;改了字也照樣推進);代理的回覆依序播放,
+// 連續的代理回合自動接續,`afterMs` = 主動發的進度更新(前一則結束後隔多久出現)。
+// 劇本只在「新對話」起頭時啟動一次;跑完(或另開對話)後回到一般行為。
+export type TAgentScriptStep =
+  | { who: 'user'; text: string }
+  | { who: 'agent'; steps: string[]; body: ReactNode; copyText: string; afterMs?: number }
+export type TAgentScript = { title: string; steps: TAgentScriptStep[] }
+
 function seedConversations(): TAgentConversation[] {
   return [
     {
@@ -245,9 +275,11 @@ const titleFrom = (text: string) => (text.length > 48 ? `${text.slice(0, 48)}…
 // ── Engine(App 持有,兩個 surface 共用)────────────────────────────────────────
 export type TAgentEngine = ReturnType<typeof useTAgentEngine>
 
-export function useTAgentEngine({ onSendToRoom }: {
+export function useTAgentEngine({ onSendToRoom, script }: {
   /** 代理代使用者送出訊息(決策卡選「Send now」);回傳新訊息 id 供「view message」連結使用。 */
   onSendToRoom: (roomId: string, text: string) => string
+  /** demo 劇本(見 TAgentScript);省略 = 一般行為 */
+  script?: TAgentScript
 }) {
   const [conversations, setConversations] = useState<TAgentConversation[]>(seedConversations)
   const [busyConvId, setBusyConvId] = useState<string | null>(null)
@@ -256,6 +288,15 @@ export function useTAgentEngine({ onSendToRoom }: {
   const busyTurnRef = useRef<{ convId: string; turnId: string } | null>(null)
   const sendToRoomRef = useRef(onSendToRoom)
   sendToRoomRef.current = onSendToRoom
+  // 劇本進度:跑在哪一則對話、下一步是第幾步(render 用 state,事件處理讀 ref 避免舊值)
+  const [scriptConvId, setScriptConvId] = useState<string | null>(null)
+  const [scriptPos, setScriptPos] = useState(0)
+  const scriptRef = useRef({ convId: null as string | null, pos: 0 })
+  const setScript = useCallback((convId: string | null, pos: number) => {
+    scriptRef.current = { convId, pos }
+    setScriptConvId(convId)
+    setScriptPos(pos)
+  }, [])
 
   useEffect(() => () => timers.current.forEach((t) => window.clearTimeout(t)), [])
 
@@ -270,7 +311,7 @@ export function useTAgentEngine({ onSendToRoom }: {
   }, [patchConversation])
 
   /** 模擬代理回合:步驟逐條串流(思考塊微光)→ 完成後放入內文。 */
-  const runAgent = useCallback((convId: string, steps: string[], finish: () => { body: ReactNode; copyText: string }) => {
+  const runAgent = useCallback((convId: string, steps: string[], finish: () => { body: ReactNode; copyText: string }, onDone?: () => void) => {
     const turnId = nextId('a')
     busyTurnRef.current = { convId, turnId }
     setBusyConvId(convId)
@@ -292,9 +333,20 @@ export function useTAgentEngine({ onSendToRoom }: {
         busyTurnRef.current = null
         setBusyConvId(null)
         setUnseenReply(true)
+        onDone?.()
       }, 900 * steps.length + 400),
     )
   }, [patchConversation, patchTurn])
+
+  /** 從劇本第 pos 步開始播代理回合,直到下一句使用者的話(或劇本結束) */
+  const playScriptFrom = useCallback((convId: string, pos: number) => {
+    const step = script?.steps[pos]
+    setScript(convId, pos)
+    if (!step || step.who === 'user') return
+    const start = () => runAgent(convId, step.steps, () => ({ body: step.body, copyText: step.copyText }), () => playScriptFrom(convId, pos + 1))
+    if (step.afterMs) timers.current.push(window.setTimeout(start, step.afterMs))
+    else start()
+  }, [script, runAgent, setScript])
 
   const stop = useCallback(() => {
     timers.current.forEach((t) => window.clearTimeout(t))
@@ -328,18 +380,26 @@ export function useTAgentEngine({ onSendToRoom }: {
   const send = useCallback((convId: string | null, text: string, attachments: AgentPromptAttachment[]) => {
     const id = convId ?? nextId('c')
     const userTurn: Turn = { kind: 'user', id: nextId('u'), text, attachments }
+    // 劇本:下一步是使用者的話,而且是「新對話起頭」或「劇本那一則對話」→ 照劇本推進
+    const sc = scriptRef.current
+    const scripted = !!script && script.steps[sc.pos]?.who === 'user'
+      && (sc.convId === null ? convId === null && sc.pos === 0 : convId === sc.convId)
     setConversations((prev) => {
       const existing = prev.find((c) => c.id === id)
       const base: TAgentConversation = existing ?? { id, title: NEW_CONVERSATION_TITLE, group: GROUP_TODAY, turns: [] }
       const updated: TAgentConversation = {
         ...base,
-        title: base.turns.length === 0 ? titleFrom(text) : base.title,
+        title: base.turns.length === 0 ? (scripted && script ? script.title : titleFrom(text)) : base.title,
         group: GROUP_TODAY,
         decision: undefined,
         turns: [...base.turns, userTurn],
       }
       return [updated, ...prev.filter((c) => c.id !== id)]
     })
+    if (scripted) {
+      playScriptFrom(id, sc.pos + 1)
+      return id
+    }
     const scope = attachments.map((a) => a.label)
     runAgent(
       id,
@@ -354,7 +414,7 @@ export function useTAgentEngine({ onSendToRoom }: {
       }),
     )
     return id
-  }, [runAgent])
+  }, [runAgent, script, playScriptFrom])
 
   const resolveDecision = useCallback((convId: string, answers: Record<string, string>) => {
     const [qTask, qReply] = FOLLOW_UP_QUESTIONS
@@ -419,6 +479,9 @@ export function useTAgentEngine({ onSendToRoom }: {
     listed: useMemo(() => conversations.filter((c) => c.turns.length > 0), [conversations]),
     busyConvId,
     busy: busyConvId !== null,
+    /** 劇本的下一句使用者台詞(輪到使用者時才有),輸入盒預先填入;以及劇本跑在哪一則對話 */
+    scriptPrefill: script && script.steps[scriptPos]?.who === 'user' ? (script.steps[scriptPos] as { text: string }).text : null,
+    scriptConvId,
     unseenReply,
     clearUnseen,
     send,
@@ -472,7 +535,8 @@ export function renderTurns(conversation: TAgentConversation, onOpenRoom: (roomI
           )
         }
       >
-        <AgentThinking thinking={t.thinking} steps={t.steps} currentStep={t.currentStep} />
+        {/* 沒有任何步驟的回合(劇本裡代理主動發的進度更新)不顯示思考塊,只在回覆中閃一下微光 */}
+        {(t.thinking || t.steps.length > 0) && <AgentThinking thinking={t.thinking} steps={t.steps} currentStep={t.currentStep} />}
         {t.body}
       </AgentMessage>
     )

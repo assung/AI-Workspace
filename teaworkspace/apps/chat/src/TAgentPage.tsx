@@ -20,7 +20,7 @@
 // - Projects / Artifacts = DS DataTable(2026-10-23 user:先維持表格,等 DS 出 Card)(data-table.spec.md「簡單展示也用 DataTable」)+ LinkInput view(站內路徑 `/tagent/<id>` 才渲染成連結;
 //   頁面攔截改成切換對話,DS agent-panel.stories TaskListView 同款)
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   AppShell,
   SidebarProvider,
@@ -67,12 +67,14 @@ import { SquarePen, FolderKanban, Shapes, MoreHorizontal, Pin, PinOff, Pencil, T
 import {
   TAGENT_LABEL,
   TAgentNavigateProvider,
+  TAgentOpenDocProvider,
+  type TAgentOpenDoc,
   TAgentPrompt,
   renderTurns,
   type TAgentConversation,
   type TAgentEngine,
 } from './TAgent'
-import { CHROME_SIDEBAR_BG } from './chrome'
+import { CHROME_SIDEBAR_BG, CHROME_SIDEBAR_FILL_X } from './chrome'
 
 /** 整頁的位置:新對話首頁 / 某一則對話 / Projects / Artifacts。也是側欄 SidebarProvider 的 activeId(單選高亮)。 */
 export type TAgentRoute = 'new' | 'projects' | 'artifacts' | `conversation:${string}`
@@ -125,6 +127,7 @@ export function TAgentPage({
   menuWidth,
   portalContainer,
   userName,
+  onOpenDoc,
 }: {
   engine: TAgentEngine
   route: TAgentRoute
@@ -136,6 +139,8 @@ export function TAgentPage({
   portalContainer: HTMLElement | null
   /** 首頁問候用的名字 */
   userName: string
+  /** 代理內文的 Docs 連結(DocLink):切到 Docs 分頁並開該頁 */
+  onOpenDoc: TAgentOpenDoc
 }) {
   const [draft, setDraft] = useState('')
   const [renameTarget, setRenameTarget] = useState<TAgentConversation | null>(null)
@@ -146,6 +151,14 @@ export function TAgentPage({
     : undefined
   // 開著的對話被刪掉 → 回新對話首頁
   const effectiveRoute: TAgentRoute = route.startsWith('conversation:') && !activeConversation ? 'new' : route
+
+  // 劇本台詞預先填入輸入盒(2026-10-29 user:「第一句話先預設填入輸入框內」):劇本還沒開始 → 新對話首頁;
+  // 開始後 → 劇本那一則對話,輪到使用者時填下一句。只在台詞或位置改變時填,不蓋掉使用者正在打的字。
+  const prefillHere = engine.scriptPrefill !== null
+    && (engine.scriptConvId === null ? effectiveRoute === 'new' : activeConversation?.id === engine.scriptConvId)
+  useEffect(() => {
+    if (prefillHere && engine.scriptPrefill) setDraft(engine.scriptPrefill)
+  }, [prefillHere, engine.scriptPrefill, effectiveRoute])
 
   const send = (text: string, attachments: Parameters<TAgentEngine['send']>[2]) => {
     const id = engine.send(activeConversation?.id ?? null, text, attachments)
@@ -184,7 +197,7 @@ export function TAgentPage({
 
   const sidebar = (
     // 收合 = offcanvas、寬度設定與 Chat 分頁的 ChatList 同一組(兩個分頁左側面板一致;2026-10-22 user 選「無細列」)
-    <Sidebar collapsible="offcanvas" contentType="tagent-nav" widthRange={menuWidth} className={CHROME_SIDEBAR_BG}>
+    <Sidebar collapsible="offcanvas" contentType="tagent-nav" widthRange={menuWidth} className={`${CHROME_SIDEBAR_BG} ${CHROME_SIDEBAR_FILL_X}`}>
       <SidebarHeader>
         <h2 className="flex-1 truncate text-body-lg font-medium">{TAGENT_LABEL}</h2>
       </SidebarHeader>
@@ -274,10 +287,12 @@ export function TAgentPage({
     main = (
       <div className="flex h-full min-h-0 flex-col">
         <TAgentNavigateProvider navigate={onOpenInChat}>
-          {/* className 落在 log 本體:同一欄置中;捲軸仍在整個 Main 右緣 */}
-          <AgentConversation className="mx-auto w-full" style={{ maxWidth: COLUMN_MAX_WIDTH }}>
-            {renderTurns(activeConversation, (roomId) => onOpenInChat(roomId, ''))}
-          </AgentConversation>
+          <TAgentOpenDocProvider openDoc={onOpenDoc}>
+            {/* className 落在 log 本體:同一欄置中;捲軸仍在整個 Main 右緣 */}
+            <AgentConversation className="mx-auto w-full" style={{ maxWidth: COLUMN_MAX_WIDTH }}>
+              {renderTurns(activeConversation, (roomId) => onOpenInChat(roomId, ''))}
+            </AgentConversation>
+          </TAgentOpenDocProvider>
         </TAgentNavigateProvider>
         {/* AgentPromptInput 自帶 m-loose mt-0(與 AgentConversation 的 p-loose 同一條內緣)→ 外層不再加 padding,輸入盒與訊息左右對齊 */}
         <div className="mx-auto w-full" style={{ maxWidth: COLUMN_MAX_WIDTH }}>

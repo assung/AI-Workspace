@@ -19,6 +19,18 @@ export const CHROME_RAIL_BG = 'bg-[var(--color-neutral-1-opaque)]'
 export const CHROME_SIDEBAR_BG = '[&_[data-sidebar=sidebar]]:bg-[var(--color-neutral-1-opaque)]'
 
 /**
+ * 給 DS `<Sidebar className>`:讓側欄內容寬度固定在側欄寬,長標題照 DS 規則截斷(… + tooltip),不把內容撐寬。
+ *
+ * 原因(DS 0.1.0-beta.148):SidebarContent 內包 DS ScrollArea 但沒開 `fillX`,Radix 捲動區內層是 `display: table`,
+ * 會被最長的一行(例如 tAgent Recents「payments-api ImagePullBackOff on staging」、Docs 頁面樹的文章標題)撐開,
+ * 側欄內容變得比側欄寬:群組收合箭頭、Docs 空間選擇器的右緣被裁掉(2026-10-29 劇本演示實測)。
+ * 補法 = DS ScrollArea `fillX` 自己的三個 class(scroll-area.js:`[&>div]:!block [&>div]:!w-full [&>div]:!min-w-0`),
+ * 從外層以後代選擇器套到捲動區的 viewport。待 DS 修(STRUCTURE.md §4.5)。
+ */
+export const CHROME_SIDEBAR_FILL_X =
+  '[&_[data-radix-scroll-area-viewport]>div]:!block [&_[data-radix-scroll-area-viewport]>div]:!w-full [&_[data-radix-scroll-area-viewport]>div]:!min-w-0'
+
+/**
  * 給 AppShell 外框的 className:掛載當下關掉 AppShell 面板(`[data-app-shell-panel]`)的寬度轉場。
  *
  * 原因(DS 0.1.0-beta.148):AppShell 掛載時要等 ResizeObserver 量到自己的寬,才決定 Menu 並排;在那之前 Menu 外層寬 = 0,

@@ -49,9 +49,9 @@ import {
   Button,
   LinkInput,
 } from '@qijenchen/design-system'
-import { LayoutDashboard, FileText, UserRound, Leaf, Rocket, Plus, Pencil, Share2 } from 'lucide-react'
+import { LayoutDashboard, FileText, UserRound, Leaf, Rocket, Container, Plus, Pencil, Share2 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { CHROME_SIDEBAR_BG } from './chrome'
+import { CHROME_SIDEBAR_BG, CHROME_SIDEBAR_FILL_X } from './chrome'
 import type { TaskPerson } from './TasksPage'
 
 /** 文章與 Overview 的欄寬:沿用 tAgent 對話欄 880(2026-10-23 user 定),同一個產品的閱讀欄同寬 */
@@ -61,6 +61,9 @@ type Block =
   | { type: 'h2'; text: string }
   | { type: 'p'; text: string }
   | { type: 'ul'; items: string[] }
+  | { type: 'ol'; items: string[] }
+  /** 指令 / 程式碼(等寬字、可水平捲動) */
+  | { type: 'code'; text: string }
   | { type: 'callout'; variant: 'info' | 'warning'; title: string; text?: string }
   /** widths = 各欄 DS `meta.width`(最小保留寬,多的依比例分配) */
   | { type: 'table'; columns: string[]; widths: number[]; rows: string[][] }
@@ -76,7 +79,7 @@ type DocPage = {
   children?: DocPage[]
 }
 
-type Space = { id: string; name: string; description: string; icon: LucideIcon; color: 'blue' | 'green' | 'purple'; owner: string; pages: DocPage[] }
+type Space = { id: string; name: string; description: string; icon: LucideIcon; color: 'blue' | 'green' | 'purple' | 'indigo'; owner: string; pages: DocPage[] }
 
 // ── 示範內容:延續 Chat / Tasks / Drive(東頂 #3、週五品茶、零售買家)─────────────
 const MY_PAGES: DocPage[] = [
@@ -189,6 +192,31 @@ export const SPACES: Space[] = [
       { id: 'release', title: 'Release process', owner: 'yui', updated: '2026/10/22 11:05 AM', updatedBy: 'yui', body: [{ type: 'p', text: 'From code freeze to store review.' }] },
     ],
   },
+  {
+    // 2026-10-29 tAgent 劇本(payments-api ImagePullBackOff)引用的已知問題文章:代理回覆的「文章」連結打開這一頁
+    id: 'k8s-platform', name: 'K8s Platform', description: 'Runbooks and known issues from the K8s platform team.', icon: Container, color: 'indigo', owner: 'kenji',
+    pages: [
+      {
+        id: 'known-issues', title: 'Known issues', owner: 'kenji', updated: '2026/10/20 10:12 AM', updatedBy: 'kenji',
+        body: [{ type: 'p', text: '常見部署問題與自助排除步驟。照文章做仍無法解決時，請在 tAgent 開單給 K8s 平台團隊。' }],
+        children: [
+          {
+            id: 'kb-imagepull', title: 'ImagePullBackOff：registry pull secret 過期', owner: 'kenji', updated: '2026/10/20 10:12 AM', updatedBy: 'kenji',
+            body: [
+              { type: 'callout', variant: 'info', title: '適用症狀', text: 'Pod 停在 ImagePullBackOff，Events 出現 Failed to pull image …: unauthorized: authentication required。' },
+              { type: 'h2', text: '原因' },
+              { type: 'p', text: 'namespace 裡的 registry pull secret 由 External Secrets 同步。來源金鑰輪替後，舊的 secret 會過期，節點拉映像檔時就會被 registry 拒絕。' },
+              { type: 'h2', text: '排除步驟（3 步驟，約 2 分鐘）' },
+              { type: 'ol', items: ['確認 pull secret 的同步狀態與最後更新時間', '強制重新同步 pull secret', '重新啟動 deployment，讓 pod 用新的 secret 拉映像檔'] },
+              { type: 'code', text: 'kubectl get externalsecret regcred -n <namespace>\nkubectl annotate externalsecret regcred force-sync=$(date +%s) --overwrite -n <namespace>\nkubectl rollout restart deploy/<deployment> -n <namespace>' },
+              { type: 'h2', text: '還是失敗？' },
+              { type: 'p', text: '代表問題不在 secret 本身（例如 registry 帳號被停用）。請在 tAgent 開單，附上 namespace 與 Events 的錯誤訊息，K8s 平台團隊值班會接手。' },
+            ],
+          },
+        ],
+      },
+    ],
+  }
 ]
 
 /** 頁面在樹裡的路徑(含自己),找不到回空陣列 */
@@ -258,7 +286,7 @@ export function DocsPage({
 
   const sidebar = (
     // 與 Tasks / Drive / tAgent 頁側欄同一組設定(收合 offcanvas、寬度、淺灰底)
-    <Sidebar collapsible="offcanvas" contentType="docs-nav" widthRange={menuWidth} className={CHROME_SIDEBAR_BG}>
+    <Sidebar collapsible="offcanvas" contentType="docs-nav" widthRange={menuWidth} className={`${CHROME_SIDEBAR_BG} ${CHROME_SIDEBAR_FILL_X}`}>
       <SidebarHeader>
         <h2 className="flex-1 truncate text-body-lg font-medium">Docs</h2>
       </SidebarHeader>
@@ -363,6 +391,19 @@ export function DocsPage({
           <ul key={i} className="flex list-disc flex-col gap-1 ps-[var(--layout-space-loose)] text-body">
             {b.items.map((t) => <li key={t}>{t}</li>)}
           </ul>
+        )
+      case 'ol':
+        return (
+          <ol key={i} className="flex list-decimal flex-col gap-1 ps-[var(--layout-space-loose)] text-body">
+            {b.items.map((t) => <li key={t}>{t}</li>)}
+          </ol>
+        )
+      case 'code':
+        // 指令區塊:等寬字(DS 元件同用 font-mono)+ 淺灰底(bg-muted,DataTable 表頭同色)
+        return (
+          <pre key={i} className="overflow-x-auto rounded-md bg-muted p-[var(--layout-space-loose)] font-mono text-body">
+            {b.text}
+          </pre>
         )
       case 'callout':
         return <Alert key={i} variant={b.variant} title={b.title} description={b.text} />
