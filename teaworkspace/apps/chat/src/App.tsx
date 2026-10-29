@@ -851,6 +851,13 @@ const WORKSPACE_NAV_ITEMS: { tab: Exclude<NavTab, 'home'>; icon: React.Component
   { tab: 'agent', icon: Sparkles, label: TAGENT_LABEL },
 ]
 
+/**
+ * 自己發話的泡泡底色。DS 沒有對應 token(color.spec.md 無 chat bubble 語義),淺 / 深各一色:
+ * 淺色 #EBEEFF(Teams 淺色自己泡泡同系);深色 #282B3E(2026-10-29 user 指定;原本寫死 inline 淺色,深色主題沒切換)。
+ * DS 深色主題 = 祖先 `[data-theme="dark"]`(tokens/color/primitives.css);文字一律 text-foreground。
+ */
+const MY_BUBBLE_BG = 'bg-[#EBEEFF] [[data-theme=dark]_&]:bg-[#282B3E]'
+
 function NavRail({
   unreadCount,
   agentUnread = false,
@@ -1849,8 +1856,8 @@ function MessageBubble({
         />
       )}
       <div
-        className={`rounded-xl p-3 text-body max-w-full min-w-0 transition-colors duration-700 ${mine ? 'text-foreground' : 'bg-muted text-foreground'}`}
-        style={{ backgroundColor: flashing ? 'var(--color-indigo-6)' : (mine ? '#EBEEFF' : undefined) }}
+        className={`rounded-xl p-3 text-body max-w-full min-w-0 transition-colors duration-700 text-foreground ${mine ? MY_BUBBLE_BG : 'bg-muted'}`}
+        style={flashing ? { backgroundColor: 'var(--color-indigo-6)' } : undefined}
       >
         {message.html ? (
           <div className="rich-text break-words" dangerouslySetInnerHTML={{ __html: message.html }} />

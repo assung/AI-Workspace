@@ -7,8 +7,11 @@
 // 「文章」連結打開 Docs › K8s Platform › Known issues › ImagePullBackOff：registry pull secret 過期(DocsPage.tsx `kb-imagepull`)。
 import { DocLink, TicketLink, type TAgentScript } from './TAgent'
 
-/** 進度更新(主動發)的間隔:讓講者有時間說明「值班已接手」再出下一則 */
-const UPDATE_GAP_MS = 4000
+/**
+ * 進度更新(主動發)的間隔:讓講者有時間說明「值班已接手」再出下一則。
+ * 2026-10-29 user:4 秒 → 8 秒(demo 時要來得及關面板 / 切走,才看得到通知與紅點)。
+ */
+const UPDATE_GAP_MS = 8000
 
 export const K8S_IMAGEPULL_SCRIPT: TAgentScript = {
   title: 'payments-api ImagePullBackOff on staging',

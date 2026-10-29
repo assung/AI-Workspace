@@ -201,7 +201,7 @@ Conversation
 │       └── Search / Room info…
 ├── MessageArea
 │   └── MessageBubble × n
-│       ├── 我的: bg #EBEEFF、時間在上、status icon (16×16) 在泡泡外；泡泡四角圓角 rounded-xl (12px)
+│       ├── 我的: bg #EBEEFF（深色主題 #282B3E，`MY_BUBBLE_BG`）、時間在上、status icon (16×16) 在泡泡外；泡泡四角圓角 rounded-xl (12px)
 │       │      邊距(MessageArea layout): bubble 左緣撐滿時距 region 左緣 96px(paddingLeft)；status icon 距 region 右緣 20px(paddingRight)；bubble↔icon 4px gap；無 icon 仍保留 16px 寬
 │       ├── 對方: 頭像 + 名稱 + 時間 (sm/400 12px/130% neutral-7)；名稱與時間間距 8px；名稱+時間列與泡泡間距 4px；bubble 右緣撐滿跨行時距 region 右緣 96px(paddingRight)，短訊息自然內縮
 │       ├── 泡泡 padding p-3 (12px)；reactions emoji 按鈕一律 h-6(24px)/px-2(8px)/py-1(4px)/border neutral-5/按鈕間 gap-1(4px)；emoji 16px、count `12px/400/130%/neutral-8`；Add reaction 按鈕同尺寸/padding，icon `SmilePlus 16px` color neutral-7（2026-06-18 confirmed）
@@ -442,7 +442,7 @@ user：「我想照我寫好的對話劇本來演示」→ 劇本 `K8S_IMAGEPULL
 
 - **台詞逐字照 user 劇本**，只修錯字（unauthourized / refistry / regitstry / 團對）。每則代理回覆前的「思考過程」步驟是補的（劇本沒寫），讓代理看起來真的去查。
 - **使用者那句預先填在輸入盒**（第一句在 tAgent 首頁；之後每輪代理回完填下一句），講者按 Enter 送出；改字也照樣推進劇本。等主動更新時輸入盒留空。
-- **主動更新**（`afterMs`，`UPDATE_GAP_MS = 4000`）：沒有思考步驟 → 不顯示思考塊（`renderTurns` 只在 `thinking || steps.length` 時渲染 AgentThinking）。
+- **主動更新**（`afterMs`，`UPDATE_GAP_MS = 8000`；2026-10-29 user 由 4 秒提高到 8 秒，demo 時來得及關面板 / 切走看通知與紅點）：沒有思考步驟 → 不顯示思考塊（`renderTurns` 只在 `thinking || steps.length` 時渲染 AgentThinking）。
 - **文章連結** = `DocLink` → `TAgentOpenDocProvider` → App `handleAgentOpenDoc`：切到 Docs 分頁並開該頁（`docsJump` 改 DocsPage key 重掛載），**同時把這則對話帶進 Docs 頁的側邊面板並打開**（`fromConversationId` → `panelConversationId` + `agentOpen`；2026-10-29 user：「導到 doc 看 SOP 時 agent panel 可以打開並帶入對話，看完 SOP 後可以在 doc 頁繼續對話」）。面板一樣預填下一句，劇本在面板裡接著跑（含主動更新）；回到 AI agent 整頁看到的是同一則、含面板裡的後續。
 - **單號** = `TicketLink`（連結樣式的假連結，點了不導航；2026-10-29 user「之後要連到哪再跟你說」）。
 - 劇本起頭判定：整頁 New（沒有對話 id）或側邊面板的空對話都算「新對話」。
@@ -511,4 +511,4 @@ App 以 `useState(INITIAL_ROOMS)` 管理 rooms，`handleSend` 在 active room �
 | MessageArea padding | `px-4 py-4` (16px) | fullWidth ON/OFF 均同 |
 | MessageBubble gap | `gap-3` (12px) | 訊息間距 |
 | InputBox max-width (fullWidth=false) | 880px | InputBox 置中上限 |
-| 我的泡泡背景 | `#EBEEFF` | — |
+| 我的泡泡背景 | 淺 `#EBEEFF` / 深 `#282B3E`（`MY_BUBBLE_BG`，2026-10-29 user 指定深色值；文字 text-foreground） | — |
