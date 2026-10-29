@@ -294,15 +294,28 @@ const titleFrom = (text: string) => (text.length > 48 ? `${text.slice(0, 48)}…
 // ── Engine(App 持有,兩個 surface 共用)────────────────────────────────────────
 export type TAgentEngine = ReturnType<typeof useTAgentEngine>
 
-export function useTAgentEngine({ onSendToRoom, script }: {
+export function useTAgentEngine({ onSendToRoom, script, isViewing, onBackgroundReply }: {
   /** 代理代使用者送出訊息(決策卡選「Send now」);回傳新訊息 id 供「view message」連結使用。 */
   onSendToRoom: (roomId: string, text: string) => string
   /** demo 劇本(見 TAgentScript);省略 = 一般行為 */
   script?: TAgentScript
+  /** 使用者此刻是否正看著這則對話(整頁開著它,或側邊面板開著且顯示它);App 提供 */
+  isViewing?: (convId: string) => boolean
+  /**
+   * 代理在使用者沒看著的對話裡回完一則(關了面板 / 離開 AI agent 頁時劇本仍在處理):該則記為未讀(紅點),並通知 App 發 Toast。
+   * 2026-10-29 user:「使用者可能會關掉 Agent panel 或跳離 AI Agent 頁面,需要通知機制與紅點,讓使用者知道該任務已處理完成」
+   */
+  onBackgroundReply?: (conversation: { id: string; title: string }, replyText: string) => void
 }) {
   const [conversations, setConversations] = useState<TAgentConversation[]>(seedConversations)
   const conversationsRef = useRef(conversations)
   conversationsRef.current = conversations
+  const isViewingRef = useRef(isViewing)
+  isViewingRef.current = isViewing
+  const onBackgroundReplyRef = useRef(onBackgroundReply)
+  onBackgroundReplyRef.current = onBackgroundReply
+  // 有新回覆、使用者還沒打開看的對話(NavRail AI agent 圖示與對話列的紅點)
+  const [unreadIds, setUnreadIds] = useState<ReadonlySet<string>>(() => new Set())
   const [busyConvId, setBusyConvId] = useState<string | null>(null)
   const [unseenReply, setUnseenReply] = useState(false)
   const timers = useRef<number[]>([])
@@ -354,6 +367,11 @@ export function useTAgentEngine({ onSendToRoom, script }: {
         busyTurnRef.current = null
         setBusyConvId(null)
         setUnseenReply(true)
+        if (isViewingRef.current && !isViewingRef.current(convId)) {
+          setUnreadIds((prev) => new Set(prev).add(convId))
+          const conv = conversationsRef.current.find((c) => c.id === convId)
+          onBackgroundReplyRef.current?.({ id: convId, title: conv?.title ?? NEW_CONVERSATION_TITLE }, copyText)
+        }
         onDone?.()
       }, 900 * steps.length + 400),
     )
@@ -495,6 +513,14 @@ export function useTAgentEngine({ onSendToRoom, script }: {
   const togglePin = useCallback((id: string) => patchConversation(id, (c) => ({ ...c, pinned: !c.pinned })), [patchConversation])
   const remove = useCallback((id: string) => setConversations((prev) => prev.filter((c) => c.id !== id)), [])
   const clearUnseen = useCallback(() => setUnseenReply(false), [])
+  const markRead = useCallback((id: string) => {
+    setUnreadIds((prev) => {
+      if (!prev.has(id)) return prev
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
+  }, [])
 
   return {
     conversations,
@@ -507,6 +533,10 @@ export function useTAgentEngine({ onSendToRoom, script }: {
     scriptConvId,
     unseenReply,
     clearUnseen,
+    /** 未讀對話(已刪除的不算) */
+    unreadIds,
+    hasUnread: useMemo(() => conversations.some((c) => unreadIds.has(c.id)), [conversations, unreadIds]),
+    markRead,
     send,
     stop,
     resolveDecision,

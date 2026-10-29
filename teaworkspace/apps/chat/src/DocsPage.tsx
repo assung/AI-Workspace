@@ -50,7 +50,7 @@ import {
   Button,
   LinkInput,
 } from '@qijenchen/design-system'
-import { LayoutDashboard, FileText, UserRound, Leaf, Rocket, Container, Plus, Pencil, Share2 } from 'lucide-react'
+import { LayoutDashboard, FileText, UserRound, Leaf, Rocket, Container, Plus, Pencil } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { CHROME_SIDEBAR_BG, CHROME_SIDEBAR_FILL_X } from './chrome'
 import type { TaskPerson } from './TasksPage'
@@ -365,7 +365,6 @@ export function DocsPage({
       <div className="flex items-center gap-2">
         {page ? (
           <>
-            <Button variant="tertiary" size="sm" startIcon={Share2}>Share</Button>
             <Button variant="primary" size="sm" startIcon={Pencil}>Edit</Button>
           </>
         ) : (

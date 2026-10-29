@@ -339,7 +339,8 @@ TAgentDock
 4. **SidebarGroupAction 不與群組標題垂直置中**：DS 定位 `absolute top-2`（= 群組上邊距），按鈕高 16、標題列高 `--field-height-md`（32），所以按鈕貼在標題列上半部，比「Content」字高約 8px（2026-10-28 Docs 側欄 Content 的「+」實測）。app 端補：`!top-[calc(0.5rem+(var(--field-height-md)-1rem)/2)]`。DS 該做：top 依標題列高置中。
 5. **Sidebar 內容會被長標題撐寬**：SidebarContent 內包 DS ScrollArea 但沒開 `fillX`，Radix 捲動區內層是 `display: table`，被最長一行（tAgent Recents「payments-api ImagePullBackOff on staging」、Docs 頁面樹的文章標題）撐成 394 > 側欄 320 → 標題不截斷、收合箭頭與 Docs 空間選擇器右緣被裁（2026-10-29 劇本演示實測）。app 端補：`CHROME_SIDEBAR_FILL_X`（`chrome.ts`，= ScrollArea `fillX` 的三個 class，以後代選擇器套到 viewport 內層），Chat / tAgent / Tasks / Drive / Docs 五個側欄都套。DS 該做：SidebarContent 傳 `fillX`。
 6. **AgentMessage 使用者泡泡不斷字**：泡泡 `max-w-[85%]` 但沒有 `overflow-wrap`，附件 Chip 的 label 也不截斷 → 長網址（劇本的 Argo CD 連結）、長附件名（Docs 文章標題）在側邊面板寬度下溢出泡泡右緣（2026-10-29 實測）。app 端補：`USER_BUBBLE_WRAP`（`TAgent.tsx`；泡泡 `overflow-wrap: anywhere`、chip 不超過泡泡寬、label 截斷 …）。DS 該做：泡泡加 `[overflow-wrap:anywhere]`、訊息內 Chip 截斷。
-7. **DS 版本**：本版需要 0.1.0-beta.148（PR #169 尚未發版）；預覽是用 PR #169 本機打包的套件建置。
+7. **AgentPanelHeader 歷史清單沒有未讀標示**：`AgentConversationSummary` 只有 `thinking`，沒有 unread → 側邊面板的歷史浮層無法在有新回覆的對話列上畫紅點（AI agent 整頁的 Recents / Pinned 有，§4.5a）。DS 該做：summary 加 `unread`，列尾畫 Badge dot。
+8. **DS 版本**：本版需要 0.1.0-beta.148（PR #169 尚未發版）；預覽是用 PR #169 本機打包的套件建置。
 
 ---
 
@@ -350,6 +351,15 @@ TAgentDock
 - context chip = 這一頁目前的位置：Tasks「My tasks」/ 專案名；Drive 目前資料夾名（根 = My drive / 頻道名）；Docs 文章標題 /「<空間> overview」。可移除。
 - 面板內連結：聊天室來源 → 回 Chat 分頁定位（`handleAgentOpenInChat`）；Docs 文章 → 在 Docs 頁內換頁（DocsPage 給 `go`，不重新掛載）。
 - 點 NavRail AI agent 時面板開著 → 整頁接著開面板那一則、面板收起（§5「從側邊面板接到整頁」，原規則沿用）。
+
+**背景回覆的通知與紅點**（2026-10-29 user：「處理案件的過程中，使用者可能會關掉 Agent panel 或跳離 AI Agent 頁面，需要通知機制以及紅點：nav bar 圖標右上角、Agent chat list 的該則 chat」）
+
+- 「使用者正看著」= AI agent 整頁開著那一則，或側邊面板開著（在有面板的分頁）且顯示那一則（App `viewedConversationId`）。代理在**沒被看著**的對話回完一則 → 該則記為未讀（engine `unreadIds`）+ 發 DS Toast；打開那一則（整頁點進去 / 面板顯示它）即清除。
+- 紅點 = 同 Chat 列表未讀點（`Badge dot variant="critical"`，同色 `#EC540F`）：
+  - NavRail AI agent 圖示右上角（`overlayBadge`，同 Chat 分頁的未讀數位置；不計數 —— 代理回覆以對話為單位）。
+  - AI agent 整頁 Pinned / Recents 的該則列尾（DS `SidebarMenuBadge`）；與 hover 才出現的 ⋯ 同位置 → 滑過 / 焦點在列上時讓位給 ⋯（同 Chat 列表）。
+  - 側邊面板歷史浮層：DS 沒有欄位，暫無（§4.5 第 7 項）。入口鈕本身照 DS 用招喚態（`attract`）提示有新訊。
+- Toast：DS `toast()` neutral，標題 = 對話名、內文 = 回覆開頭 80 字（Teams / Slack 訊息通知「哪裡 + 說了什麼」）；`<Toaster>` 掛在 tWorkspace 外框，落點照 DS 預設右下、可能疊在入口鈕上（toast.spec.md「落點」刻意如此）。**不放「View」動作**：toast.spec.md 的 action 只給「復原 / 重試」這類後手，回到對話靠紅點。
 
 ### 4.5b Tasks 分頁（`TasksPage.tsx`，2026-10-28 keyscreen → 同日 user 確認，已加入 prototype）
 
@@ -376,7 +386,7 @@ TAgentDock
 - user：「左側欄標題為 Docs，下方為 selector，預設選在 My space（首頁），下方是 Overview（點進去看 space 的概覽資訊），接著是隔線，隔線下方區塊為 Content，呈現 pages（tree view）。右側為頁面頁，header 邏輯同 Drive 的麵包屑，下方是文章內容，類似 Confluence」。
 - NavRail 的 Docs 分頁即此頁（story `Apps/chat/Docs`：Overview / 頁面）。五個分頁都已有正式頁面，佔位頁元件已移除。
 - 左側：空間選擇器 = DS Select（選項 icon + 說明；My space / Tea Tasting / Product Team）→ Overview（SidebarMenuButton）→ SidebarSeparator → Content（SidebarGroup + DS TreeView；sidebar.spec.md「深度 > 1、使用者自建 → TreeView」）。TreeView 單選、受控展開，到某頁時自動展開它的上層。
-- 頁首：Overview = h1「Overview」+「New page」；頁面 = DS Breadcrumb（md）放頁首（同 Drive），根層 = 空間名（連回 Overview）+「Share」「Edit」（未接行為）。
+- 頁首：Overview = h1「Overview」+「New page」；頁面 = DS Breadcrumb（md）放頁首（同 Drive），根層 = 空間名（連回 Overview）+「Edit」（未接行為；「Share」2026-10-29 user 要求先拿掉）。
 - 文章：置中欄寬 880（沿用 tAgent 對話欄）；標題 text-h3 semibold（breadcrumb.spec.md：md 麵包屑配 h3 標題）+ 作者 / 最後更新；內文區塊 = h2（text-h4）/ 段落 / 清單 / DS DataTable（各欄 `meta.width`）/ DS Alert（Confluence info panel）。
 - Overview：空間圖示（Avatar square solid，各空間一色）+ 名稱 + 說明；DS DescriptionList（Owner / Pages / Last updated）；Recently updated（DS DataTable 前 5 筆，頁名 = LinkInput 站內連結 `/docs/<space>/<page>`，頁面攔截切換）。
 - Content 標題列右端「+」（新增頁，2026-10-28 user「text 樣式無框」）= DS SidebarGroupAction + Tooltip；行為未接。
@@ -436,6 +446,7 @@ user：「我想照我寫好的對話劇本來演示」→ 劇本 `K8S_IMAGEPULL
 - **文章連結** = `DocLink` → `TAgentOpenDocProvider` → App `handleAgentOpenDoc`：切到 Docs 分頁並開該頁（`docsJump` 改 DocsPage key 重掛載），**同時把這則對話帶進 Docs 頁的側邊面板並打開**（`fromConversationId` → `panelConversationId` + `agentOpen`；2026-10-29 user：「導到 doc 看 SOP 時 agent panel 可以打開並帶入對話，看完 SOP 後可以在 doc 頁繼續對話」）。面板一樣預填下一句，劇本在面板裡接著跑（含主動更新）；回到 AI agent 整頁看到的是同一則、含面板裡的後續。
 - **單號** = `TicketLink`（連結樣式的假連結，點了不導航；2026-10-29 user「之後要連到哪再跟你說」）。
 - 劇本起頭判定：整頁 New（沒有對話 id）或側邊面板的空對話都算「新對話」。
+- **分享用 demo（Claude artifact）加密碼**（2026-10-29 user：有分享需求，為了保密設密碼）：`scripts/protect-demo.mjs` 把 demo 建置的 app 程式（所有畫面、文字、示範資料）用 AES-256-GCM 加密，金鑰由密碼經 PBKDF2-SHA256（310k 次）導出；頁面只剩密碼畫面是明文，輸入正確密碼後在瀏覽器解密再執行。密碼不進 repo（命令列給）。同一分頁重新整理不再問（sessionStorage）。圖片（示範頭像 / 風景照）與樣式表未加密。
 - 一份劇本只演一次（第一則對話）；之後的新對話走一般 fallback 回覆。重新整理頁面 = 重來。`config.agentScript: false` 關掉（回歸 story `AgentHomeNoScript`）。
 - Story：`Apps/chat/tAgent` › 「Demo 劇本：ImagePullBackOff 開單」。
 

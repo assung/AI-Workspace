@@ -34,6 +34,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarMenuAction,
+  SidebarMenuBadge,
   SidebarTrigger,
   ChromeHeader,
   AgentConversation,
@@ -188,6 +189,15 @@ export function TAgentPage({
         <SidebarMenuButton id={conversationRoute(c.id)} tooltip={c.title}>
           {c.title}
         </SidebarMenuButton>
+        {/* 未讀紅點:同 Chat 列表(Badge dot + 同色);與 hover 才出現的 ⋯ 同位置 → 滑過 / 焦點在列上時讓位給 ⋯ */}
+        {engine.unreadIds.has(c.id) && (
+          <SidebarMenuBadge
+            dot
+            variant="critical"
+            aria-label="New reply"
+            className={`!bg-[#EC540F] group-hover/menu-item:invisible group-focus-within/menu-item:invisible`}
+          />
+        )}
         {rowMenu(c)}
       </SidebarMenuItem>
     ))

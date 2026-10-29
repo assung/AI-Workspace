@@ -12,6 +12,8 @@ import {
   ProfileCard,
   ProfileCardDefaultActions,
   Badge,
+  Toaster,
+  toast,
   Separator,
   ScrollArea,
   Popover,
@@ -851,6 +853,7 @@ const WORKSPACE_NAV_ITEMS: { tab: Exclude<NavTab, 'home'>; icon: React.Component
 
 function NavRail({
   unreadCount,
+  agentUnread = false,
   onOpenSettings,
   tab: tabProp,
   onTabChange,
@@ -860,6 +863,8 @@ function NavRail({
   variant = 'default',
 }: {
   unreadCount: number
+  /** AI agent 有未讀回覆(劇本在背景處理完)→ AI agent 圖示右上角紅點(同 Chat 列表未讀點) */
+  agentUnread?: boolean
   onOpenSettings: () => void
   /** 受控分頁(config.agent:App 依分頁切換整頁內容);省略 = 只在 NavRail 內記住高亮(base 行為) */
   tab?: NavTab
@@ -888,6 +893,8 @@ function NavRail({
   // workspace:Logo 列 / 分頁 / 底部群組都用 w-12(48)欄寬置中 —— rail 48 扣右邊線只剩 47,在 47 裡置中 32px 圖標會落在 x=7.5(半像素,1x 螢幕會糊);
   // 改以 48 欄置中 → 圖標 x=8、中心 24 都是整數,選中直線 6–8、tooltip 離圖標剛好 8(2026-10-25)。欄的最後 1px 疊在右邊線下,內容到 40 為止碰不到線。
   const chatBadge = unreadCount > 0 ? <Badge variant="critical" count={unreadCount} max={99} className="!bg-[#EC540F]" /> : undefined
+  // AI agent 未讀 = 純點(不計數:代理回覆以「對話」為單位,DS Badge dot = 「這裡有東西要看」)
+  const agentBadge = <Badge dot variant="critical" aria-label="New AI agent reply" className="!bg-[#EC540F]" />
   const workspace = variant === 'workspace'
   // workspace:底部選單鈕 = lucide Settings、名稱「Settings and more」(2026-10-25 user;選單內容 Settings / Help / Sign out 不變)。
   // 對照 Microsoft Teams 左下同名入口「Settings and more」;icon 依 user 指定用 Settings 齒輪。
@@ -921,7 +928,7 @@ function NavRail({
               label={item.label}
               active={tab === item.tab}
               onClick={() => setTab(item.tab)}
-              overlayBadge={item.tab === 'chat' ? chatBadge : undefined}
+              overlayBadge={item.tab === 'chat' ? chatBadge : item.tab === 'agent' && agentUnread ? agentBadge : undefined}
             />
           ))}
         </div>
@@ -3309,10 +3316,31 @@ export default function App({
     return id
   }
   // tAgent 對話資料只有一份(側邊面板與整頁共用;TAgent.tsx useTAgentEngine)
+  // 使用者此刻看著哪一則對話:AI agent 整頁開著的那則;否則側邊面板開著(在有面板的分頁)時面板那則。
+  // 沒看著的對話回完 → 記未讀 + Toast(2026-10-29 user「關掉 panel 或跳離 AI agent 頁時要有通知與紅點」)
+  const panelVisible = agentOpen && (navTab === 'tasks' || navTab === 'docs' || navTab === 'drive' || (navTab === 'chat' && chatAgentPanel))
+  const viewedConversationId =
+    navTab === 'agent' ? (agentRoute.startsWith('conversation:') ? agentRoute.slice('conversation:'.length) : null)
+      : panelVisible ? panelConversationId : null
+  const viewedRef = useRef(viewedConversationId)
+  viewedRef.current = viewedConversationId
   const agentEngine = useTAgentEngine({
     onSendToRoom: handleAgentSendToRoom,
     script: agentEnabled && config?.agentScript !== false ? K8S_IMAGEPULL_SCRIPT : undefined,
+    isViewing: (id) => viewedRef.current === id,
+    // DS Toast(neutral、無 action:toast.spec.md 的 action 只給「復原 / 重試」這類後手;回到對話靠紅點)。
+    // 標題 = 對話名(哪一件事),內文 = 回覆開頭 —— 同 Teams / Slack 訊息通知「誰 + 說了什麼」
+    onBackgroundReply: (conversation, replyText) => {
+      toast({
+        title: conversation.title,
+        description: replyText.length > 80 ? `${replyText.slice(0, 80)}…` : replyText,
+      })
+    },
   })
+  const markAgentRead = agentEngine.markRead
+  useEffect(() => {
+    if (viewedConversationId) markAgentRead(viewedConversationId)
+  }, [viewedConversationId, markAgentRead])
   // 代理內文的 Docs 連結:切到 Docs 分頁並開該頁(DocsPage 以 key 重新掛載、從指定位置開始)。
   // 從整頁對話點的 → 這則對話接到 Docs 頁的側邊面板、面板打開,看完文章可以在 Docs 頁繼續對話
   // (2026-10-29 user:「導到 doc 看 SOP 時 agent panel 可以打開,並將對話內容帶入」)。
@@ -3464,7 +3492,10 @@ export default function App({
         onTabChange={handleNavTabChange}
         variant="workspace"
         backgroundClassName={CHROME_RAIL_BG}
+        agentUnread={agentEngine.hasUnread}
       />
+      {/* AI agent 背景回覆的通知;落點照 DS 預設(右下、以整個視窗為準,toast.spec.md「落點」) */}
+      <Toaster containerAriaLabel="Notifications" />
       {/* AppShell 不撐滿視窗(左邊是 NavRail)→ 這一層當 Menu 浮層的定位框:transform 讓 fixed 以它為準,
           ChatList 左側浮層與遮罩從 AppShell 左緣起、不蓋 NavRail(app-shell.spec.md「版面規則」§9「從版面左緣開始」+
           API `portalContainer`;DS stories-helpers/scene/simulated-browser.tsx 畫布同款 translateZ(0)) */}
