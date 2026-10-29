@@ -51,7 +51,7 @@ const html = `<!doctype html>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex" />
-    <title>tWorkspace</title>
+    <title>Design demo</title>
     <link rel="stylesheet" href="./assets/${cssName}">
     <style>
       /* Password screen — DS tokens from the app stylesheet (canvas / surface / field height / radius / primary) */
@@ -79,8 +79,8 @@ const html = `<!doctype html>
     <div class="tw-gate" id="tw-gate" hidden>
       <form class="tw-card" id="tw-form" novalidate>
         <div>
-          <h1>tWorkspace prototype</h1>
-          <p>This prototype is password protected. Enter the password you were given to continue.</p>
+          <h1>Design demo</h1>
+          <p>This demo is password protected. Enter the password you were given to continue.</p>
         </div>
         <div class="tw-field">
           <label for="tw-pw">Password</label>
