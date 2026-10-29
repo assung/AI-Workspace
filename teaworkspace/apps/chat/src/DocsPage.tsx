@@ -16,7 +16,8 @@
 // - Overview(Confluence space overview):空間名稱與說明、DS DescriptionList(Owner / Pages / Last updated)、最近更新的頁(DS DataTable,頁名連到該頁)。
 // - Content 標題列右端「+」= DS SidebarGroupAction(新增頁入口,行為未接)。
 // - 尚未做(keyscreen 範圍外):編輯、新增頁的實際流程、頁面樹拖曳排序、留言、分享。
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
+import type { TAgentOpenDoc, TAgentRoomRef } from './TAgent'
 import {
   SidebarProvider,
   Sidebar,
@@ -198,7 +199,7 @@ export const SPACES: Space[] = [
     pages: [
       {
         id: 'known-issues', title: 'Known issues', owner: 'kenji', updated: '2026/10/20 10:12 AM', updatedBy: 'kenji',
-        body: [{ type: 'p', text: '常見部署問題與自助排除步驟。照文章做仍無法解決時，請在 tAgent 開單給 K8s 平台團隊。' }],
+        body: [{ type: 'p', text: '常見部署問題與自助排除步驟。照文章做仍無法解決時，請在 AI agent 開單給 K8s 平台團隊。' }],
         children: [
           {
             id: 'kb-imagepull', title: 'ImagePullBackOff：registry pull secret 過期', owner: 'kenji', updated: '2026/10/20 10:12 AM', updatedBy: 'kenji',
@@ -210,7 +211,7 @@ export const SPACES: Space[] = [
               { type: 'ol', items: ['確認 pull secret 的同步狀態與最後更新時間', '強制重新同步 pull secret', '重新啟動 deployment，讓 pod 用新的 secret 拉映像檔'] },
               { type: 'code', text: 'kubectl get externalsecret regcred -n <namespace>\nkubectl annotate externalsecret regcred force-sync=$(date +%s) --overwrite -n <namespace>\nkubectl rollout restart deploy/<deployment> -n <namespace>' },
               { type: 'h2', text: '還是失敗？' },
-              { type: 'p', text: '代表問題不在 secret 本身（例如 registry 帳號被停用）。請在 tAgent 開單，附上 namespace 與 Events 的錯誤訊息，K8s 平台團隊值班會接手。' },
+              { type: 'p', text: '代表問題不在 secret 本身（例如 registry 帳號被停用）。請在 AI agent 開單，附上 namespace 與 Events 的錯誤訊息，K8s 平台團隊值班會接手。' },
             ],
           },
         ],
@@ -245,12 +246,17 @@ export function DocsPage({
   portalContainer,
   resolvePerson,
   initialRoute = { space: 'my', page: null },
+  renderAgent,
 }: {
   mainMinWidth: number
   menuWidth: { min: number; initial: number; max: number }
   portalContainer: HTMLElement | null
   resolvePerson: (key: string) => TaskPerson
   initialRoute?: DocsRoute
+  /**
+   * 右側 AI agent 區(同 Tasks / Drive)。第二個參數 = 在 Docs 頁內換頁(面板裡的文章連結不必重新掛載整頁)。
+   */
+  renderAgent?: (context: TAgentRoomRef, openDoc: TAgentOpenDoc) => ReactNode
 }) {
   const [route, setRoute] = useState<DocsRoute>(initialRoute)
   const space = SPACES.find((s) => s.id === route.space) ?? SPACES[0]
@@ -474,6 +480,10 @@ export function DocsPage({
         portalContainer={portalContainer}
         sidebar={sidebar}
         header={header}
+        agent={renderAgent?.(
+          page ? { id: `doc:${space.id}/${page.id}`, title: page.title } : { id: `doc:${space.id}`, title: `${space.name} overview` },
+          (s, p) => go({ space: s, page: p }),
+        )}
       >
         {main}
       </AppShell>

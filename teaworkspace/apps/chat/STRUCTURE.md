@@ -265,6 +265,8 @@ Conversation
 
 ---
 
+> **介面名稱（2026-10-29 user）**：「tAgent」改名為 **AI agent**（`TAGENT_LABEL`：NavRail、側欄標題、面板 aria-label、入口鈕 tooltip、輸入盒 placeholder；Storybook `Apps/chat/AI agent`）。程式識別字與本文件仍沿用 tAgent / TAgent*。
+
 ## 4. tAgent + AppShell 四區版面 — `apps/chat/src/TAgent.tsx`（2026-10-22，config.agent 才渲染）
 
 tWorkspace 的智慧代理。**全部消費 DS 真元件**：版面 = DS **AppShell 四區**（`app-shell.spec.md`「版面規則」，DS **0.1.0-beta.148**，PR #169），面板 = DS AgentPanel 家族（`agent-panel.spec.md`）。本 app 不自算任何並排 / 浮層 / 寬度規則。
@@ -336,9 +338,18 @@ TAgentDock
 3. **AppShell 首次排版有寬度轉場**：AppShell 掛載時 ResizeObserver 量到寬度前 Menu 外層寬 = 0，量到後變 `widthRange.initial`，而 Sidebar 外層恆掛 `transition-[width] duration-200` → 每次掛載都從 0 滑到 320。tWorkspace 的 Chat / tAgent 各是一套 AppShell，切分頁 = 重新掛載，所以每次切都滑一次（2026-10-23 user：「切換 chat 跟 tAgent 的過程中一直有側面面板重複滑出的轉場」）。app 端補法：外框掛載後 300ms 內加 `NO_MOUNT_PANEL_TRANSITION`（`chrome.ts`；只對 `[data-app-shell-panel]` 關 transition-property），之後使用者開合 / 視窗變窄的 200ms 轉場照 DS。DS 該做：首次量測前不套用寬度轉場。
 4. **SidebarGroupAction 不與群組標題垂直置中**：DS 定位 `absolute top-2`（= 群組上邊距），按鈕高 16、標題列高 `--field-height-md`（32），所以按鈕貼在標題列上半部，比「Content」字高約 8px（2026-10-28 Docs 側欄 Content 的「+」實測）。app 端補：`!top-[calc(0.5rem+(var(--field-height-md)-1rem)/2)]`。DS 該做：top 依標題列高置中。
 5. **Sidebar 內容會被長標題撐寬**：SidebarContent 內包 DS ScrollArea 但沒開 `fillX`，Radix 捲動區內層是 `display: table`，被最長一行（tAgent Recents「payments-api ImagePullBackOff on staging」、Docs 頁面樹的文章標題）撐成 394 > 側欄 320 → 標題不截斷、收合箭頭與 Docs 空間選擇器右緣被裁（2026-10-29 劇本演示實測）。app 端補：`CHROME_SIDEBAR_FILL_X`（`chrome.ts`，= ScrollArea `fillX` 的三個 class，以後代選擇器套到 viewport 內層），Chat / tAgent / Tasks / Drive / Docs 五個側欄都套。DS 該做：SidebarContent 傳 `fillX`。
-6. **DS 版本**：本版需要 0.1.0-beta.148（PR #169 尚未發版）；預覽是用 PR #169 本機打包的套件建置。
+6. **AgentMessage 使用者泡泡不斷字**：泡泡 `max-w-[85%]` 但沒有 `overflow-wrap`，附件 Chip 的 label 也不截斷 → 長網址（劇本的 Argo CD 連結）、長附件名（Docs 文章標題）在側邊面板寬度下溢出泡泡右緣（2026-10-29 實測）。app 端補：`USER_BUBBLE_WRAP`（`TAgent.tsx`；泡泡 `overflow-wrap: anywhere`、chip 不超過泡泡寬、label 截斷 …）。DS 該做：泡泡加 `[overflow-wrap:anywhere]`、訊息內 Chip 截斷。
+7. **DS 版本**：本版需要 0.1.0-beta.148（PR #169 尚未發版）；預覽是用 PR #169 本機打包的套件建置。
 
 ---
+
+### 4.5a Tasks / Docs / Drive 的 AI agent 側邊面板（2026-10-29 user：「task / docs / drive 的內容頁都要有 FAB」）
+
+- 三頁的 AppShell `agent` 區都放 `TAgentDock`（App `renderPageAgent`，頁面以 `renderAgent(context)` 接上）：同一份對話資料（`agentEngine`）、同一個開合狀態（`agentOpen`）與面板對話（`panelConversationId`），換分頁後面板維持開 / 關、看同一則。Chat 分頁仍不放（§4.3）。
+- 入口鈕：DS 預設「家」（右下角圓鈕，agent-panel-fab.spec.md；這三頁底部沒有輸入區，不必像 Chat 貼邊避開）。`TAgentDock placement`：`home`（預設）/ `above-input`（Chat）。
+- context chip = 這一頁目前的位置：Tasks「My tasks」/ 專案名；Drive 目前資料夾名（根 = My drive / 頻道名）；Docs 文章標題 /「<空間> overview」。可移除。
+- 面板內連結：聊天室來源 → 回 Chat 分頁定位（`handleAgentOpenInChat`）；Docs 文章 → 在 Docs 頁內換頁（DocsPage 給 `go`，不重新掛載）。
+- 點 NavRail AI agent 時面板開著 → 整頁接著開面板那一則、面板收起（§5「從側邊面板接到整頁」，原規則沿用）。
 
 ### 4.5b Tasks 分頁（`TasksPage.tsx`，2026-10-28 keyscreen → 同日 user 確認，已加入 prototype）
 
@@ -422,7 +433,9 @@ user：「我想照我寫好的對話劇本來演示」→ 劇本 `K8S_IMAGEPULL
 - **台詞逐字照 user 劇本**，只修錯字（unauthourized / refistry / regitstry / 團對）。每則代理回覆前的「思考過程」步驟是補的（劇本沒寫），讓代理看起來真的去查。
 - **使用者那句預先填在輸入盒**（第一句在 tAgent 首頁；之後每輪代理回完填下一句），講者按 Enter 送出；改字也照樣推進劇本。等主動更新時輸入盒留空。
 - **主動更新**（`afterMs`，`UPDATE_GAP_MS = 4000`）：沒有思考步驟 → 不顯示思考塊（`renderTurns` 只在 `thinking || steps.length` 時渲染 AgentThinking）。
-- **文章連結** = `DocLink` → `TAgentOpenDocProvider` → App `handleAgentOpenDoc`：切到 Docs 分頁並開該頁（`docsJump` 改 DocsPage key 重掛載）。
+- **文章連結** = `DocLink` → `TAgentOpenDocProvider` → App `handleAgentOpenDoc`：切到 Docs 分頁並開該頁（`docsJump` 改 DocsPage key 重掛載），**同時把這則對話帶進 Docs 頁的側邊面板並打開**（`fromConversationId` → `panelConversationId` + `agentOpen`；2026-10-29 user：「導到 doc 看 SOP 時 agent panel 可以打開並帶入對話，看完 SOP 後可以在 doc 頁繼續對話」）。面板一樣預填下一句，劇本在面板裡接著跑（含主動更新）；回到 AI agent 整頁看到的是同一則、含面板裡的後續。
+- **單號** = `TicketLink`（連結樣式的假連結，點了不導航；2026-10-29 user「之後要連到哪再跟你說」）。
+- 劇本起頭判定：整頁 New（沒有對話 id）或側邊面板的空對話都算「新對話」。
 - 一份劇本只演一次（第一則對話）；之後的新對話走一般 fallback 回覆。重新整理頁面 = 重來。`config.agentScript: false` 關掉（回歸 story `AgentHomeNoScript`）。
 - Story：`Apps/chat/tAgent` › 「Demo 劇本：ImagePullBackOff 開單」。
 

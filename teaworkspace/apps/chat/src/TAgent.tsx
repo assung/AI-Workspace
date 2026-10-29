@@ -40,7 +40,8 @@ import {
 // ── Public contract with App.tsx ──────────────────────────────────────────────
 export type TAgentRoomRef = { id: string; title: string }
 
-export const TAGENT_LABEL = 'tAgent'
+// 介面名稱(2026-10-29 user:「tAgent 改名為 AI agent」;程式識別字仍用 TAgent*)
+export const TAGENT_LABEL = 'AI agent'
 
 // ── Conversation model ────────────────────────────────────────────────────────
 type Link = { roomId: string; messageId: string; label: string }
@@ -125,8 +126,12 @@ function SourceLink({ link }: { link: Link }) {
   )
 }
 
-/** 代理內文打開 Docs 的某一頁(切到 Docs 分頁並開該頁;由 surface 提供,同 SourceLink 的導航) */
-export type TAgentOpenDoc = (space: string, page: string) => void
+/**
+ * 代理內文打開 Docs 的某一頁(由 surface 提供,同 SourceLink 的導航)。
+ * 整頁 = 切到 Docs 分頁開該頁,並把這則對話帶進 Docs 頁的側邊面板(`fromConversationId`,2026-10-29 user:
+ * 「導到 doc 看 SOP 時 agent panel 打開並帶入對話,看完可以在 doc 頁繼續對話」);側邊面板 = 在 Docs 頁內換頁。
+ */
+export type TAgentOpenDoc = (space: string, page: string, fromConversationId?: string) => void
 const TAgentOpenDocContext = createContext<TAgentOpenDoc>(() => {})
 export function TAgentOpenDocProvider({ openDoc, children }: { openDoc: TAgentOpenDoc; children: ReactNode }) {
   return <TAgentOpenDocContext.Provider value={openDoc}>{children}</TAgentOpenDocContext.Provider>
@@ -142,6 +147,18 @@ export function DocLink({ space, page, children }: { space: string; page: string
       }}
     >
       {children}
+    </a>
+  )
+}
+
+/**
+ * 工單號連結(劇本「已開單 #SD-2318」;2026-10-29 user:「單號以連結樣式呈現,先做成假連結,之後要連到哪再跟你說」)。
+ * 目前點了不導航;接上 Service Desk 後把 href 換成工單網址。
+ */
+export function TicketLink({ id }: { id: string }) {
+  return (
+    <a href={`#ticket-${id}`} onClick={(e) => e.preventDefault()}>
+      #{id}
     </a>
   )
 }
@@ -264,6 +281,8 @@ function seedConversations(): TAgentConversation[] {
   ]
 }
 
+const USER_BUBBLE_WRAP = '[&>div]:min-w-0 [&>div]:[overflow-wrap:anywhere] [&>div>div>*]:max-w-full [&>div>div>*>span]:min-w-0 [&>div>div>*>span]:truncate'
+
 let idSeq = 0
 const nextId = (p: string) => `${p}-${Date.now().toString(36)}-${(idSeq++).toString(36)}`
 
@@ -282,6 +301,8 @@ export function useTAgentEngine({ onSendToRoom, script }: {
   script?: TAgentScript
 }) {
   const [conversations, setConversations] = useState<TAgentConversation[]>(seedConversations)
+  const conversationsRef = useRef(conversations)
+  conversationsRef.current = conversations
   const [busyConvId, setBusyConvId] = useState<string | null>(null)
   const [unseenReply, setUnseenReply] = useState(false)
   const timers = useRef<number[]>([])
@@ -380,10 +401,12 @@ export function useTAgentEngine({ onSendToRoom, script }: {
   const send = useCallback((convId: string | null, text: string, attachments: AgentPromptAttachment[]) => {
     const id = convId ?? nextId('c')
     const userTurn: Turn = { kind: 'user', id: nextId('u'), text, attachments }
-    // 劇本:下一步是使用者的話,而且是「新對話起頭」或「劇本那一則對話」→ 照劇本推進
+    // 劇本:下一步是使用者的話,而且是「新對話起頭」(整頁 New = 沒有 id;側邊面板的新對話 = 還沒有內容)
+    // 或「劇本那一則對話」→ 照劇本推進
     const sc = scriptRef.current
+    const isFresh = convId === null || !conversationsRef.current.find((c) => c.id === convId)?.turns.length
     const scripted = !!script && script.steps[sc.pos]?.who === 'user'
-      && (sc.convId === null ? convId === null && sc.pos === 0 : convId === sc.convId)
+      && (sc.convId === null ? isFresh && sc.pos === 0 : convId === sc.convId)
     setConversations((prev) => {
       const existing = prev.find((c) => c.id === id)
       const base: TAgentConversation = existing ?? { id, title: NEW_CONVERSATION_TITLE, group: GROUP_TODAY, turns: [] }
@@ -506,6 +529,9 @@ export function renderTurns(conversation: TAgentConversation, onOpenRoom: (roomI
         <AgentMessage
           key={t.id}
           role="user"
+          // DS 使用者泡泡沒有斷字:長網址(劇本的 Argo CD 連結)、長附件 chip 在側邊面板寬度下溢出泡泡右緣 → 允許任意處斷行、
+          // chip 不超過泡泡寬(DS 待補,STRUCTURE.md §4.5)
+          className={USER_BUBBLE_WRAP}
           attachments={t.attachments}
           onAttachmentClick={(a) => {
             if (a.id.startsWith('room:')) onOpenRoom(a.id.slice(5))
@@ -613,36 +639,45 @@ export function TAgentPrompt({
   )
 }
 
-// ── 側邊面板(Chat 分頁的 AppShell AI agent 區)─────────────────────────────────
+// ── 側邊面板(各內容頁的 AppShell AI agent 區:Tasks / Docs / Drive;Chat 暫不開放)──────────────────
+/** 入口鈕初始位置:`home` = DS 預設右下角圓鈕;`above-input` = 貼右緣、在底部輸入區上方(Chat 用) */
+export type TAgentDockPlacement = 'home' | 'above-input'
+
 export function TAgentDock({
   open,
   onOpenChange,
   engine,
-  currentRoom,
+  context,
   onViewMessage,
+  onOpenDoc,
   activeId,
   onActiveIdChange,
+  placement = 'home',
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   engine: TAgentEngine
-  /** 左側內容頁(目前聊天室)= 預設互動範圍 */
-  currentRoom: TAgentRoomRef
+  /** 左側內容頁目前的位置(聊天室 / 任務清單 / 文件頁 / 資料夾)= 預設互動範圍,以 context chip 帶入;null = 不帶 */
+  context: TAgentRoomRef | null
   /** 切到該聊天室並 flash 該則訊息(messageId 空 = 只切聊天室) */
   onViewMessage: (roomId: string, messageId: string) => void
-  /** 面板目前看的對話(App 持有:點 NavRail tAgent 時整頁接著開這一則,2026-10-23 user) */
+  /** 代理內文的 Docs 連結 */
+  onOpenDoc?: TAgentOpenDoc
+  /** 面板目前看的對話(App 持有:點 NavRail AI agent 時整頁接著開這一則,2026-10-23 user) */
   activeId: string
   onActiveIdChange: (id: string) => void
+  placement?: TAgentDockPlacement
 }) {
   const { navigateFromAgent } = useAppShell()
 
-  // 入口鈕預設「貼邊」(2026-10-22 user 選):DS 為「被遮擋」設計的 28px 貼右緣形態,放在輸入框上方
+  // Chat:入口鈕預設「貼邊」(2026-10-22 user 選):DS 為「被遮擋」設計的 28px 貼右緣形態,放在輸入框上方
   // (家 = 右下角會蓋到 Thread 的 Send reply、與主輸入框 0 間距)。y = 距 AppShell 頂;188 = 28 鈕 + 160 預留給底部輸入區。
-  // 使用者可拖回右下角;位置由 AgentPanelDock 保管。
-  const [defaultPlacement] = useState(() => ({
-    kind: 'dock' as const,
-    y: Math.max(0, (typeof window === 'undefined' ? 900 : window.innerHeight) - 188),
-  }))
+  // Tasks / Docs / Drive 底部沒有輸入區 → DS 預設「家」(右下角圓鈕,agent-panel-fab.spec.md)。使用者可拖動;位置由 AgentPanelDock 保管。
+  const [defaultPlacement] = useState(() =>
+    placement === 'above-input'
+      ? { kind: 'dock' as const, y: Math.max(0, (typeof window === 'undefined' ? 900 : window.innerHeight) - 188) }
+      : undefined,
+  )
 
   // 從代理導向 Main(app-shell.spec.md「版面規則」§4 末條):產品導航 + navigateFromAgent 同一個事件 ——
   // AI agent 是浮層 → 收起讓位、焦點回 Main;並排 → 不動。
@@ -669,7 +704,14 @@ export function TAgentDock({
 
   const conversationEmpty = !active || active.turns.length === 0
   const contextChip: AgentPromptAttachment | null =
-    contextRemovedFor === currentRoom.id ? null : { id: `room:${currentRoom.id}`, label: currentRoom.title }
+    !context || contextRemovedFor === context.id ? null : { id: context.id, label: context.title }
+
+  // 劇本:輪到使用者時把台詞填進輸入盒(同整頁 TAgentPage)—— 劇本還沒開始 = 空對話;已開始 = 劇本那一則
+  const prefillHere = engine.scriptPrefill !== null
+    && (engine.scriptConvId === null ? conversationEmpty : active?.id === engine.scriptConvId)
+  useEffect(() => {
+    if (prefillHere && engine.scriptPrefill) setDraft(engine.scriptPrefill)
+  }, [prefillHere, engine.scriptPrefill, activeId])
   const logoState: AgentLogoState = engine.busy ? 'think' : engine.unseenReply && !open ? 'attract' : 'still'
 
   const summaries: AgentConversationSummary[] = engine.listed.map((c) => ({
@@ -719,11 +761,13 @@ export function TAgentDock({
                 <Empty
                   icon={<AgentLogo state="attract" size={48} label={TAGENT_LABEL} />}
                   title="What can I help with?"
-                  description="Ask about your chats, tasks, and docs. The chat you have open is attached as context."
+                  description="Ask about your chats, tasks, and docs. The page you have open is attached as context."
                 />
               </div>
             ) : (
-              <AgentConversation>{renderTurns(active, (roomId) => navigate(roomId, ''))}</AgentConversation>
+              <TAgentOpenDocProvider openDoc={onOpenDoc ?? (() => {})}>
+                <AgentConversation>{renderTurns(active, (roomId) => navigate(roomId, ''))}</AgentConversation>
+              </TAgentOpenDocProvider>
             )}
           </TAgentNavigateProvider>
           <TAgentPrompt
@@ -736,7 +780,7 @@ export function TAgentDock({
               setDraft('')
             }}
             contextChip={contextChip}
-            onRemoveContext={() => setContextRemovedFor(currentRoom.id)}
+            onRemoveContext={() => context && setContextRemovedFor(context.id)}
           />
         </AgentPanel>
       )}

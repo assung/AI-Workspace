@@ -243,7 +243,7 @@ export function TAgentPage({
 
   const header = (
     <ChromeHeader className="bg-surface">
-      <SidebarTrigger aria-label="Toggle tAgent sidebar" />
+      <SidebarTrigger aria-label="Toggle AI agent sidebar" />
       <h1 className="flex-1 truncate text-body-lg font-medium">{headerTitle}</h1>
       {activeConversation && (
         <div className="flex items-center gap-2">
@@ -287,7 +287,7 @@ export function TAgentPage({
     main = (
       <div className="flex h-full min-h-0 flex-col">
         <TAgentNavigateProvider navigate={onOpenInChat}>
-          <TAgentOpenDocProvider openDoc={onOpenDoc}>
+          <TAgentOpenDocProvider openDoc={(space, page) => onOpenDoc(space, page, activeConversation.id)}>
             {/* className 落在 log 本體:同一欄置中;捲軸仍在整個 Main 右緣 */}
             <AgentConversation className="mx-auto w-full" style={{ maxWidth: COLUMN_MAX_WIDTH }}>
               {renderTurns(activeConversation, (roomId) => onOpenInChat(roomId, ''))}

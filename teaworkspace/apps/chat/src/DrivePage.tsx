@@ -16,7 +16,8 @@
 //   資料夾名稱 = DS LinkInput 站內連結(點了進資料夾,與 tAgent Projects 表格同一個 navigate-valued cell 做法)。
 //   Owner = DS person 欄;Last modified = YYYY/MM/DD hh:mm AM/PM;File size,資料夾為 DS 空值佔位「-」。資料夾排在前面(Drive / OneDrive 同)。
 // - 尚未做(keyscreen 範圍外):開檔預覽、上傳 / 新資料夾、列操作(下載 / 分享 / 改名)、排序切換。
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
+import type { TAgentRoomRef } from './TAgent'
 import {
   SidebarProvider,
   Sidebar,
@@ -180,6 +181,7 @@ export function DrivePage({
   resolvePerson,
   onOpenChannel,
   initialRoute = { root: 'my', path: [] },
+  renderAgent,
 }: {
   mainMinWidth: number
   menuWidth: { min: number; initial: number; max: number }
@@ -190,6 +192,11 @@ export function DrivePage({
   /** 頻道檔案區的「Open chat」:切到 Chat 分頁並開該頻道 */
   onOpenChannel: (roomId: string) => void
   initialRoute?: DriveRoute
+  /**
+   * 右側 AI agent 區(側邊面板 + 入口鈕,2026-10-29 user「task / docs / drive 的內容頁都要有 FAB」)。
+   * 參數 = 這一頁目前的位置,面板以 context chip 帶入;App 提供(對話資料與開合狀態在 App)。
+   */
+  renderAgent?: (context: TAgentRoomRef) => ReactNode
 }) {
   const [route, setRoute] = useState<DriveRoute>(initialRoute)
   // 釘選:存位置的站內路徑(頻道檔案區根目錄或資料夾)。示範預設釘兩個:Tea Tasting 頻道、My drive 的 Q4 Tasting Program
@@ -391,6 +398,7 @@ export function DrivePage({
         portalContainer={portalContainer}
         sidebar={sidebar}
         header={header}
+        agent={renderAgent?.({ id: `drive:${routeHref(route)}`, title })}
       >
         {main}
       </AppShell>

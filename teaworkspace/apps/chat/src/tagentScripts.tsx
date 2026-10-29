@@ -3,8 +3,9 @@
 //
 // 台詞逐字照 user 劇本;只改了錯字(unauthourized → unauthorized、refistry / regitstry → registry、負責團對 → 負責團隊),
 // 並在中英文 / 數字之間補半形空格。思考步驟(AgentThinking)是劇本沒寫、為了演示代理「真的去查」而補的過程文字。
+// 單號 #SD-2318 = TicketLink(假連結,2026-10-29 user)。
 // 「文章」連結打開 Docs › K8s Platform › Known issues › ImagePullBackOff：registry pull secret 過期(DocsPage.tsx `kb-imagepull`)。
-import { DocLink, type TAgentScript } from './TAgent'
+import { DocLink, TicketLink, type TAgentScript } from './TAgent'
 
 /** 進度更新(主動發)的間隔:讓講者有時間說明「值班已接手」再出下一則 */
 const UPDATE_GAP_MS = 4000
@@ -62,14 +63,14 @@ export const K8S_IMAGEPULL_SCRIPT: TAgentScript = {
       who: 'agent',
       steps: ['在 Service Desk 建立單號 SD-2318', '通知 K8s 平台團隊值班'],
       copyText: '已開單 #SD-2318。K8s 平台團隊的值班會接手，進度會更新在這個 thread。',
-      body: <p className="mt-2">已開單 <strong>#SD-2318</strong>。K8s 平台團隊的值班會接手，進度會更新在這個 thread。</p>,
+      body: <p className="mt-2">已開單 <TicketLink id="SD-2318" />。K8s 平台團隊的值班會接手，進度會更新在這個 thread。</p>,
     },
     {
       who: 'agent',
       afterMs: UPDATE_GAP_MS,
       steps: [],
       copyText: '#SD-2318 已由 K8s 平台團隊的 Bob 接手，正在處理。',
-      body: <p><strong>#SD-2318</strong> 已由 K8s 平台團隊的 Bob 接手，正在處理。</p>,
+      body: <p><TicketLink id="SD-2318" /> 已由 K8s 平台團隊的 Bob 接手，正在處理。</p>,
     },
     {
       who: 'agent',
@@ -78,7 +79,7 @@ export const K8S_IMAGEPULL_SCRIPT: TAgentScript = {
       copyText: '#SD-2318 已處理。原因是 registry 的 robot account 在昨晚金鑰輪替後被停用，已重新啟用。請重新部署試試看，問題真的解決了嗎？',
       body: (
         <p>
-          <strong>#SD-2318</strong> 已處理。原因是 registry 的 robot account 在昨晚金鑰輪替後被停用，已重新啟用。請重新部署試試看，問題真的解決了嗎？
+          <TicketLink id="SD-2318" /> 已處理。原因是 registry 的 robot account 在昨晚金鑰輪替後被停用，已重新啟用。請重新部署試試看，問題真的解決了嗎？
         </p>
       ),
     },
@@ -87,7 +88,7 @@ export const K8S_IMAGEPULL_SCRIPT: TAgentScript = {
       who: 'agent',
       steps: ['結案 SD-2318'],
       copyText: '太好了，#SD-2318 已結案。',
-      body: <p className="mt-2">太好了，<strong>#SD-2318</strong> 已結案。</p>,
+      body: <p className="mt-2">太好了，<TicketLink id="SD-2318" /> 已結案。</p>,
     },
   ],
 }

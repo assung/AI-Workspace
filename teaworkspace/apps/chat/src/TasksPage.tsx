@@ -12,7 +12,8 @@
 //   「完成」以 Status 欄表達,不在列首放勾選框:DataTable 的勾選框是「選取」語意(data-table.spec.md L2),與「標記完成」不同件事。
 // - 專案頁:同一張表,多一欄 Assignee(DS person 欄);沒有分頁。
 // - 尚未做(keyscreen 範圍外):點列開任務詳情(預計 AppShell Right panel)、新增任務、改狀態 / 到期日。
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
+import type { TAgentRoomRef } from './TAgent'
 import {
   SidebarProvider,
   Sidebar,
@@ -127,6 +128,7 @@ export function TasksPage({
   portalContainer,
   resolvePerson,
   initialRoute = 'my-tasks',
+  renderAgent,
 }: {
   mainMinWidth: number
   menuWidth: { min: number; initial: number; max: number }
@@ -134,12 +136,18 @@ export function TasksPage({
   /** 成員 key → DS person 欄要的資料(App 的 PEOPLE / ME) */
   resolvePerson: (key: string) => TaskPerson
   initialRoute?: TasksRoute
+  /**
+   * 右側 AI agent 區(側邊面板 + 入口鈕,2026-10-29 user「task / docs / drive 的內容頁都要有 FAB」)。
+   * 參數 = 這一頁目前的位置,面板以 context chip 帶入;App 提供(對話資料與開合狀態在 App)。
+   */
+  renderAgent?: (context: TAgentRoomRef) => ReactNode
 }) {
   const [route, setRoute] = useState<TasksRoute>(initialRoute)
   const [tab, setTab] = useState<MyTasksTab>('upcoming')
 
   const project = route.startsWith('project:') ? TASK_PROJECTS.find((p) => `project:${p.id}` === route) : undefined
   const projectName = (id: string) => TASK_PROJECTS.find((p) => p.id === id)?.name ?? ''
+  const agentContext: TAgentRoomRef = project ? { id: `tasks:${project.id}`, title: project.name } : { id: 'tasks:my', title: 'My tasks' }
 
   const sidebar = (
     // 與 tAgent 頁側欄同一組設定(收合 offcanvas、寬度、淺灰底)
@@ -270,6 +278,7 @@ export function TasksPage({
         portalContainer={portalContainer}
         sidebar={sidebar}
         header={header}
+        agent={renderAgent?.(agentContext)}
       >
         {main}
       </AppShell>

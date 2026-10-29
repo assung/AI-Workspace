@@ -86,7 +86,7 @@ import {
   ChevronRight as SubArrow,
 } from 'lucide-react'
 import { FormatToolbar, RichTextArea, textToHtml, hasRichMarkup, type RichEditorHandle } from './RichTextEditor'
-import { TAgentDock, TAgentRailIcon, TAGENT_LABEL, useTAgentEngine } from './TAgent'
+import { TAgentDock, TAgentRailIcon, TAGENT_LABEL, useTAgentEngine, type TAgentOpenDoc, type TAgentRoomRef } from './TAgent'
 import { TAgentPage, type TAgentRoute } from './TAgentPage'
 import { TasksPage, type TasksRoute } from './TasksPage'
 import { DrivePage, type DriveRoute } from './DrivePage'
@@ -3189,7 +3189,8 @@ export default function App({
   const [flash, setFlash] = useState<{ roomId: string; messageId: string; token: number } | null>(null)
   const agentEnabled = config?.agent ?? false
   const chatAgentPanel = config?.chatAgentPanel ?? false
-  const [agentOpen, setAgentOpen] = useState(chatAgentPanel && (config?.initialAgentOpen ?? false))
+  // 側邊面板開合:Tasks / Docs / Drive 共用一份(2026-10-29 起這三頁有入口鈕);Chat 只在 chatAgentPanel 時放面板
+  const [agentOpen, setAgentOpen] = useState(config?.initialAgentOpen ?? false)
   // AppShell 版 Thread(Right panel):以 id 追蹤父訊息,換聊天室即收起(與舊版 ThreadPanel 同規則)
   const [shellThreadId, setShellThreadId] = useState<string | null>(config?.initialThreadId ?? null)
   const [shellFrame, setShellFrame] = useState<HTMLDivElement | null>(null)
@@ -3312,12 +3313,31 @@ export default function App({
     onSendToRoom: handleAgentSendToRoom,
     script: agentEnabled && config?.agentScript !== false ? K8S_IMAGEPULL_SCRIPT : undefined,
   })
-  // 代理內文的 Docs 連結:切到 Docs 分頁並開該頁(DocsPage 以 key 重新掛載、從指定位置開始)
+  // 代理內文的 Docs 連結:切到 Docs 分頁並開該頁(DocsPage 以 key 重新掛載、從指定位置開始)。
+  // 從整頁對話點的 → 這則對話接到 Docs 頁的側邊面板、面板打開,看完文章可以在 Docs 頁繼續對話
+  // (2026-10-29 user:「導到 doc 看 SOP 時 agent panel 可以打開,並將對話內容帶入」)。
   const [docsJump, setDocsJump] = useState<{ n: number; route?: DocsRoute }>({ n: 0 })
-  function handleAgentOpenDoc(space: string, page: string) {
+  const handleAgentOpenDoc: TAgentOpenDoc = (space, page, fromConversationId) => {
     setDocsJump((j) => ({ n: j.n + 1, route: { space, page } }))
+    if (fromConversationId) {
+      setPanelConversationId(fromConversationId)
+      setAgentOpen(true)
+    }
     setNavTab('docs')
   }
+  // Tasks / Docs / Drive 的 AI agent 區:同一份對話資料與開合狀態;面板裡的聊天室連結 → 回 Chat 分頁定位
+  const renderPageAgent = (context: TAgentRoomRef, openDoc?: TAgentOpenDoc) => (
+    <TAgentDock
+      open={agentOpen}
+      onOpenChange={setAgentOpen}
+      engine={agentEngine}
+      context={context}
+      onViewMessage={handleAgentOpenInChat}
+      onOpenDoc={openDoc ?? handleAgentOpenDoc}
+      activeId={panelConversationId}
+      onActiveIdChange={setPanelConversationId}
+    />
+  )
 
   // tAgent 整頁裡的來源連結 / 聊天室附件:回到 Chat 分頁再定位(側邊面板則留在 Chat 分頁,見 TAgentDock)
   function handleAgentOpenInChat(roomId: string, messageId: string) {
@@ -3456,6 +3476,7 @@ export default function App({
             portalContainer={shellFrame}
             initialRoute={config?.initialTasksRoute}
             resolvePerson={resolveTaskPerson}
+            renderAgent={renderPageAgent}
           />
         ) : navTab === 'drive' ? (
           <DrivePage
@@ -3467,6 +3488,7 @@ export default function App({
             channels={rooms.filter((r) => r.type === 'general' && r.origin !== 'teams').map((r) => ({ id: r.id, title: r.title }))}
             onOpenChannel={(roomId) => handleAgentOpenInChat(roomId, '')}
             resolvePerson={resolveTaskPerson}
+            renderAgent={renderPageAgent}
           />
         ) : navTab === 'docs' ? (
           <DocsPage
@@ -3476,6 +3498,7 @@ export default function App({
             portalContainer={shellFrame}
             initialRoute={docsJump.route ?? config?.initialDocsRoute}
             resolvePerson={resolveTaskPerson}
+            renderAgent={renderPageAgent}
           />
 
         ) : navTab === 'agent' ? (
@@ -3534,8 +3557,10 @@ export default function App({
                 open={agentOpen}
                 onOpenChange={setAgentOpen}
                 engine={agentEngine}
-                currentRoom={{ id: current.id, title: current.title }}
+                context={{ id: `room:${current.id}`, title: current.title }}
                 onViewMessage={handleAgentViewMessage}
+                onOpenDoc={handleAgentOpenDoc}
+                placement="above-input"
                 activeId={panelConversationId}
                 onActiveIdChange={setPanelConversationId}
               />

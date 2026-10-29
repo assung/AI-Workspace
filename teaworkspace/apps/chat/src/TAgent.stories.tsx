@@ -13,14 +13,14 @@ import App from './App'
 // - Chat 分頁的側邊面板(右緣入口鈕 / FAB)2026-10-23 起先不開放(user:「chat 部分請先幫我把 FAB 移除,目前先不開放 Chat 可以同時運用 ai agent」)。
 //   程式保留在 `config.chatAgentPanel`(預設 false);下方三則 test-only story 打開它,只給回歸測試用,不出現在側欄與文件頁。
 const meta: Meta<typeof App> = {
-  title: 'Apps/chat/tAgent',
+  title: 'Apps/chat/AI agent',
   component: App,
   parameters: {
     layout: 'fullscreen',
     docs: {
       description: {
         component:
-          'tWorkspace 的智慧代理 tAgent:點左側 NavRail 的 tAgent 進入專屬整頁 —— 左側 New / Projects / Artifacts / Pinned / Recents,右側對話。Chat 分頁目前不提供代理側邊面板。版面照 DS AppShell 四區規則;一次性的確認或表單仍用 Dialog,回覆單則訊息的討論串用 Thread。',
+          'tWorkspace 的智慧代理 AI agent(2026-10-29 由 tAgent 改名):點左側 NavRail 的 AI agent 進入專屬整頁 —— 左側 New / Projects / Artifacts / Pinned / Recents,右側對話。Tasks / Docs / Drive 內容頁右下角有入口鈕,叫出側邊面板;Chat 分頁目前不提供。版面照 DS AppShell 四區規則;一次性的確認或表單仍用 Dialog,回覆單則訊息的討論串用 Thread。',
       },
     },
   },
@@ -34,12 +34,12 @@ type Story = StoryObj<typeof App>
  * 整頁不帶預設範圍(沒有左側內容頁),用 + 自行指定。
  */
 export const AgentHome: Story = {
-  name: 'tAgent 首頁(新對話)',
+  name: 'AI agent 首頁(新對話)',
   render: () => <App config={{ agent: true, initialTab: 'agent' }} />,
 }
 
 /**
- * Demo 劇本(tagentScripts.tsx):payments-api 部到 staging ImagePullBackOff → 已知問題文章 → 無效 → 開單 SD-2318 → 值班接手 / 處理 → 結案。
+ * Demo 劇本(tagentScripts.tsx):payments-api 部到 staging ImagePullBackOff → 已知問題文章(點了切到 Docs,這則對話帶進 Docs 頁的側邊面板,在那裡繼續)→ 無效 → 開單 SD-2318 → 值班接手 / 處理 → 結案。
  * 輸入盒預先填好使用者的下一句,按 Enter 推進;「Bob 接手」「已處理」兩則是代理主動發的進度更新,隔幾秒自動出現。
  * 劇本在 tWorkspace 預設開啟,tAgent 首頁(上一則)同樣從這裡開始;這一則只是讓演示入口在側欄好找。
  */
@@ -50,14 +50,14 @@ export const ScriptDemo: Story = {
 
 /** test-only:劇本關閉時的一般行為(自由提問 → 通用回覆),回歸測試用。 */
 export const AgentHomeNoScript: Story = {
-  name: 'tAgent 首頁(劇本關閉,回歸用)',
+  name: 'AI agent 首頁(劇本關閉,回歸用)',
   tags: ['test-only'],
   render: () => <App config={{ agent: true, initialTab: 'agent', agentScript: false }} />,
 }
 
 /** tAgent 整頁開著一則對話(從 Pinned 點進來):訊息與輸入盒同一欄置中;頁首可釘選、改名、刪除。 */
 export const AgentConversationPage: Story = {
-  name: 'tAgent 整頁對話',
+  name: 'AI agent 整頁對話',
   render: () => <App config={{ agent: true, initialTab: 'agent', initialAgentRoute: 'conversation:c-dongding' }} />,
 }
 
@@ -93,7 +93,7 @@ export const PanelOpen: Story = {
  * 更窄時 tAgent 變右側浮層。
  */
 export const ThreadAndAgent: Story = {
-  name: 'Thread 與 tAgent 並存(回歸用)',
+  name: 'Thread 與 AI agent 並存(回歸用)',
   tags: ['test-only'],
   render: () => <App config={{ agent: true, chatAgentPanel: true, initialAgentOpen: true, initialThreadId: 'm1' }} />,
 }
