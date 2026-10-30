@@ -8,11 +8,11 @@
 //   (developer.atlassian.com/platform/forge/ui-kit/components/lozenge)→ New 灰、In progress 藍、
 //   Waiting for requester 黃(等別人回覆,需要留意;tag.spec.md yellow「常用於注意類」)、Closed 綠。
 // - 段落標題 / 條列 / 字級 = articles.tsx 同一組(text-h4、list utilities、text-body)
-// 單子內容跟著劇本走(SD-2318 / SD-2320 的狀態、負責人、活動紀錄 = engine.scriptPos,oncallScript.tsx ONCALL_MILESTONES)。
+// 單子內容跟著劇本走(SD-2318 / SD-2320 的狀態、負責人、活動紀錄 = engine.scriptPos;各身分的劇本步數不同,里程碑由 personas.tsx 給)。
 import { Button, ButtonDivider, DescriptionItem, DescriptionList, Tag, Tooltip, TooltipContent, TooltipTrigger } from '@qijenchen/design-system'
 import { ExternalLink } from 'lucide-react'
 import { AsideHeaderActions } from './AsideHeaderActions'
-import { ONCALL_MILESTONES as M } from './oncallScript'
+import type { TicketMilestones } from './oncallScript'
 
 type Status = 'New' | 'In progress' | 'Waiting for requester' | 'Closed'
 const STATUS_COLOR: Record<Status, 'neutral' | 'blue' | 'yellow' | 'green'> = {
@@ -40,8 +40,8 @@ export type Ticket = {
 // 日期格式 YYYY/MM/DD hh:mm AM/PM(本專案慣例)
 const TODAY = '2026/10/30'
 
-/** 單子目前的樣子;`pos` = 值班者劇本進度(還沒開始 = 0) */
-export function getTicket(id: string, pos: number): Ticket | undefined {
+/** 單子目前的樣子;`pos` = 這個身分的劇本進度(還沒開始 = 0),`M` = 這份劇本的里程碑 */
+export function getTicket(id: string, pos: number, M: TicketMilestones): Ticket | undefined {
   const done = (step: number) => pos > step
   if (id === 'SD-2318') {
     const status: Status = done(M.closed) ? 'Closed' : done(M.replied) ? 'Waiting for requester' : done(M.assigned) ? 'In progress' : 'New'

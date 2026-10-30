@@ -4,9 +4,9 @@
 // ── 版面 ─────────────────────────────────────────────────────────────────────
 // DS AppShell(app-shell.spec.md「版面規則」):Menu = 側欄、Main = 對話 / 清單、Right panel = 知識庫文章預覽;不用 AI agent 區
 // (這一頁本身就是代理)。
-// 側欄項目 New / Projects / Artifacts / Pinned / Recents(2026-10-30 user:Projects / Artifacts 先保留):
-//   對照 Claude 側欄有獨立 Artifacts 區(support.claude.com/en/articles/9487310)與獨立 Starred 區;Gemini 把釘選放在 Recent 最上面
-//   (support.google.com/gemini/answer/13666746)。Pinned / Recents 分開 = Claude 做法。
+// 側欄項目 New / Updates / Pinned / Recents(2026-10-30 user:拿掉 Projects / Artifacts,新增 Updates):
+//   Updates 放在 New 下方 = ChatGPT「Your Dot」的位置(側欄 New chat 正下方,zapier.com/blog/chatgpt-dots);內容見 TAgent.tsx UPDATES_ID。
+//   Pinned / Recents 分開 = Claude 側欄獨立 Starred 區的做法;Gemini 則把釘選放在 Recent 最上面(support.google.com/gemini/answer/13666746)。
 // 右側面板(2026-10-30 user:「開在 right panel,走跟 Claude 右邊面板預覽一樣的方式」):代理內文的文章連結,
 //   以及值班者身分的單號連結 → 在同一個事件裡 `requestAside(內容類型)`(使用者主動要求 Right 顯示內容,§4);
 //   × 關閉後對話填滿;換對話時收起。內容依身分(personas.tsx)。
@@ -19,7 +19,6 @@
 //   agent-panel.spec.md「何時不用:全螢幕沉浸式對話產品 → 產品自建頁面」—— 頁面是本 app 組的,零件全用 DS 的)
 // - 新對話首頁 = DS Empty(AgentLogo attract 48,spec「附:空狀態」)+ 建議 = DS Chip variant="assist"
 // - 改名 / 刪除 = DS Dialog(height="hug"、maxWidth 440)+ Field + useFormValidation(agent-panel.spec.md「附:歷史浮層」同款)
-// - Projects / Artifacts = DS DataTable + LinkInput view(站內路徑 `/conversations/<id>` 才渲染成連結;頁面攔截改成切換對話)
 
 import { useEffect, useState, type ReactNode } from 'react'
 import {
@@ -62,12 +61,10 @@ import {
   FieldLabel,
   FieldError,
   Input,
-  DataTable,
-  LinkInput,
   useAppShell,
   useFormValidation,
 } from '@qijenchen/design-system'
-import { SquarePen, FolderKanban, Shapes, MoreHorizontal, Pin, PinOff, Pencil, Trash2 } from 'lucide-react'
+import { SquarePen, Bell, MoreHorizontal, Pin, PinOff, Pencil, Trash2 } from 'lucide-react'
 import {
   TAGENT_LABEL,
   TAgentOpenArticleProvider,
@@ -76,14 +73,17 @@ import {
   renderTurns,
   type TAgentConversation,
   type TAgentEngine,
+  UPDATES_ID,
+  UPDATES_TITLE,
 } from './TAgent'
+import { UpdatesActionsProvider } from './updates'
 import { ARTICLES, ArticlePreview } from './articles'
 import { getTicket, TicketPreview } from './tickets'
 import type { Persona } from './personas'
 import { CHROME_SIDEBAR_BG, CHROME_SIDEBAR_FILL_X } from './chrome'
 
-/** 整頁的位置:新對話首頁 / 某一則對話 / Projects / Artifacts。也是側欄 SidebarProvider 的 activeId(單選高亮)。 */
-export type TAgentRoute = 'new' | 'projects' | 'artifacts' | `conversation:${string}`
+/** 整頁的位置:新對話首頁 / 某一則對話(Updates 也是一則對話,id = UPDATES_ID)。也是側欄 SidebarProvider 的 activeId(單選高亮)。 */
+export type TAgentRoute = 'new' | `conversation:${string}`
 
 export const conversationRoute = (id: string): TAgentRoute => `conversation:${id}`
 
@@ -109,7 +109,7 @@ function greeting(name: string, now = new Date()) {
  * 對話區:提供文章 / 單號連結的動作。要在 AppShell 子樹內才拿得到 `requestAside`(app-shell.spec.md「Hook export」),
  * 所以包在 Main 裡,不放在頁面最外層。
  */
-function PanelScope({ onOpen, tickets, children }: { onOpen: (kind: Panel['kind'], id: string) => void; tickets: boolean; children: ReactNode }) {
+function PanelScope({ onOpen, children }: { onOpen: (kind: Panel['kind'], id: string) => void; children: ReactNode }) {
   const { requestAside } = useAppShell()
   // 使用者主動要求 Right 顯示內容 → 同一個事件裡呼叫(§4:放不下時連帶規則由 AppShell 處理)
   const open = (kind: Panel['kind'], id: string) => {
@@ -118,7 +118,7 @@ function PanelScope({ onOpen, tickets, children }: { onOpen: (kind: Panel['kind'
   }
   return (
     <TAgentOpenArticleProvider openArticle={(id) => open('article', id)}>
-      <TAgentOpenTicketProvider openTicket={tickets ? (id) => open('ticket', id) : null}>{children}</TAgentOpenTicketProvider>
+      <TAgentOpenTicketProvider openTicket={(id) => open('ticket', id)}>{children}</TAgentOpenTicketProvider>
     </TAgentOpenArticleProvider>
   )
 }
@@ -152,7 +152,7 @@ export function TAgentPage({
   }, [activeConversation?.id])
   const openArticle = panel?.kind === 'article' ? ARTICLES[panel.id] : undefined
   // 單子跟著劇本進度變(狀態、負責人、活動紀錄)
-  const openTicket = panel?.kind === 'ticket' ? getTicket(panel.id, engine.scriptPos) : undefined
+  const openTicket = panel?.kind === 'ticket' ? getTicket(panel.id, engine.scriptPos, persona.milestones) : undefined
 
   // 劇本台詞預先填入輸入盒(2026-10-29 user:「第一句話先預設填入輸入框內」):劇本還沒開始 → 新對話首頁;
   // 開始後 → 劇本那一則對話,輪到使用者時填下一句。只在台詞或位置改變時填,不蓋掉使用者正在打的字。
@@ -219,10 +219,9 @@ export function TAgentPage({
                 <SidebarMenuButton id="new" startIcon={SquarePen} tooltip="New conversation">New conversation</SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton id="projects" startIcon={FolderKanban} tooltip="Projects">Projects</SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton id="artifacts" startIcon={Shapes} tooltip="Artifacts">Artifacts</SidebarMenuButton>
+                <SidebarMenuButton id={conversationRoute(UPDATES_ID)} startIcon={Bell} tooltip={UPDATES_TITLE}>{UPDATES_TITLE}</SidebarMenuButton>
+                {/* 未讀紅點:同對話列(2026-10-30 user:「一樣有紅點機制」);這一列沒有 ⋯,紅點常駐 */}
+                {engine.unreadIds.has(UPDATES_ID) && <SidebarMenuBadge dot variant="critical" aria-label="New update" className="!bg-[#EC540F]" />}
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
@@ -245,17 +244,15 @@ export function TAgentPage({
     </Sidebar>
   )
 
-  const headerTitle =
-    effectiveRoute === 'projects' ? 'Projects'
-      : effectiveRoute === 'artifacts' ? 'Artifacts'
-        : activeConversation ? activeConversation.title
-          : 'New conversation'
+  const headerTitle = activeConversation ? activeConversation.title : 'New conversation'
+  // Updates 不能釘選 / 改名 / 刪除(它是固定入口,不是一般對話)
+  const isUpdates = activeConversation?.id === UPDATES_ID
 
   const header = (
     <ChromeHeader className="bg-surface">
       <SidebarTrigger aria-label={`Toggle ${TAGENT_LABEL} sidebar`} />
       <h1 className="flex-1 truncate text-body-lg font-medium">{headerTitle}</h1>
-      {activeConversation && (
+      {activeConversation && !isUpdates && (
         <div className="flex items-center gap-2">
           <Tooltip>
             <TooltipTrigger asChild>
@@ -290,17 +287,30 @@ export function TAgentPage({
 
   const openConversation = (id: string) => onRouteChange(conversationRoute(id))
 
+  // Updates 訊息裡的動作(updates.tsx):開劇本那則帶前情的新對話 / 打開某一則對話(`script` = 劇本那一則)
+  const updatesActions = {
+    ticketChatStarted: engine.scriptConvId !== null,
+    workOnTicket: () => {
+      const id = engine.startScripted()
+      if (id) openConversation(id)
+    },
+    openConversation: (id: string) => {
+      const target = id === 'script' ? engine.scriptConvId : id
+      if (target) openConversation(target)
+    },
+  }
+
   let main: ReactNode
-  if (effectiveRoute === 'projects') main = <ProjectsView engine={engine} projects={persona.projects} onOpenConversation={openConversation} />
-  else if (effectiveRoute === 'artifacts') main = <ArtifactsView engine={engine} artifacts={persona.artifacts} onOpenConversation={openConversation} />
-  else if (activeConversation)
+  if (activeConversation)
     main = (
       <div className="flex h-full min-h-0 flex-col">
-        <PanelScope tickets={persona.ticketPanel} onOpen={(kind, id) => setPanel({ conversationId: activeConversation.id, kind, id })}>
+        <PanelScope onOpen={(kind, id) => setPanel({ conversationId: activeConversation.id, kind, id })}>
           {/* className 落在 log 本體:同一欄置中;捲軸仍在整個 Main 右緣 */}
-          <AgentConversation className="mx-auto w-full" style={{ maxWidth: COLUMN_MAX_WIDTH }}>
-            {renderTurns(activeConversation)}
-          </AgentConversation>
+          <UpdatesActionsProvider value={updatesActions}>
+            <AgentConversation className="mx-auto w-full" style={{ maxWidth: COLUMN_MAX_WIDTH }}>
+              {renderTurns(activeConversation)}
+            </AgentConversation>
+          </UpdatesActionsProvider>
         </PanelScope>
         {/* AgentPromptInput 自帶 m-loose mt-0(與 AgentConversation 的 p-loose 同一條內緣)→ 外層不再加 padding */}
         <div className="mx-auto w-full" style={{ maxWidth: COLUMN_MAX_WIDTH }}>
@@ -456,60 +466,5 @@ function RenameConversationDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
-}
-
-/** 內部連結由頁面攔截、改成切換對話(SPA link interception,DS agent-panel.stories TaskListView 同款) */
-function interceptConversationLink(onOpenConversation: (id: string) => void) {
-  return (e: React.MouseEvent) => {
-    const href = (e.target as Element).closest?.('a[href]')?.getAttribute('href')
-    const m = href?.match(/^\/conversations\/(.+)$/)
-    if (!m) return
-    e.preventDefault()
-    e.stopPropagation()
-    onOpenConversation(m[1])
-  }
-}
-
-const conversationLinkCell = (label: string, conversationId: string | undefined) =>
-  conversationId ? <LinkInput mode="view" value={`/conversations/${conversationId}`} label={label} /> : label
-
-function ProjectsView({ engine, projects, onOpenConversation }: { engine: TAgentEngine; projects: Persona['projects']; onOpenConversation: (id: string) => void }) {
-  // 對話資料與側欄同一份:數量只算還在的對話;「最近一則」= Recents 排序(最近活動在前)裡最前面那一則
-  const rows = projects.map((p) => {
-    const alive = engine.listed.filter((c) => p.conversationIds.includes(c.id))
-    return { ...p, conversations: alive.length, latestId: alive[0]?.id }
-  })
-  type Row = (typeof rows)[number]
-  const columns = [
-    { accessorKey: 'name', header: 'Name', cell: ({ row }: { row: { original: Row } }) => conversationLinkCell(row.original.name, row.original.latestId) },
-    { accessorKey: 'description', header: 'Description', meta: { type: 'string' as const } },
-    { accessorKey: 'conversations', header: 'Conversations', meta: { type: 'number' as const } },
-    { accessorKey: 'updated', header: 'Last updated', meta: { type: 'string' as const } },
-  ]
-  return (
-    <div className="flex h-full min-h-0 flex-col px-[var(--layout-space-loose)] py-[var(--layout-space-tight)]" onClickCapture={interceptConversationLink(onOpenConversation)}>
-      <DataTable columns={columns} data={rows} height="100%" getRowId={(p: Row) => p.id} aria-label="Projects" />
-    </div>
-  )
-}
-
-function ArtifactsView({ engine, artifacts, onOpenConversation }: { engine: TAgentEngine; artifacts: Persona['artifacts']; onOpenConversation: (id: string) => void }) {
-  // 來源對話已被刪除的成果物不列
-  const rows = artifacts.flatMap((a) => {
-    const source = engine.conversations.find((c) => c.id === a.conversationId)
-    return source ? [{ ...a, createdIn: source.title }] : []
-  })
-  type Row = (typeof rows)[number]
-  const columns = [
-    { accessorKey: 'name', header: 'Name', cell: ({ row }: { row: { original: Row } }) => conversationLinkCell(row.original.name, row.original.conversationId) },
-    { accessorKey: 'type', header: 'Type', meta: { type: 'select' as const } },
-    { accessorKey: 'createdIn', header: 'Created in', meta: { type: 'string' as const } },
-    { accessorKey: 'updated', header: 'Last updated', meta: { type: 'string' as const } },
-  ]
-  return (
-    <div className="flex h-full min-h-0 flex-col px-[var(--layout-space-loose)] py-[var(--layout-space-tight)]" onClickCapture={interceptConversationLink(onOpenConversation)}>
-      <DataTable columns={columns} data={rows} height="100%" getRowId={(a: Row) => a.id} aria-label="Artifacts" />
-    </div>
   )
 }

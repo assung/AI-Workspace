@@ -101,11 +101,22 @@ export function TicketLink({ id }: { id: string }) {
 // ── 劇本(demo 用,2026-10-29 user:「prototype 在 demo 時照我寫好的對話劇本演示」)──────────────
 // 使用者的每一句預先填進輸入盒(按 Enter 送出;改了字也照樣推進);代理的回覆依序播放,
 // 連續的代理回合自動接續,`afterMs` = 主動發的進度更新(前一則結束後隔多久出現)。
-// 劇本只在「新對話」起頭時啟動一次;跑完後回到一般行為。
+// 劇本只在「新對話」起頭時啟動一次(或從 Updates 的「Work on this ticket」開出來時,第一步是代理);跑完後回到一般行為。
+// `update` = 這一步完成時也發一則到 Updates(2026-10-30 user:進度通知「兩邊都放」—— 對話裡一則、Updates 一則)。
+export type TAgentUpdate = { body: ReactNode; copyText: string }
 export type TAgentScriptStep =
   | { who: 'user'; text: string }
-  | { who: 'agent'; steps: string[]; body: ReactNode; copyText: string; afterMs?: number }
+  | { who: 'agent'; steps: string[]; body: ReactNode; copyText: string; afterMs?: number; update?: TAgentUpdate }
 export type TAgentScript = { title: string; steps: TAgentScriptStep[] }
+
+/**
+ * Updates(2026-10-30 user:「類似 GPT agent 的 Your dot 功能,裡面會有提醒事項的訊息流」,入口名稱 Updates)。
+ * 對照 ChatGPT「Your Dot」:側欄 New chat 下方的入口、一條持續的對話、代理主動開口、可分出帶前情的新對話
+ * (zapier.com/blog/chatgpt-dots;technicallycurious.substack.com/p/meet-your-new-work-bestie-chatgpt)。
+ * 這裡做成一則特殊對話(id 固定),不列在 Pinned / Recents;未讀紅點、Toast 沿用一般對話那一套。
+ */
+export const UPDATES_ID = 'updates'
+export const UPDATES_TITLE = 'Updates'
 
 // 使用者泡泡斷字(DS 泡泡沒有;長網址、長附件 chip 會溢出泡泡右緣 —— apps/chat 同一組,STRUCTURE.md §4.5 待 DS 補)
 const USER_BUBBLE_WRAP = '[&>div]:min-w-0 [&>div]:[overflow-wrap:anywhere] [&>div>div>*]:max-w-full [&>div>div>*>span]:min-w-0 [&>div>div>*>span]:truncate'
@@ -118,9 +129,11 @@ const titleFrom = (text: string) => (text.length > 48 ? `${text.slice(0, 48)}…
 // ── Engine ────────────────────────────────────────────────────────────────────
 export type TAgentEngine = ReturnType<typeof useTAgentEngine>
 
-export function useTAgentEngine({ seed, script, isViewing, onBackgroundReply }: {
+export function useTAgentEngine({ seed, updatesSeed, script, isViewing, onBackgroundReply }: {
   /** 側欄一開始就有的示範對話(依身分不同,personas.tsx) */
   seed: () => TAgentConversation[]
+  /** Updates 一開始就有的訊息(依身分不同) */
+  updatesSeed: () => TAgentTurn[]
   /** demo 劇本(見 TAgentScript);省略 = 一般行為 */
   script?: TAgentScript
   /** 使用者此刻是否正看著這則對話(對話頁開著它,且瀏覽器分頁在前景) */
@@ -128,7 +141,10 @@ export function useTAgentEngine({ seed, script, isViewing, onBackgroundReply }: 
   /** 代理在使用者沒看著的對話裡回完一則:該則記為未讀(紅點 + 分頁標題),並通知頁面發 Toast。 */
   onBackgroundReply?: (conversation: { id: string; title: string }, replyText: string) => void
 }) {
-  const [conversations, setConversations] = useState<TAgentConversation[]>(seed)
+  const [conversations, setConversations] = useState<TAgentConversation[]>(() => [
+    { id: UPDATES_ID, title: UPDATES_TITLE, turns: updatesSeed() },
+    ...seed(),
+  ])
   const conversationsRef = useRef(conversations)
   conversationsRef.current = conversations
   const isViewingRef = useRef(isViewing)
@@ -193,15 +209,44 @@ export function useTAgentEngine({ seed, script, isViewing, onBackgroundReply }: 
     )
   }, [patchConversation, patchTurn])
 
+  /**
+   * 發一則到 Updates(代理主動開口,沒有思考過程)。使用者沒看著 Updates → 記未讀(紅點 + 分頁標題);
+   * `silent` = 同一件事已經在別的對話通知過(進度「兩邊都放」的 Updates 那一份),只記紅點、不再跳 Toast。
+   */
+  const postUpdate = useCallback((update: TAgentUpdate, { silent = false } = {}) => {
+    const turn: AgentTurn = { kind: 'agent', id: nextId('n'), thinking: false, steps: [], body: update.body, copyText: update.copyText }
+    patchConversation(UPDATES_ID, (c) => ({ ...c, turns: [...c.turns, turn] }))
+    if (isViewingRef.current && !isViewingRef.current(UPDATES_ID)) {
+      setUnreadIds((prev) => new Set(prev).add(UPDATES_ID))
+      if (!silent) onBackgroundReplyRef.current?.({ id: UPDATES_ID, title: UPDATES_TITLE }, update.copyText)
+    }
+  }, [patchConversation])
+
   /** 從劇本第 pos 步開始播代理回合,直到下一句使用者的話(或劇本結束) */
   const playScriptFrom = useCallback((convId: string, pos: number) => {
     const step = script?.steps[pos]
     setScript(convId, pos)
     if (!step || step.who === 'user') return
-    const start = () => runAgent(convId, step.steps, () => ({ body: step.body, copyText: step.copyText }), () => playScriptFrom(convId, pos + 1))
+    const start = () => runAgent(convId, step.steps, () => ({ body: step.body, copyText: step.copyText }), () => {
+      if (step.update) postUpdate(step.update, { silent: true })
+      playScriptFrom(convId, pos + 1)
+    })
     if (step.afterMs) timers.current.push(window.setTimeout(start, step.afterMs))
     else start()
-  }, [script, runAgent, setScript])
+  }, [script, runAgent, setScript, postUpdate])
+
+  /**
+   * 從 Updates 的「Work on this ticket」開一則帶前情的新對話(對照 Your Dot「分出帶前情的新對話」):
+   * 劇本第一步是代理的整理,開出來就開始播。劇本已經開始過 → 回傳那一則,不重開。
+   */
+  const startScripted = useCallback(() => {
+    if (!script) return null
+    if (scriptRef.current.convId) return scriptRef.current.convId
+    const id = nextId('c')
+    setConversations((prev) => [prev[0], { id, title: script.title, turns: [] }, ...prev.slice(1)])
+    playScriptFrom(id, 0)
+    return id
+  }, [script, playScriptFrom])
 
   const stop = useCallback(() => {
     timers.current.forEach((t) => window.clearTimeout(t))
@@ -241,7 +286,10 @@ export function useTAgentEngine({ seed, script, isViewing, onBackgroundReply }: 
         title: base.turns.length === 0 ? (scripted && script ? script.title : titleFrom(text)) : base.title,
         turns: [...base.turns, userTurn],
       }
-      return [updated, ...prev.filter((c) => c.id !== id)]
+      // Updates 固定在最前面(不參與最近活動排序)
+      const rest = prev.filter((c) => c.id !== id && c.id !== UPDATES_ID)
+      const updates = prev.find((c) => c.id === UPDATES_ID)
+      return updates ? [updates, updated, ...rest] : [updated, ...rest]
     })
     if (scripted) {
       playScriptFrom(id, sc.pos + 1)
@@ -271,11 +319,15 @@ export function useTAgentEngine({ seed, script, isViewing, onBackgroundReply }: 
     })
   }, [])
 
-  const listed = useMemo(() => conversations.filter((c) => c.turns.length > 0), [conversations])
+  const listed = useMemo(() => conversations.filter((c) => c.turns.length > 0 && c.id !== UPDATES_ID), [conversations])
+  const updates = conversations.find((c) => c.id === UPDATES_ID)!
   return {
     conversations,
-    /** 有內容的對話(側欄只列這些) */
+    /** 有內容的對話(側欄 Pinned / Recents 只列這些;不含 Updates) */
     listed,
+    updates,
+    postUpdate,
+    startScripted,
     busyConvId,
     busy: busyConvId !== null,
     /** 劇本的下一句使用者台詞(輪到使用者時才有),輸入盒預先填入;以及劇本跑在哪一則對話 */
@@ -286,7 +338,7 @@ export function useTAgentEngine({ seed, script, isViewing, onBackgroundReply }: 
     /** 未讀對話 */
     unreadIds,
     /** 未讀數(已刪除的不算;分頁標題用) */
-    unreadCount: useMemo(() => listed.filter((c) => unreadIds.has(c.id)).length, [listed, unreadIds]),
+    unreadCount: useMemo(() => listed.filter((c) => unreadIds.has(c.id)).length + (unreadIds.has(UPDATES_ID) ? 1 : 0), [listed, unreadIds]),
     markRead,
     send,
     stop,

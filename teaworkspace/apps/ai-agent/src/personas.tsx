@@ -1,27 +1,28 @@
-// Demo 身分(2026-10-30 user 選 A:同一個 app / artifact,網址 `#oncall` = 值班者 Bob,沒有 hash = 申請人)。
-// 每個身分各有:問候名字、首頁說明與建議、側欄示範對話、Projects / Artifacts、劇本、能不能在右側面板看單子。
+// Demo 身分(2026-10-30 user 選 A:同一個 app / artifact,用網址 hash 切換):
+//   沒有 hash = 申請人 Aaron;`#oncall` = 值班者 Bob「人找事」(開口問隊列);`#oncall-updates` = Bob「事找人」(Updates 主動通知新單)。
+// 每個身分各有:問候名字、首頁說明與建議、側欄示範對話、Updates 訊息、劇本與單子里程碑。
+// Projects / Artifacts 拿掉(2026-10-30 user)。
 import type { ReactNode } from 'react'
-import type { TAgentConversation, TAgentScript, TAgentTurn } from './TAgent'
+import { TicketLink, type TAgentConversation, type TAgentScript, type TAgentTurn, type TAgentUpdate } from './TAgent'
 import { K8S_IMAGEPULL_SCRIPT } from './tagentScripts'
-import { ONCALL_SCRIPT } from './oncallScript'
-
-/** `conversationIds` = 屬於這個專案的對話;Name 連到其中最近一則 */
-export type Project = { id: string; name: string; description: string; conversationIds: string[]; updated: string }
-export type Artifact = { id: string; name: string; type: string; conversationId: string; updated: string }
+import { NEW_TICKET_UPDATE, ONCALL_MILESTONES, ONCALL_SCRIPT, ONCALL_UPDATES_MILESTONES, ONCALL_UPDATES_SCRIPT, type TicketMilestones } from './oncallScript'
+import { OpenConversationButton, UpdateTime } from './updates'
 
 export type Persona = {
-  id: 'requester' | 'oncall'
+  id: 'requester' | 'oncall' | 'oncall-updates'
   /** 首頁問候用的名字 */
   userName: string
   homeDescription: string
   /** 新對話首頁的建議(Chip assist;點了填入輸入盒) */
   suggestions: string[]
   seed: () => TAgentConversation[]
-  projects: Project[]
-  artifacts: Artifact[]
+  /** Updates 一開始就有的訊息 */
+  updatesSeed: () => TAgentTurn[]
+  /** 打開 demo 後隔多久自動發到 Updates 的訊息(事找人的觸發點) */
+  liveUpdates?: Array<TAgentUpdate & { afterMs: number }>
   script: TAgentScript
-  /** 單號點了在右側面板看單子(2026-10-30 user:值班者視角;申請人視角維持假連結) */
-  ticketPanel: boolean
+  /** 劇本各步對單子狀態的影響(右側面板的單子跟著變) */
+  milestones: TicketMilestones
 }
 
 const agent = (id: string, steps: string[], text: ReactNode, copyText: string): TAgentTurn => ({
@@ -34,6 +35,21 @@ const agent = (id: string, steps: string[], text: ReactNode, copyText: string): 
 })
 const user = (id: string, text: string): TAgentTurn => ({ kind: 'user', id, text, attachments: [] })
 const said = (id: string, steps: string[], text: string) => agent(id, steps, text, text)
+/** Updates 訊息:時間 + 內文 + 動作(Updates 的語言 = demo 劇本的語言,中文) */
+const update = (id: string, time: string, text: ReactNode, copyText: string, action?: ReactNode): TAgentTurn => ({
+  kind: 'agent',
+  id,
+  thinking: false,
+  steps: [],
+  copyText,
+  body: (
+    <>
+      <UpdateTime>{time}</UpdateTime>
+      <p className="mt-1">{text}</p>
+      {action}
+    </>
+  ),
+})
 
 // 日期格式 YYYY/MM/DD hh:mm AM/PM(本專案慣例)
 
@@ -44,7 +60,14 @@ export const REQUESTER: Persona = {
   homeDescription: 'Tell me what’s broken. Paste an error or a link, and I’ll look into it or open a ticket for you.',
   suggestions: ['My deploy is stuck on staging', 'Request access to a repository', 'Check the status of my ticket'],
   script: K8S_IMAGEPULL_SCRIPT,
-  ticketPanel: false,
+  // 申請人劇本:第 9 步(Bob 接手)= 指派、第 10 步(已處理)= 重新啟用 + 回覆、第 12 步 = 結案;沒有後續單
+  milestones: { assigned: 8, reenabled: 9, replied: 9, closed: 11, followUpOpened: Infinity },
+  updatesSeed: () => [
+    update('u-ar', '2026/10/29 04:10 PM', 'Priya 核准了你的權限申請 AR-5170，你現在有 billing-service 的寫入權限。',
+      'Priya 核准了你的權限申請 AR-5170，你現在有 billing-service 的寫入權限。', <OpenConversationButton conversationId="c-repo" />),
+    update('u-gp', '09:00 AM', 'Self Service 已經有 GlobalProtect 6.2.5，更新後就能解決 VPN 斷線。',
+      'Self Service 已經有 GlobalProtect 6.2.5，更新後就能解決 VPN 斷線。', <OpenConversationButton conversationId="c-vpn" />),
+  ],
   seed: () => [
     {
       id: 'c-vpn',
@@ -84,15 +107,18 @@ export const REQUESTER: Persona = {
       ],
     },
   ],
-  projects: [
-    { id: 'p-laptop', name: 'New laptop setup', description: 'MFA, Wi-Fi certificate and VPN on the new MacBook', conversationIds: ['c-okta', 'c-wifi', 'c-vpn'], updated: '2026/10/29 05:40 PM' },
-    { id: 'p-billing', name: 'Invoice export project', description: 'Repository access and staging environment for billing-service', conversationIds: ['c-repo'], updated: '2026/10/27 11:15 AM' },
-  ],
-  artifacts: [
-    { id: 'a-vpn', name: 'GlobalProtect 6.2.5 update steps', type: 'Doc', conversationId: 'c-vpn', updated: '2026/10/29 05:32 PM' },
-    { id: 'a-access', name: 'billing-service access request AR-5170', type: 'Request', conversationId: 'c-repo', updated: '2026/10/27 11:12 AM' },
-    { id: 'a-wifi', name: 'Wi-Fi certificate renewal checklist', type: 'Doc', conversationId: 'c-wifi', updated: '2026/10/24 09:05 AM' },
-  ],
+}
+
+/** Bob 的 Updates:晨間摘要 + SLA 提醒(兩條值班情境共用) */
+function ONCALL_UPDATES_SEED(): TAgentTurn[] {
+  return [
+    update('u-morning', '08:30 AM',
+      <>早安，Bob。昨晚 stg-cluster-01 有 2 則告警，都已自動恢復。你的隊列還有 2 張單：<TicketLink id="SD-2311" />、<TicketLink id="SD-2305" />。</>,
+      '早安，Bob。昨晚 stg-cluster-01 有 2 則告警，都已自動恢復。你的隊列還有 2 張單：#SD-2311、#SD-2305。'),
+    update('u-sla', '09:15 AM',
+      <>提醒：<TicketLink id="SD-2311" /> 今天 05:00 PM 到 SLA。</>,
+      '提醒：#SD-2311 今天 05:00 PM 到 SLA。'),
+  ]
 }
 
 // ── 值班者(Bob,K8s 平台團隊;2026-10-30 user:「以值班者角度的 user journey demo」)──────────
@@ -102,7 +128,8 @@ export const ONCALL: Persona = {
   homeDescription: 'Ask about your queue, a ticket, or a cluster. I’ll pull the context together for you.',
   suggestions: ['Which tickets are close to their SLA?', 'Summarize last night’s alerts', 'Show tickets waiting on me'],
   script: ONCALL_SCRIPT,
-  ticketPanel: true,
+  milestones: ONCALL_MILESTONES,
+  updatesSeed: () => ONCALL_UPDATES_SEED(),
   seed: () => [
     {
       id: 'c-rotation',
@@ -142,14 +169,17 @@ export const ONCALL: Persona = {
       ],
     },
   ],
-  projects: [
-    { id: 'p-week44', name: 'On-call week 44', description: 'Queue, alerts and handover for this on-call week', conversationIds: ['c-disk', 'c-quota', 'c-ingress'], updated: '2026/10/30 09:12 AM' },
-    { id: 'p-rotation', name: 'Registry key rotation', description: 'Rotation schedule, runbook and post-rotation checks', conversationIds: ['c-rotation'], updated: '2026/10/29 06:20 PM' },
-  ],
-  artifacts: [
-    { id: 'a-handover', name: 'On-call handover notes, week 44', type: 'Doc', conversationId: 'c-disk', updated: '2026/10/30 09:10 AM' },
-    { id: 'a-ingress', name: 'Ingress 502 incident timeline', type: 'Doc', conversationId: 'c-ingress', updated: '2026/10/24 04:35 PM' },
-  ],
 }
 
-export const personaFromHash = (hash: string): Persona => (hash === '#oncall' ? ONCALL : REQUESTER)
+// ── 值班者「事找人」(2026-10-30 user:「一種情境是人找事,另一種情境是事找人」)────────────────────
+// 同一個 Bob、同一組示範對話;差在劇本從 Updates 的新單通知開始(5 秒後自動出現)。
+export const ONCALL_UPDATES: Persona = {
+  ...ONCALL,
+  id: 'oncall-updates',
+  script: ONCALL_UPDATES_SCRIPT,
+  milestones: ONCALL_UPDATES_MILESTONES,
+  liveUpdates: [NEW_TICKET_UPDATE],
+}
+
+export const personaFromHash = (hash: string): Persona =>
+  hash === '#oncall' ? ONCALL : hash === '#oncall-updates' ? ONCALL_UPDATES : REQUESTER

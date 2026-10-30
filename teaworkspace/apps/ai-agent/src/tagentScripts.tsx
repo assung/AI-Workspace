@@ -7,6 +7,20 @@
 // 「文章」連結在右側面板預覽 K8s Platform › Known issues › ImagePullBackOff：registry pull secret 過期(articles.tsx `kb-imagepull`)。
 // 從 apps/chat/src/tagentScripts.tsx 複製(2026-10-30 獨立產品);第 4 步思考改回 handoff §3 的寫法(獨立產品沒有 Docs 分頁,user 同意)。
 import { ArticleLink, TicketLink, type TAgentScript } from './TAgent'
+import { OpenConversationButton, UpdateTime } from './updates'
+
+// 進度「兩邊都放」(2026-10-30 user):第 9、10、12 步同時發一則到 Updates(時間 = 單子活動紀錄同一組,tickets.tsx),
+// 附「Open conversation」回到這一則對話(`script` = 劇本那一則)。Updates 那一份只記紅點、不再跳 Toast(對話那一份已通知過)。
+const mirror = (time: string, text: string, body: React.ReactNode) => ({
+  copyText: text,
+  body: (
+    <>
+      <UpdateTime>{time}</UpdateTime>
+      <p className="mt-1">{body}</p>
+      <OpenConversationButton conversationId="script" />
+    </>
+  ),
+})
 
 /**
  * 進度更新(主動發)的間隔:讓講者有時間說明「值班已接手」再出下一則。
@@ -74,6 +88,7 @@ export const K8S_IMAGEPULL_SCRIPT: TAgentScript = {
       afterMs: UPDATE_GAP_MS,
       steps: [],
       copyText: '#SD-2318 已由 K8s 平台團隊的 Bob 接手，正在處理。',
+      update: mirror('10:44 AM', '#SD-2318 已由 K8s 平台團隊的 Bob 接手，正在處理。', <><TicketLink id="SD-2318" /> 已由 K8s 平台團隊的 Bob 接手，正在處理。</>),
       body: <p><TicketLink id="SD-2318" /> 已由 K8s 平台團隊的 Bob 接手，正在處理。</p>,
     },
     {
@@ -81,6 +96,7 @@ export const K8S_IMAGEPULL_SCRIPT: TAgentScript = {
       afterMs: UPDATE_GAP_MS,
       steps: [],
       copyText: '#SD-2318 已處理。原因是 registry 的 robot account 在昨晚金鑰輪替後被停用，已重新啟用。請重新部署試試看，問題真的解決了嗎？',
+      update: mirror('10:48 AM', '#SD-2318 已處理，請重新部署試試看。', <><TicketLink id="SD-2318" /> 已處理，請重新部署試試看。</>),
       body: (
         <p>
           <TicketLink id="SD-2318" /> 已處理。原因是 registry 的 robot account 在昨晚金鑰輪替後被停用，已重新啟用。請重新部署試試看，問題真的解決了嗎？
@@ -92,6 +108,7 @@ export const K8S_IMAGEPULL_SCRIPT: TAgentScript = {
       who: 'agent',
       steps: ['結案 SD-2318'],
       copyText: '太好了，#SD-2318 已結案。',
+      update: mirror('10:51 AM', '#SD-2318 已結案。', <><TicketLink id="SD-2318" /> 已結案。</>),
       body: <p className="mt-2">太好了，<TicketLink id="SD-2318" /> 已結案。</p>,
     },
   ],

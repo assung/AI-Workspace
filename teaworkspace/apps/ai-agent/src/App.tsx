@@ -8,7 +8,8 @@
 //   (要先跳權限詢問,會打斷 demo)。
 // - 重新開啟 / 重新整理 → 停在上次的對話;按 New 才回首頁。上次的對話已不存在(示範資料重設、被刪除)→ 首頁。
 //
-// Demo 身分(2026-10-30 user 選 A):網址 `#oncall` = 值班者 Bob,沒有 hash = 申請人 Aaron(personas.tsx)。
+// Demo 身分(2026-10-30 user 選 A):沒有 hash = 申請人 Aaron;`#oncall` = 值班者 Bob「人找事」;
+// `#oncall-updates` = Bob「事找人」(打開 5 秒後 Updates 收到新單)。見 personas.tsx。
 // 換 hash 就換一整套(對話、劇本、記住的位置各自一份);分享用 artifact 只傳得過純 `#name`,所以用 hash 不用 query。
 import { useEffect, useRef, useState } from 'react'
 import { Toaster, toast } from '@qijenchen/design-system'
@@ -21,7 +22,8 @@ const routeKey = (persona: Persona) => `it-service-desk:${persona.id}:route`
 function readStoredRoute(key: string): TAgentRoute {
   try {
     const v = window.localStorage.getItem(key)
-    if (v === 'new' || v === 'projects' || v === 'artifacts' || v?.startsWith('conversation:')) return v as TAgentRoute
+    // Projects / Artifacts 已拿掉(2026-10-30):以前記住的這兩個位置回首頁
+    if (v === 'new' || v?.startsWith('conversation:')) return v as TAgentRoute
   } catch {
     // 私密視窗 / 被封鎖的儲存:從首頁開始
   }
@@ -61,6 +63,7 @@ function PersonaApp({ persona }: { persona: Persona }) {
 
   const engine = useTAgentEngine({
     seed: persona.seed,
+    updatesSeed: persona.updatesSeed,
     script: persona.script,
     isViewing: (id) => viewedRef.current === id,
     onBackgroundReply: (conversation, replyText) => {
@@ -70,6 +73,13 @@ function PersonaApp({ persona }: { persona: Persona }) {
       })
     },
   })
+
+  // 事找人的觸發點:打開 demo 後自動發到 Updates(2026-10-30 user:「先五秒鐘自動出現」)
+  const { postUpdate } = engine
+  useEffect(() => {
+    const timers = (persona.liveUpdates ?? []).map((u) => window.setTimeout(() => postUpdate(u), u.afterMs))
+    return () => timers.forEach((t) => window.clearTimeout(t))
+  }, [persona, postUpdate])
 
   // 看到了就算讀過(包括分頁回到前景)
   const { markRead } = engine
