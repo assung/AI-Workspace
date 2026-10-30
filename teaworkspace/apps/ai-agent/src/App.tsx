@@ -53,7 +53,10 @@ export default function App() {
 
 function PersonaApp({ persona }: { persona: Persona }) {
   const ROUTE_KEY = routeKey(persona)
-  const [route, setRoute] = useState<TAgentRoute>(() => readStoredRoute(ROUTE_KEY))
+  // 有自動觸發的身分(事找人)每次打開都從首頁開始:重新整理 = 重跑 demo,若停回上次的 Updates,
+  // 通知到的時候正看著 Updates → 照規則不亮紅點、不跳 Toast,觸發點就看不到了(2026-10-30 user 回報「過五秒沒有看到紅點」)。
+  // 其他身分照舊停在上次的對話。
+  const [route, setRoute] = useState<TAgentRoute>(() => (persona.liveUpdates?.length ? 'new' : readStoredRoute(ROUTE_KEY)))
   const pageVisible = usePageVisible()
 
   // 使用者此刻看著哪一則對話:開著的那則,而且分頁在前景
