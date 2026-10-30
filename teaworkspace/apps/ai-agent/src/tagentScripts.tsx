@@ -7,16 +7,16 @@
 // 「文章」連結在右側面板預覽 K8s Platform › Known issues › ImagePullBackOff：registry pull secret 過期(articles.tsx `kb-imagepull`)。
 // 從 apps/chat/src/tagentScripts.tsx 複製(2026-10-30 獨立產品);第 4 步思考改回 handoff §3 的寫法(獨立產品沒有 Docs 分頁,user 同意)。
 import { ArticleLink, TicketLink, type TAgentScript } from './TAgent'
-import { OpenConversationButton, UpdateTime } from './updates'
+import { OpenConversationButton } from './updates'
 
 // 進度「兩邊都放」(2026-10-30 user):第 9、10、12 步同時發一則到 Updates(時間 = 單子活動紀錄同一組,tickets.tsx),
 // 附「Open conversation」回到這一則對話(`script` = 劇本那一則)。Updates 那一份只記紅點、不再跳 Toast(對話那一份已通知過)。
 const mirror = (time: string, text: string, body: React.ReactNode) => ({
+  time,
   copyText: text,
   body: (
     <>
-      <UpdateTime>{time}</UpdateTime>
-      <p className="mt-1">{body}</p>
+      <p>{body}</p>
       <OpenConversationButton conversationId="script" />
     </>
   ),

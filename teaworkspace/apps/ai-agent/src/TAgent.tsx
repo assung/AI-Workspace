@@ -9,6 +9,7 @@
 // - 本檔不寫任何自訂視覺(色 / 字 / 間距)—— 只有清單縮排用 Tailwind list utilities 承載代理內文。
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { UpdateBubble } from './updates'
 import {
   AgentMessage,
   AgentThinking,
@@ -30,6 +31,8 @@ type AgentTurn = {
   body?: ReactNode
   copyText?: string
   stopped?: boolean
+  /** Updates 訊息的時間(泡泡上方「名稱 + 時間」那一列) */
+  time?: string
 }
 
 type Turn =
@@ -88,6 +91,8 @@ export function TicketLink({ id }: { id: string }) {
   return (
     <a
       href={`#ticket-${id}`}
+      // 單號不拆行(「#SD-」「2305」被拆開就認不出是單號)
+      className="whitespace-nowrap"
       onClick={(e) => {
         e.preventDefault()
         openTicket?.(id)
@@ -103,7 +108,7 @@ export function TicketLink({ id }: { id: string }) {
 // 連續的代理回合自動接續,`afterMs` = 主動發的進度更新(前一則結束後隔多久出現)。
 // 劇本只在「新對話」起頭時啟動一次(或從 Updates 的「Work on this ticket」開出來時,第一步是代理);跑完後回到一般行為。
 // `update` = 這一步完成時也發一則到 Updates(2026-10-30 user:進度通知「兩邊都放」—— 對話裡一則、Updates 一則)。
-export type TAgentUpdate = { body: ReactNode; copyText: string }
+export type TAgentUpdate = { time: string; body: ReactNode; copyText: string }
 export type TAgentScriptStep =
   | { who: 'user'; text: string }
   | { who: 'agent'; steps: string[]; body: ReactNode; copyText: string; afterMs?: number; update?: TAgentUpdate }
@@ -214,7 +219,7 @@ export function useTAgentEngine({ seed, updatesSeed, script, isViewing, onBackgr
    * `silent` = 同一件事已經在別的對話通知過(進度「兩邊都放」的 Updates 那一份),只記紅點、不再跳 Toast。
    */
   const postUpdate = useCallback((update: TAgentUpdate, { silent = false } = {}) => {
-    const turn: AgentTurn = { kind: 'agent', id: nextId('n'), thinking: false, steps: [], body: update.body, copyText: update.copyText }
+    const turn: AgentTurn = { kind: 'agent', id: nextId('n'), thinking: false, steps: [], body: update.body, copyText: update.copyText, time: update.time }
     patchConversation(UPDATES_ID, (c) => ({ ...c, turns: [...c.turns, turn] }))
     if (isViewingRef.current && !isViewingRef.current(UPDATES_ID)) {
       setUnreadIds((prev) => new Set(prev).add(UPDATES_ID))
@@ -354,11 +359,20 @@ export function useTAgentEngine({ seed, updatesSeed, script, isViewing, onBackgr
  * 所以這裡回傳元素陣列,不包一層元件)。
  */
 export function renderTurns(conversation: TAgentConversation) {
+  const isUpdates = conversation.id === UPDATES_ID
   return conversation.turns.map((t) => {
     if (t.kind === 'user')
       return (
         <AgentMessage key={t.id} role="user" className={USER_BUBBLE_WRAP} attachments={t.attachments}>
           {t.text}
+        </AgentMessage>
+      )
+    // Updates:代理主動發的通知用 Chat 對方泡泡(2026-10-30 user:「update 的訊息串樣式能套用 chat bubble 的樣式,比較方便判讀」),
+    // 外層仍是 AgentMessage(AgentConversation 靠直接子節點排版);通知不放複製 / 讚 / 倒讚工具列(Chat 泡泡也沒有)。
+    if (isUpdates)
+      return (
+        <AgentMessage key={t.id} role="agent">
+          <UpdateBubble name={TAGENT_LABEL} time={t.time}>{t.body}</UpdateBubble>
         </AgentMessage>
       )
     return (

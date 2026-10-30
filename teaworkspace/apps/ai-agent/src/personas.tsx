@@ -6,7 +6,7 @@ import type { ReactNode } from 'react'
 import { TicketLink, type TAgentConversation, type TAgentScript, type TAgentTurn, type TAgentUpdate } from './TAgent'
 import { K8S_IMAGEPULL_SCRIPT } from './tagentScripts'
 import { NEW_TICKET_UPDATE, ONCALL_MILESTONES, ONCALL_SCRIPT, ONCALL_UPDATES_MILESTONES, ONCALL_UPDATES_SCRIPT, type TicketMilestones } from './oncallScript'
-import { OpenConversationButton, UpdateTime } from './updates'
+import { OpenConversationButton } from './updates'
 
 export type Persona = {
   id: 'requester' | 'oncall' | 'oncall-updates'
@@ -42,10 +42,10 @@ const update = (id: string, time: string, text: ReactNode, copyText: string, act
   thinking: false,
   steps: [],
   copyText,
+  time,
   body: (
     <>
-      <UpdateTime>{time}</UpdateTime>
-      <p className="mt-1">{text}</p>
+      <p>{text}</p>
       {action}
     </>
   ),

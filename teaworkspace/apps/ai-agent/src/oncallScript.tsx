@@ -8,7 +8,7 @@
 // 兩條從「先確認一下，還有其他服務用這個帳號嗎？」之後共用同一段(TAIL)。
 import type { ReactNode } from 'react'
 import { TicketLink, type TAgentScript, type TAgentScriptStep } from './TAgent'
-import { OpenConversationButton, UpdateTime, WorkOnTicketButton } from './updates'
+import { OpenConversationButton, WorkOnTicketButton } from './updates'
 
 /** 主動發的結案通知的間隔(同申請人劇本 UPDATE_GAP_MS 8 秒:讓講者有時間切走,看得到通知與紅點) */
 const UPDATE_GAP_MS = 8000
@@ -53,11 +53,11 @@ const TAIL: TAgentScriptStep[] = [
       steps: [],
       // 進度「兩邊都放」:Updates 也發一則(只記紅點,不再跳 Toast)
       update: {
+        time: '10:51 AM',
         copyText: '#SD-2318 申請人確認 pod 已經起來，已結案。',
         body: (
           <>
-            <UpdateTime>10:51 AM</UpdateTime>
-            <p className="mt-1"><TicketLink id="SD-2318" /> 申請人確認 pod 已經起來，已結案。</p>
+            <p><TicketLink id="SD-2318" /> 申請人確認 pod 已經起來，已結案。</p>
             <OpenConversationButton conversationId="script" />
           </>
         ),
@@ -171,12 +171,12 @@ export const ONCALL_UPDATES_MILESTONES: TicketMilestones = { assigned: 2, reenab
 /** 事找人的觸發點:打開 demo 5 秒後 Updates 收到新單(2026-10-30 user:「先五秒鐘自動出現」);時間 = 單子建立時間 */
 export const NEW_TICKET_UPDATE = {
   afterMs: 5000,
+  time: '10:42 AM',
   copyText:
     '新的 P2 單 #SD-2318 指派給 K8s 平台團隊：payments-api 在 staging 拉不到映像檔（ImagePullBackOff），Payments 團隊的 staging 部署被阻斷。申請人已照知識庫文章重新同步 pull secret，無效。',
   body: (
     <>
-      <UpdateTime>10:42 AM</UpdateTime>
-      <p className="mt-1">
+      <p>
         新的 P2 單 <TicketLink id="SD-2318" /> 指派給 K8s 平台團隊：payments-api 在 staging 拉不到映像檔（ImagePullBackOff），Payments 團隊的 staging 部署被阻斷。申請人已照知識庫文章重新同步 pull secret，無效。
       </p>
       <WorkOnTicketButton />
