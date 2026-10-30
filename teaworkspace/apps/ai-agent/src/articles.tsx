@@ -6,10 +6,11 @@
 // 預覽面板(2026-10-30 user:「開在 right panel,走跟 Claude 右邊面板預覽一樣的方式」):
 // 對照 Claude artifact —— 開在對話右側、X 關閉後對話填滿;操作鈕在面板頂列
 // (codecademy.com/article/how-to-use-claude-artifacts-create-share-and-remix-ai-content)。
-// 「Open in new tab」user 要放頂列 X 左邊,但 DS app-shell.spec.md 禁止 AppShellAside header 加 actions,
-// 2026-10-30 user 選 C:先放內文頂端(作者列下方),之後再跟 DS 討論。
-import { Avatar, Button } from '@qijenchen/design-system'
+// 「Open in new tab」放頂列 × 左邊(2026-10-30 user;排法照 AgentPanelHeader 的「新對話 +」)。DS AppShellAside 尚無 actions 位置,
+// 先用 AsideHeaderActions 在產品端示意(暫時做法,見該檔),之後再跟 DS 提調整。
+import { Avatar, Button, ButtonDivider, Tooltip, TooltipTrigger, TooltipContent } from '@qijenchen/design-system'
 import { ExternalLink } from 'lucide-react'
+import { AsideHeaderActions } from './AsideHeaderActions'
 import kenjiAvatar from './assets/avatars/kenji.jpg'
 
 type Block =
@@ -76,15 +77,22 @@ function renderBlock(b: Block, i: number) {
 export function ArticlePreview({ article }: { article: Article }) {
   return (
     <div className="flex flex-col gap-[var(--layout-space-loose)] p-[var(--layout-space-loose)]">
+      <AsideHeaderActions deps={article.id}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            {/* 圖示鈕 + tooltip:同頁首 Pin 鈕寫法(title="" 讓 tooltip 取代原生提示);
+                假連結(同 TicketLink):接上真的知識庫後改成 window.open(article.href, '_blank', 'noopener') */}
+            <Button variant="text" size="sm" iconOnly startIcon={ExternalLink} aria-label="Open in new tab" title="" onClick={() => {}} />
+          </TooltipTrigger>
+          <TooltipContent>Open in new tab</TooltipContent>
+        </Tooltip>
+        <ButtonDivider />
+      </AsideHeaderActions>
       <div className="flex flex-col gap-[var(--layout-space-tight)]">
         <span className="text-body text-fg-secondary">{article.path.join(' › ')}</span>
         <div className="flex items-center gap-2 text-body text-fg-secondary">
           <Avatar src={article.owner.avatarUrl} alt={article.owner.name} size={24} />
           <span className="min-w-0 flex-1 truncate">Owned by {article.owner.name} · Last updated {article.updated}</span>
-        </div>
-        <div>
-          {/* 假連結(同 TicketLink):接上真的知識庫後改成 window.open(article.href, '_blank', 'noopener') */}
-          <Button variant="tertiary" size="sm" startIcon={ExternalLink} onClick={() => {}}>Open in new tab</Button>
         </div>
       </div>
       {article.body.map(renderBlock)}
