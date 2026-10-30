@@ -36,6 +36,8 @@ type Turn =
   | { kind: 'user'; id: string; text: string; attachments: AgentPromptAttachment[] }
   | AgentTurn
 
+export type TAgentTurn = Turn
+
 export type TAgentConversation = {
   id: string
   title: string
@@ -72,12 +74,25 @@ export function ArticleLink({ articleId, children }: { articleId: string; childr
 }
 
 /**
- * 工單號連結(劇本「已開單 #SD-2318」;2026-10-29 user:「單號以連結樣式呈現,先做成假連結,之後要連到哪再跟你說」)。
- * 目前點了不導航;接上 Service Desk 後把 href 換成工單網址。
+ * 工單號連結(劇本「已開單 #SD-2318」)。
+ * 2026-10-29 user:「單號以連結樣式呈現,先做成假連結」;2026-10-30 user:值班者(Bob)視角點單號 → 右側面板看單子。
+ * 頁面有提供 TAgentOpenTicketProvider 才打開;沒有 = 假連結(申請人視角維持原樣)。
  */
+export type TAgentOpenTicket = (ticketId: string) => void
+const TAgentOpenTicketContext = createContext<TAgentOpenTicket | null>(null)
+export function TAgentOpenTicketProvider({ openTicket, children }: { openTicket: TAgentOpenTicket | null; children: ReactNode }) {
+  return <TAgentOpenTicketContext.Provider value={openTicket}>{children}</TAgentOpenTicketContext.Provider>
+}
 export function TicketLink({ id }: { id: string }) {
+  const openTicket = useContext(TAgentOpenTicketContext)
   return (
-    <a href={`#ticket-${id}`} onClick={(e) => e.preventDefault()}>
+    <a
+      href={`#ticket-${id}`}
+      onClick={(e) => {
+        e.preventDefault()
+        openTicket?.(id)
+      }}
+    >
       #{id}
     </a>
   )
@@ -92,58 +107,6 @@ export type TAgentScriptStep =
   | { who: 'agent'; steps: string[]; body: ReactNode; copyText: string; afterMs?: number }
 export type TAgentScript = { title: string; steps: TAgentScriptStep[] }
 
-// ── 示範對話(IT 情境;2026-10-30 user 同意把品茶示範換成 IT 主題)────────────────
-function seedConversations(): TAgentConversation[] {
-  const agent = (id: string, steps: string[], text: string): AgentTurn => ({
-    kind: 'agent',
-    id,
-    thinking: false,
-    steps,
-    copyText: text,
-    body: <p className="mt-2">{text}</p>,
-  })
-  const user = (id: string, text: string): Turn => ({ kind: 'user', id, text, attachments: [] })
-  return [
-    {
-      id: 'c-vpn',
-      title: 'VPN drops every 30 minutes',
-      pinned: true,
-      turns: [
-        user('v1', 'My VPN drops every 30 minutes since the macOS 15.4 update.'),
-        agent('v2', ['Checked your GlobalProtect client version', 'Searched IT known issues'],
-          'This matches a known issue with GlobalProtect 6.2.3 on macOS 15.4. Updating to 6.2.5 from Self Service fixes it. Want me to open a ticket if it keeps dropping after the update?'),
-      ],
-    },
-    {
-      id: 'c-repo',
-      title: 'Request access to the billing-service repo',
-      turns: [
-        user('r1', 'I need write access to the billing-service repo for the invoice export work.'),
-        agent('r2', ['Looked up the owners of billing-service', 'Created access request AR-5170'],
-          'I sent access request AR-5170 to the Billing team owners (Priya and Marco). You’ll get write access as soon as one of them approves it, usually within a working day.'),
-      ],
-    },
-    {
-      id: 'c-okta',
-      title: 'Reset Okta MFA on a new phone',
-      turns: [
-        user('o1', 'I got a new phone and Okta Verify no longer works.'),
-        agent('o2', ['Checked your Okta factors', 'Sent a reset link to your work email'],
-          'I reset your Okta Verify factor and sent an enrollment link to your work email. Open it on your laptop and scan the QR code with the new phone.'),
-      ],
-    },
-    {
-      id: 'c-wifi',
-      title: 'Laptop won’t join the 7F Wi-Fi',
-      turns: [
-        user('w1', 'My laptop won’t join Corp-WiFi on 7F, but my phone does.'),
-        agent('w2', ['Checked the device certificate for your laptop', 'Searched IT known issues'],
-          'Your laptop’s Wi-Fi certificate expired yesterday. Restart the laptop while it’s on the office ethernet or VPN, and it will renew automatically. Then Corp-WiFi should connect.'),
-      ],
-    },
-  ]
-}
-
 // 使用者泡泡斷字(DS 泡泡沒有;長網址、長附件 chip 會溢出泡泡右緣 —— apps/chat 同一組,STRUCTURE.md §4.5 待 DS 補)
 const USER_BUBBLE_WRAP = '[&>div]:min-w-0 [&>div]:[overflow-wrap:anywhere] [&>div>div>*]:max-w-full [&>div>div>*>span]:min-w-0 [&>div>div>*>span]:truncate'
 
@@ -155,7 +118,9 @@ const titleFrom = (text: string) => (text.length > 48 ? `${text.slice(0, 48)}…
 // ── Engine ────────────────────────────────────────────────────────────────────
 export type TAgentEngine = ReturnType<typeof useTAgentEngine>
 
-export function useTAgentEngine({ script, isViewing, onBackgroundReply }: {
+export function useTAgentEngine({ seed, script, isViewing, onBackgroundReply }: {
+  /** 側欄一開始就有的示範對話(依身分不同,personas.tsx) */
+  seed: () => TAgentConversation[]
   /** demo 劇本(見 TAgentScript);省略 = 一般行為 */
   script?: TAgentScript
   /** 使用者此刻是否正看著這則對話(對話頁開著它,且瀏覽器分頁在前景) */
@@ -163,7 +128,7 @@ export function useTAgentEngine({ script, isViewing, onBackgroundReply }: {
   /** 代理在使用者沒看著的對話裡回完一則:該則記為未讀(紅點 + 分頁標題),並通知頁面發 Toast。 */
   onBackgroundReply?: (conversation: { id: string; title: string }, replyText: string) => void
 }) {
-  const [conversations, setConversations] = useState<TAgentConversation[]>(seedConversations)
+  const [conversations, setConversations] = useState<TAgentConversation[]>(seed)
   const conversationsRef = useRef(conversations)
   conversationsRef.current = conversations
   const isViewingRef = useRef(isViewing)
@@ -316,6 +281,8 @@ export function useTAgentEngine({ script, isViewing, onBackgroundReply }: {
     /** 劇本的下一句使用者台詞(輪到使用者時才有),輸入盒預先填入;以及劇本跑在哪一則對話 */
     scriptPrefill: script && script.steps[scriptPos]?.who === 'user' ? (script.steps[scriptPos] as { text: string }).text : null,
     scriptConvId,
+    /** 劇本下一步的位置(右側面板的單子狀態跟著它走) */
+    scriptPos,
     /** 未讀對話 */
     unreadIds,
     /** 未讀數(已刪除的不算;分頁標題用) */
