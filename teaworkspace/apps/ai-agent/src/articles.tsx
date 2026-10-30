@@ -1,0 +1,96 @@
+// 知識庫文章(右側面板預覽)。
+// 內容 = apps/chat/src/DocsPage.tsx `kb-imagepull`(逐字;最後一句「請在 AI agent 開單」→「請在 IT Service Desk 開單」,2026-10-30 user 同意)。
+// 區塊樣式 = DocsPage renderBlock 同一組(text-h4 標題、Alert callout、bg-muted 指令區塊、list utilities)。
+//
+// 預覽面板(2026-10-30 user:「開在 right panel,走跟 Claude 右邊面板預覽一樣的方式」):
+// 對照 Claude artifact —— 開在對話右側、X 關閉後對話填滿;操作鈕在面板頂列
+// (codecademy.com/article/how-to-use-claude-artifacts-create-share-and-remix-ai-content)。
+// 「Open in new tab」user 要放頂列 X 左邊,但 DS app-shell.spec.md 禁止 AppShellAside header 加 actions,
+// 2026-10-30 user 選 C:先放內文頂端(作者列下方),之後再跟 DS 討論。
+import { Alert, Avatar, Button } from '@qijenchen/design-system'
+import { ExternalLink } from 'lucide-react'
+import kenjiAvatar from './assets/avatars/kenji.jpg'
+
+type Block =
+  | { type: 'h2'; text: string }
+  | { type: 'p'; text: string }
+  | { type: 'ol'; items: string[] }
+  | { type: 'code'; text: string }
+  | { type: 'callout'; variant: 'info' | 'warning'; title: string; text?: string }
+
+export type Article = {
+  id: string
+  title: string
+  /** 知識庫位置(麵包屑) */
+  path: string[]
+  owner: { name: string; avatarUrl: string }
+  updated: string
+  /** 外部知識庫網址(假連結,同 TicketLink;之後 user 再說要連到哪) */
+  href: string
+  body: Block[]
+}
+
+// 日期格式 YYYY/MM/DD hh:mm AM/PM(本專案慣例)
+export const ARTICLES: Record<string, Article> = {
+  'kb-imagepull': {
+    id: 'kb-imagepull',
+    title: 'ImagePullBackOff：registry pull secret 過期',
+    path: ['K8s Platform', 'Known issues'],
+    owner: { name: 'Takahashi Kenji 高橋健二', avatarUrl: kenjiAvatar },
+    updated: '2026/10/20 10:12 AM',
+    href: 'https://kb.example.internal/k8s-platform/kb-imagepull',
+    body: [
+      { type: 'callout', variant: 'info', title: '適用症狀', text: 'Pod 停在 ImagePullBackOff，Events 出現 Failed to pull image …: unauthorized: authentication required。' },
+      { type: 'h2', text: '原因' },
+      { type: 'p', text: 'namespace 裡的 registry pull secret 由 External Secrets 同步。來源金鑰輪替後，舊的 secret 會過期，節點拉映像檔時就會被 registry 拒絕。' },
+      { type: 'h2', text: '排除步驟（3 步驟，約 2 分鐘）' },
+      { type: 'ol', items: ['確認 pull secret 的同步狀態與最後更新時間', '強制重新同步 pull secret', '重新啟動 deployment，讓 pod 用新的 secret 拉映像檔'] },
+      { type: 'code', text: 'kubectl get externalsecret regcred -n <namespace>\nkubectl annotate externalsecret regcred force-sync=$(date +%s) --overwrite -n <namespace>\nkubectl rollout restart deploy/<deployment> -n <namespace>' },
+      { type: 'h2', text: '還是失敗？' },
+      { type: 'p', text: '代表問題不在 secret 本身（例如 registry 帳號被停用）。請在 IT Service Desk 開單，附上 namespace 與 Events 的錯誤訊息，K8s 平台團隊值班會接手。' },
+    ],
+  },
+}
+
+function renderBlock(b: Block, i: number) {
+  switch (b.type) {
+    case 'h2':
+      return <h2 key={i} className="text-h4 font-semibold">{b.text}</h2>
+    case 'p':
+      return <p key={i} className="text-body">{b.text}</p>
+    case 'ol':
+      return (
+        <ol key={i} className="flex list-decimal flex-col gap-1 ps-[var(--layout-space-loose)] text-body">
+          {b.items.map((t) => <li key={t}>{t}</li>)}
+        </ol>
+      )
+    case 'code':
+      return (
+        <pre key={i} className="overflow-x-auto rounded-md bg-muted p-[var(--layout-space-loose)] font-mono text-body">
+          {b.text}
+        </pre>
+      )
+    case 'callout':
+      return <Alert key={i} variant={b.variant} title={b.title} description={b.text} />
+  }
+}
+
+/** 右側面板的文章內容(標題在 AppShellAside 頂列,這裡從麵包屑開始;內距 = DocsPage article 同值 loose) */
+export function ArticlePreview({ article }: { article: Article }) {
+  return (
+    <div className="flex flex-col gap-[var(--layout-space-loose)] p-[var(--layout-space-loose)]">
+      <div className="flex flex-col gap-[var(--layout-space-tight)]">
+        <span className="text-body text-fg-secondary">{article.path.join(' › ')}</span>
+        <div className="flex items-center gap-2 text-body text-fg-secondary">
+          <Avatar src={article.owner.avatarUrl} alt={article.owner.name} size={24} />
+          <span className="min-w-0 flex-1 truncate">Owned by {article.owner.name} · Last updated {article.updated}</span>
+        </div>
+        <div>
+          {/* 假連結(同 TicketLink):接上真的知識庫後改成 window.open(article.href, '_blank', 'noopener') */}
+          <Button variant="tertiary" size="sm" startIcon={ExternalLink} onClick={() => {}}>Open in new tab</Button>
+        </div>
+      </div>
+      {article.body.map(renderBlock)}
+    </div>
+  )
+}
