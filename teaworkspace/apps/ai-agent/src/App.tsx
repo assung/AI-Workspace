@@ -83,7 +83,9 @@ export default function App() {
   }, [engine.unreadCount])
 
   return (
-    <div className="h-screen">
+    // 底色 / 文字色明確掛在根節點:DS base.css 的 body 樣式在 @layer base,被宿主頁(例如分享用 artifact 的外框重設)的
+    // body 樣式蓋掉時,沒自帶文字色的內容(文章預覽)會在深色主題變成深底黑字。值 = DS base.css body 同一組 token。
+    <div className="h-screen bg-canvas text-foreground">
       <TAgentPage engine={engine} route={route} onRouteChange={setRoute} userName={USER_NAME} />
       <Toaster containerAriaLabel="Notifications" />
     </div>

@@ -1,13 +1,14 @@
 // 知識庫文章(右側面板預覽)。
 // 內容 = apps/chat/src/DocsPage.tsx `kb-imagepull`(逐字;最後一句「請在 AI agent 開單」→「請在 IT Service Desk 開單」,2026-10-30 user 同意)。
-// 區塊樣式 = DocsPage renderBlock 同一組(text-h4 標題、Alert callout、bg-muted 指令區塊、list utilities)。
+// 開頭的「適用症狀」藍色 info Alert 拿掉(2026-10-30 user:「避免誤會」)。
+// 區塊樣式 = DocsPage renderBlock 同一組(text-h4 標題、bg-muted 指令區塊、list utilities)。
 //
 // 預覽面板(2026-10-30 user:「開在 right panel,走跟 Claude 右邊面板預覽一樣的方式」):
 // 對照 Claude artifact —— 開在對話右側、X 關閉後對話填滿;操作鈕在面板頂列
 // (codecademy.com/article/how-to-use-claude-artifacts-create-share-and-remix-ai-content)。
 // 「Open in new tab」user 要放頂列 X 左邊,但 DS app-shell.spec.md 禁止 AppShellAside header 加 actions,
 // 2026-10-30 user 選 C:先放內文頂端(作者列下方),之後再跟 DS 討論。
-import { Alert, Avatar, Button } from '@qijenchen/design-system'
+import { Avatar, Button } from '@qijenchen/design-system'
 import { ExternalLink } from 'lucide-react'
 import kenjiAvatar from './assets/avatars/kenji.jpg'
 
@@ -16,7 +17,6 @@ type Block =
   | { type: 'p'; text: string }
   | { type: 'ol'; items: string[] }
   | { type: 'code'; text: string }
-  | { type: 'callout'; variant: 'info' | 'warning'; title: string; text?: string }
 
 export type Article = {
   id: string
@@ -40,7 +40,6 @@ export const ARTICLES: Record<string, Article> = {
     updated: '2026/10/20 10:12 AM',
     href: 'https://kb.example.internal/k8s-platform/kb-imagepull',
     body: [
-      { type: 'callout', variant: 'info', title: '適用症狀', text: 'Pod 停在 ImagePullBackOff，Events 出現 Failed to pull image …: unauthorized: authentication required。' },
       { type: 'h2', text: '原因' },
       { type: 'p', text: 'namespace 裡的 registry pull secret 由 External Secrets 同步。來源金鑰輪替後，舊的 secret 會過期，節點拉映像檔時就會被 registry 拒絕。' },
       { type: 'h2', text: '排除步驟（3 步驟，約 2 分鐘）' },
@@ -70,8 +69,6 @@ function renderBlock(b: Block, i: number) {
           {b.text}
         </pre>
       )
-    case 'callout':
-      return <Alert key={i} variant={b.variant} title={b.title} description={b.text} />
   }
 }
 
