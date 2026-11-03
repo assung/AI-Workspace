@@ -14,6 +14,7 @@ import { ExternalLink } from 'lucide-react'
 import { AsideHeaderActions } from './AsideHeaderActions'
 import type { TicketMilestones } from './oncallScript'
 import { whatHappenedItems, type TicketDraft } from './ticketDraft'
+import { OPEN_TICKETS, TEAM } from './teamStats'
 
 type Status = 'New' | 'In progress' | 'Waiting for requester' | 'Closed'
 const STATUS_COLOR: Record<Status, 'neutral' | 'blue' | 'yellow' | 'green'> = {
@@ -125,6 +126,26 @@ export function getTicket(id: string, pos: number, M: TicketMilestones, created?
       environment: 'stg-cluster-01',
       summary: [{ text: 'stg-01-w3 節點的映像檔沒有被回收，佔用 62 GB。該節點群組關閉了 image GC。' }],
       activity: [{ time: '2026/10/28 09:05 AM', text: 'Opened from a monitoring alert' }],
+    }
+  }
+  // 管理者劇本「還沒結的 7 張」(teamStats.ts)
+  const open = OPEN_TICKETS.find((t) => t.id === id)
+  if (open) {
+    return {
+      id,
+      title: open.title,
+      status: open.status,
+      priority: 'P3',
+      requester: open.requester,
+      assignee: open.assignee,
+      team: TEAM,
+      created: open.created,
+      summary: [{ text: open.summary }],
+      activity: [
+        { time: open.created, text: open.requester === 'Monitoring alert' ? 'Opened from a monitoring alert' : `AI agent opened the ticket for ${open.requester}` },
+        { time: open.assigned, text: `Assigned to ${open.assignee}` },
+        ...(open.status === 'Waiting for requester' ? [{ time: open.waitingSince!, text: `${open.assignee} asked ${open.requester} for more details` }] : []),
+      ],
     }
   }
   return undefined
