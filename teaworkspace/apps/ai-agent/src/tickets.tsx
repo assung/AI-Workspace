@@ -36,6 +36,8 @@ export type Ticket = {
   category?: string
   service?: string
   summary: Array<{ label?: string; text: string }>
+  /** 報案者送出的 What happened 是有順序的經過 → 編號清單 */
+  summaryOrdered?: boolean
   linked?: string[]
   activity: Array<{ time: string; text: string }>
 }
@@ -49,7 +51,7 @@ export function getTicket(id: string, pos: number, M: TicketMilestones, created?
   if (id === 'SD-2318') {
     // 申請人自己按 Submit 送出的單:Title 與 What happened 照草稿(使用者改過的內容);其他欄位由 Service Desk 判斷,不受草稿影響
     const fromDraft = created
-      ? { title: created.title, summary: whatHappenedItems(created.whatHappened).map((text) => ({ text })) }
+      ? { title: created.title, summary: whatHappenedItems(created.whatHappened).map((text) => ({ text })), summaryOrdered: true }
       : null
     const status: Status = done(M.closed) ? 'Closed' : done(M.replied) ? 'Waiting for requester' : done(M.assigned) ? 'In progress' : 'New'
     return {
@@ -65,6 +67,7 @@ export function getTicket(id: string, pos: number, M: TicketMilestones, created?
       created: `${TODAY} 10:42 AM`,
       environment: 'stg-cluster-02 / payment-stg',
       // 申請人那邊代理開單前的摘要(tagentScripts.tsx 第 6 步)逐字;申請人自己建的單照草稿
+      summaryOrdered: fromDraft?.summaryOrdered,
       summary: fromDraft?.summary ?? [
         { label: '問題', text: 'payments-api 在 staging 拉不到映像檔（unauthorized），已重新同步 pull secret，無效。' },
         { label: '影響', text: 'Payments 團隊的 staging 部署被阻斷。' },
@@ -157,11 +160,19 @@ export function TicketPreview({ ticket }: { ticket: Ticket }) {
         {ticket.linked && <DescriptionItem label="Linked">{ticket.linked.map((l) => `#${l}`).join(', ')}</DescriptionItem>}
       </DescriptionList>
       <h2 className="text-h4 font-semibold">Summary</h2>
-      <ul className="flex list-disc flex-col gap-1 ps-[var(--layout-space-loose)] text-body">
-        {ticket.summary.map((s) => (
-          <li key={s.text}>{s.label ? <><strong>{s.label}：</strong>{s.text}</> : s.text}</li>
-        ))}
-      </ul>
+      {(() => {
+        const items = (
+          <>
+                {ticket.summary.map((s) => (
+                  <li key={s.text}>{s.label ? <><strong>{s.label}：</strong>{s.text}</> : s.text}</li>
+                ))}
+          </>
+        )
+        // 報案者送出的經過有順序 → 編號(同 articles.tsx 的 ol 樣式);其他單子條列
+        return ticket.summaryOrdered
+          ? <ol className="flex list-decimal flex-col gap-1 ps-[var(--layout-space-loose)] text-body">{items}</ol>
+          : <ul className="flex list-disc flex-col gap-1 ps-[var(--layout-space-loose)] text-body">{items}</ul>
+      })()}
       <h2 className="text-h4 font-semibold">Activity</h2>
       {/* 依時間先後(與對話同方向,由上往下讀) */}
       <DescriptionList>

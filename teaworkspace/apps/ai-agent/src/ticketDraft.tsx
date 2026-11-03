@@ -2,6 +2,7 @@
 // - 第一次:「開單摘要蠻簡陋…讓使用者做最終確認、有機會手動修開單的內容,最後由他按下 create」;選 A = 右側面板草稿,按鈕在底部。
 // - 第二次:「開單的部分比較像是產出 Title 及歷程描述,由報案者確認後送出」→ 只留 Title 與 What happened(列點、不標時間);
 //   Priority / Category / 負責團隊等單據欄位不在報案者這邊處理,不顯示。按鈕 Create → Submit,面板標題 New ticket → Report an issue。
+// - 第三次:What happened 改用編號(1. 2. 3.),順序本身就看得出來,欄位下方的說明文字因此拿掉(2026-11-03 user)。
 //
 // 對照 GitHub Copilot 建 issue:代理起草「suggested title, body …」,使用者「Edit any field … or ask Copilot to make changes
 // with a follow-up prompt」,最後自己按 Create
@@ -12,14 +13,13 @@
 // ── 消費的 SSOT ──────────────────────────────────────────────────────────────
 // - 表單 = DS Field 家族(agent-panel.spec.md「一般表單輸入 → Field 家族」)+ FieldGroup(欄位間距 = layoutSpace 規則 3 parallel)
 //   + useFormValidation intent="create"(form-validation.spec.md:建立類送出鈕不停用,按了才驗、錯了移焦點)
-// - What happened = Textarea;列點用「• 」開頭的每一行(純文字欄位,送出後單子的摘要照行拆成條列)
+// - What happened = Textarea;每行「n. 」編號(純文字欄位,送出後單子的摘要照行拆成編號清單)
 // - 底部動作列 = DS SheetFooter(SurfaceFooter 是 @internal;對外的 Footer 裡 Sheet 的語意最接近「側邊表單」),
 //   放進 Right panel 底部靠 AsideFooter(暫時做法)。按鈕 md、靠右、Cancel tertiary + Submit primary(dialog.spec.md「Footer 按鈕」)。
 import { createContext, useContext, useEffect, type ReactNode } from 'react'
 import {
   Button,
   Field,
-  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
@@ -36,10 +36,7 @@ export type TicketDraft = {
   whatHappened: string
 }
 
-/** 列點的前綴(Textarea 是純文字,每行一點) */
-export const BULLET = '• '
-
-// 代理預填(內容 = 對話裡已知的事,依發生順序列點、不標時間)
+// 代理預填(內容 = 對話裡已知的事,依發生順序編號、不標時間)
 export const INITIAL_DRAFT: TicketDraft = {
   title: 'payments-api 在 staging 拉不到映像檔（ImagePullBackOff）',
   whatHappened: [
@@ -47,12 +44,12 @@ export const INITIAL_DRAFT: TicketDraft = {
     'kubectl describe pod 的 Events 顯示：Failed to pull image "registry.example.internal/payments/api:1.42.0": unauthorized: authentication required',
     '照知識庫文章〈ImagePullBackOff：registry pull secret 過期〉重新同步 pull secret，問題仍在。',
     'Payments 團隊的 staging 部署因此被阻斷。',
-  ].map((l) => BULLET + l).join('\n'),
+  ].map((l, i) => `${i + 1}. ${l}`).join('\n'),
 }
 
-/** What happened → 條列(去掉每行的「• 」或「- 」前綴,空行略過) */
+/** What happened → 清單項目(去掉每行開頭的「1. 」「•」「-」,空行略過;使用者自己改過編號也照行算) */
 export const whatHappenedItems = (text: string) =>
-  text.split('\n').map((l) => l.replace(/^\s*(?:•|-|\*)\s*/, '').trim()).filter(Boolean)
+  text.split('\n').map((l) => l.replace(/^\s*(?:\d+[.)、]|•|-|\*)\s*/, '').trim()).filter(Boolean)
 
 export function TicketDraftForm({ draft, onDraftChange, onCancel, onSubmit }: {
   draft: TicketDraft
@@ -95,7 +92,6 @@ export function TicketDraftForm({ draft, onDraftChange, onCancel, onSubmit }: {
           <Field required invalid={!!form.errors.whatHappened}>
             <FieldLabel>What happened</FieldLabel>
             <Textarea id="draft-what-happened" rows={9} {...form.getInputProps('whatHappened')} error={!!form.errors.whatHappened} />
-            <FieldDescription>One point per line, in the order it happened.</FieldDescription>
             <FieldError>{form.errors.whatHappened}</FieldError>
           </Field>
         </FieldGroup>

@@ -11,8 +11,8 @@ import { OpenConversationButton } from './updates'
 export type Persona = {
   id: 'requester' | 'oncall' | 'oncall-updates'
   /**
-   * 側欄頂端產品名稱後的情境標籤(2026-11-03 user:「方便 demo 時展示不易搞混」;DS Tag,一綠一藍)。
-   * 兩條值班網址(#oncall / #oncall-updates)同一個標籤。
+   * 側欄頂端產品名稱後的情境標籤(2026-11-03 user:「方便 demo 時展示不易搞混」;DS Tag,報案者綠、值班者藍)。
+   * 文字用中文、值班者分兩種情境(2026-11-03 user:「值班者 (人找事)」/「值班者 (事找人)」)。
    */
   role: { label: string; color: 'green' | 'blue' }
   /** 首頁問候用的名字 */
@@ -61,7 +61,7 @@ const update = (id: string, time: string, text: ReactNode, copyText: string, act
 // ── 申請人(Aaron;2026-10-30 user 同意把品茶示範換成 IT 主題)────────────────────
 export const REQUESTER: Persona = {
   id: 'requester',
-  role: { label: 'Requester', color: 'green' },
+  role: { label: '報案者', color: 'green' },
   userName: 'Aaron',
   homeDescription: 'Tell me what’s broken. Paste an error or a link, and I’ll look into it or open a ticket for you.',
   suggestions: ['My deploy is stuck on staging', 'Request access to a repository', 'Check the status of my ticket'],
@@ -131,7 +131,7 @@ function ONCALL_UPDATES_SEED(): TAgentTurn[] {
 // ── 值班者(Bob,K8s 平台團隊;2026-10-30 user:「以值班者角度的 user journey demo」)──────────
 export const ONCALL: Persona = {
   id: 'oncall',
-  role: { label: 'On-call', color: 'blue' },
+  role: { label: '值班者 (人找事)', color: 'blue' },
   userName: 'Bob',
   homeDescription: 'Ask about your queue, a ticket, or a cluster. I’ll pull the context together for you.',
   suggestions: ['Which tickets are close to their SLA?', 'Summarize last night’s alerts', 'Show tickets waiting on me'],
@@ -184,6 +184,7 @@ export const ONCALL: Persona = {
 export const ONCALL_UPDATES: Persona = {
   ...ONCALL,
   id: 'oncall-updates',
+  role: { label: '值班者 (事找人)', color: 'blue' },
   script: ONCALL_UPDATES_SCRIPT,
   milestones: ONCALL_UPDATES_MILESTONES,
   liveUpdates: [NEW_TICKET_UPDATE],
