@@ -186,16 +186,35 @@ async function renderStandaloneHtml() {
 </html>`
 }
 
+/**
+ * 分享用的 demo 放在 claude.ai artifact 的框裡:框不允許頁面自己下載(2026-11-04 user 回報「按了下載後沒有反應」),
+ * 要透過平台的 downloads 功能存檔(會先跳確認)。`window.claude` 只有在 artifact 框裡才有;
+ * 其他地方(本機、Netlify)沒有 → 照一般網頁用 <a download>。
+ */
+type ArtifactDownloads = { save: (req: { filename: string; data: string }) => Promise<unknown> }
+const artifactRuntime = () => (window as unknown as { claude?: { use?: (name: string) => Promise<unknown> } }).claude
+const inArtifactViewer = () => typeof artifactRuntime()?.use === 'function'
+
+async function saveHtml(html: string) {
+  if (inArtifactViewer()) {
+    const downloads = (await artifactRuntime()!.use!('downloads')) as ArtifactDownloads | null
+    if (downloads) {
+      // 使用者在確認框按取消 = 正常結果,不另外提示
+      await downloads.save({ filename: REPORT.fileName, data: html }).catch(() => {})
+      return
+    }
+  }
+  const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = REPORT.fileName
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export function ReportPreview() {
   const blobUrl = async () => URL.createObjectURL(new Blob([await renderStandaloneHtml()], { type: 'text/html' }))
-  const download = async () => {
-    const url = await blobUrl()
-    const a = document.createElement('a')
-    a.href = url
-    a.download = REPORT.fileName
-    a.click()
-    URL.revokeObjectURL(url)
-  }
+  const download = async () => saveHtml(await renderStandaloneHtml())
   const openInNewTab = async () => {
     // 先開分頁再填網址:等報告畫完才 window.open 會被瀏覽器當成彈出視窗擋掉
     const tab = window.open('', '_blank')
@@ -211,12 +230,13 @@ export function ReportPreview() {
           </TooltipTrigger>
           <TooltipContent>Download</TooltipContent>
         </Tooltip>
-        <Tooltip>
+        {/* artifact 框不允許開新分頁 → 在框裡不顯示這顆(只留 Download) */}
+        {!inArtifactViewer() && <Tooltip>
           <TooltipTrigger asChild>
             <Button variant="text" size="sm" iconOnly startIcon={ExternalLink} aria-label="Open in new tab" title="" onClick={() => void openInNewTab()} />
           </TooltipTrigger>
           <TooltipContent>Open in new tab</TooltipContent>
-        </Tooltip>
+        </Tooltip>}
         <ButtonDivider />
       </AsideHeaderActions>
       <ReportBody />

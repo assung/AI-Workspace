@@ -42,7 +42,8 @@ export const MANAGER_SCRIPT: TAgentScript = {
         </>
       ),
     },
-    { who: 'user', text: `這 ${TOTALS.tickets} 張的問題類型怎麼排？` },
+    // 2026-11-04 user 改句:「這 42 張的報案類型依照件數排序」
+    { who: 'user', text: `這 ${TOTALS.tickets} 張的報案類型依照件數排序` },
     {
       who: 'agent',
       steps: ['依問題類型分組', '依件數排序'],
