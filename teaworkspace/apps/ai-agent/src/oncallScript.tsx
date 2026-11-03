@@ -196,7 +196,6 @@ export const ONCALL_UPDATES_SCRIPT: TAgentScript = {
           <p className="mt-2">這是 <TicketLink id="SD-2318" /> 目前掌握的狀況：</p>
           {BRIEFING}
           <p className="mt-2">推測原因是這個帳號被停用。要接這張單嗎？我會指派給你，並通知申請人。</p>
-          <MessageRequesterButton name="Aaron" />
         </>
       ),
     },
@@ -205,10 +204,12 @@ export const ONCALL_UPDATES_SCRIPT: TAgentScript = {
       who: 'agent',
       steps: ['指派 SD-2318 給 Bob', '通知申請人'],
       copyText: '已指派給你，也通知申請人你接手了。' + SOP_HANDOFF_TEXT,
+      // Message Aaron 放在接案之後(2026-11-03 user:還沒接案不該先出現聯絡申請人;同人找事版,出現在指派後的回覆)
       body: (
         <>
           <p className="mt-2">已指派給你，也通知申請人你接手了。</p>
           {SOP_HANDOFF}
+          <MessageRequesterButton name="Aaron" />
         </>
       ),
     },
