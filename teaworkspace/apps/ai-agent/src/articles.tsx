@@ -50,6 +50,33 @@ export const ARTICLES: Record<string, Article> = {
       { type: 'p', text: '代表問題不在 secret 本身（例如 registry 帳號被停用）。請在 IT Service Desk 開單，附上 namespace 與 Events 的錯誤訊息，K8s 平台團隊值班會接手。' },
     ],
   },
+  // 值班者用的 SOP(2026-11-03 user:human in the loop —— 代理提供 SOP、值班者手動重新啟用)。內容是 AI 起草的示範資料。
+  'kb-robot-reenable': {
+    id: 'kb-robot-reenable',
+    title: 'Registry robot account 被停用：重新啟用',
+    path: ['K8s Platform', 'Runbooks'],
+    owner: { name: 'Takahashi Kenji 高橋健二', avatarUrl: kenjiAvatar },
+    updated: '2026/10/22 03:40 PM',
+    href: 'https://kb.example.internal/k8s-platform/kb-robot-reenable',
+    body: [
+      { type: 'h2', text: '適用症狀' },
+      { type: 'p', text: '拉映像檔回應 unauthorized: authentication required，而且重新同步 pull secret 無效。' },
+      { type: 'h2', text: '處理步驟（5 步驟，由值班者執行）' },
+      {
+        type: 'ol',
+        items: [
+          '在 registry 稽核日誌確認 robot account 的狀態與停用時間',
+          '確認停用原因不是資安事件（例如金鑰外洩）；是的話停止，改走資安事件流程',
+          '在 registry 管理介面重新啟用該 robot account',
+          '確認使用它的 pull secret 仍對應同一組金鑰，並從受影響的 cluster 測試拉取映像檔',
+          '在單子記錄處理結果與重新啟用時間',
+        ],
+      },
+      { type: 'code', text: 'registryctl robot get <robot-name>\nregistryctl robot enable <robot-name>\nkubectl run pull-test --rm -it --image=<image> -n <namespace> -- true' },
+      { type: 'h2', text: '注意' },
+      { type: 'p', text: '重新啟用屬於變更動作，必須由值班者執行並留下紀錄。AI agent 只會協助查詢與確認結果。' },
+    ],
+  },
 }
 
 function renderBlock(b: Block, i: number) {

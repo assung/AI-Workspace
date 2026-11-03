@@ -6,8 +6,15 @@
 // 2026-10-30 user:兩條都留 ——「人找事」= ONCALL_SCRIPT(#oncall,Bob 開口問隊列);
 // 「事找人」= ONCALL_UPDATES_SCRIPT(#oncall-updates,Updates 主動通知新單 → Work on this ticket 開出帶前情的新對話)。
 // 兩條從「先確認一下，還有其他服務用這個帳號嗎？」之後共用同一段(TAIL)。
+//
+// Human in the loop(2026-11-03 user:「公司的規定需要人為做決策,不能讓 agent 直接處理重開金鑰這種執行動作,
+// 而是應該把可以處理的方式 SOP 提供給值班者參考…讓值班者手動執行重新啟用」):
+// - 代理只做唯讀的事(查詢、比對、讀日誌、確認結果);重新啟用由 Bob 照 SOP 手動做。
+// - SOP 在右側面板開(articles.tsx `kb-robot-reenable`,同申請人那邊的知識庫文章)。
+// - 通知申請人仍是代理起草、Bob 按「送出」才發。
+// - 「詢問 SOP 是否要調整」user 2026-11-03 拿掉(避免太複雜),結案後照原本只問要不要開後續單。
 import type { ReactNode } from 'react'
-import { TicketLink, type TAgentScript, type TAgentScriptStep } from './TAgent'
+import { ArticleLink, TicketLink, type TAgentScript, type TAgentScriptStep } from './TAgent'
 import { OpenConversationButton, WorkOnTicketButton } from './updates'
 
 /** 主動發的結案通知的間隔(同申請人劇本 UPDATE_GAP_MS 8 秒:讓講者有時間切走,看得到通知與紅點) */
@@ -16,23 +23,35 @@ const UPDATE_GAP_MS = 8000
 /** 申請人那邊第 10 步原文(這裡是 Bob 送出前的草稿) */
 const REQUESTER_UPDATE = '已處理。原因是 registry 的 robot account 在昨晚金鑰輪替後被停用，已重新啟用。請重新部署試試看，問題真的解決了嗎？'
 
-/** 兩條共用的後段(確認帳號 → 重新啟用 → 回覆申請人 → 結案 → 後續單) */
+/** 兩條指派之後同一句:提供 SOP,請 Bob 手動重新啟用 */
+const SOP_HANDOFF_TEXT =
+  '推測原因是這個帳號被停用。依規定，重新啟用要由值班者執行，處理方式在這份 SOP：Registry robot account 被停用：重新啟用（5 步驟）。你照著做完跟我說，我幫你確認結果。'
+const SOP_HANDOFF: ReactNode = (
+  <p className="mt-2">
+    推測原因是這個帳號被停用。依規定，重新啟用要由值班者執行，處理方式在這份 SOP：
+    <ArticleLink articleId="kb-robot-reenable">Registry robot account 被停用：重新啟用</ArticleLink>（5 步驟）。你照著做完跟我說，我幫你確認結果。
+  </p>
+)
+
+/** 兩條共用的後段(確認影響範圍 → Bob 手動重新啟用 → 代理唯讀確認 → 回覆申請人 → 結案 → 後續單) */
 const TAIL: TAgentScriptStep[] = [
     { who: 'user', text: '先確認一下，還有其他服務用這個帳號嗎？' },
     {
       who: 'agent',
       steps: ['查詢使用 robot$payments-ci 的 pull secret'],
-      copyText: '只有 payment-stg 和 payment-dev 兩個 namespace 在用。payment-dev 今天還沒有部署，所以還沒出錯。',
-      body: <p className="mt-2">只有 payment-stg 和 payment-dev 兩個 namespace 在用。payment-dev 今天還沒有部署，所以還沒出錯。</p>,
+      copyText: '只有 payment-stg 和 payment-dev 兩個 namespace 在用。payment-dev 今天還沒有部署，所以還沒出錯。重新啟用後兩邊都會恢復，不影響其他服務。',
+      body: <p className="mt-2">只有 payment-stg 和 payment-dev 兩個 namespace 在用。payment-dev 今天還沒有部署，所以還沒出錯。重新啟用後兩邊都會恢復，不影響其他服務。</p>,
     },
-    { who: 'user', text: '好，重新啟用。' },
+    // Bob 照 SOP 手動執行完回報(human in the loop)
+    { who: 'user', text: '我照 SOP 重新啟用了。' },
     {
       who: 'agent',
-      steps: ['重新啟用 robot$payments-ci', '在 stg-cluster-02 測試拉取 payments/api:1.42.0'],
-      copyText: `已重新啟用，並從 stg-cluster-02 測試拉取成功。要我通知申請人重新部署嗎？草稿：「#SD-2318 ${REQUESTER_UPDATE}」`,
+      // 唯讀確認:讀帳號狀態、讀拉取紀錄(不自己去拉)
+      steps: ['檢查 robot$payments-ci 的狀態', '讀取 stg-cluster-02 的映像檔拉取紀錄'],
+      copyText: `我確認了：robot$payments-ci 現在是啟用狀態，stg-cluster-02 剛剛拉取 payments/api:1.42.0 也成功了，問題看起來已經解決。你這邊確認沒問題的話，要我通知申請人重新部署嗎？草稿：「#SD-2318 ${REQUESTER_UPDATE}」`,
       body: (
         <>
-          <p className="mt-2">已重新啟用，並從 stg-cluster-02 測試拉取成功。要我通知申請人重新部署嗎？草稿：</p>
+          <p className="mt-2">我確認了：robot$payments-ci 現在是啟用狀態，stg-cluster-02 剛剛拉取 payments/api:1.42.0 也成功了，問題看起來已經解決。你這邊確認沒問題的話，要我通知申請人重新部署嗎？草稿：</p>
           {/* 引用的草稿:左邊線 + 次要字色(apps/chat 決策流程的草稿呈現同款) */}
           <p className="mt-2 border-l border-divider pl-3 text-fg-secondary">
             <TicketLink id="SD-2318" /> {REQUESTER_UPDATE}
@@ -110,7 +129,7 @@ export const ONCALL_SCRIPT: TAgentScript = {
       who: 'agent',
       steps: ['指派 SD-2318 給 Bob', '通知申請人', '讀取申請人與 AI agent 的對話紀錄', '查詢 registry 稽核日誌'],
       copyText:
-        '已指派給你，也通知申請人你接手了。目前掌握的狀況：症狀：stg-cluster-02 / payment-stg 拉 payments/api:1.42.0 時回應 unauthorized。已嘗試：申請人照文章重新同步了 pull secret，無效。我查到的：registry 稽核日誌顯示，robot account robot$payments-ci 在昨晚 02:14 金鑰輪替後被停用。推測原因是這個帳號被停用。要我直接重新啟用嗎？',
+        '已指派給你，也通知申請人你接手了。目前掌握的狀況：症狀：stg-cluster-02 / payment-stg 拉 payments/api:1.42.0 時回應 unauthorized。已嘗試：申請人照文章重新同步了 pull secret，無效。我查到的：registry 稽核日誌顯示，robot account robot$payments-ci 在昨晚 02:14 金鑰輪替後被停用。' + SOP_HANDOFF_TEXT,
       body: (
         <>
           <p className="mt-2">已指派給你，也通知申請人你接手了。目前掌握的狀況：</p>
@@ -119,7 +138,7 @@ export const ONCALL_SCRIPT: TAgentScript = {
             <li><strong>已嘗試：</strong>申請人照文章重新同步了 pull secret，無效。</li>
             <li><strong>我查到的：</strong>registry 稽核日誌顯示，robot account robot$payments-ci 在昨晚 02:14 金鑰輪替後被停用。</li>
           </ul>
-          <p className="mt-2">推測原因是這個帳號被停用。要我直接重新啟用嗎？</p>
+          {SOP_HANDOFF}
         </>
       ),
     },
@@ -160,8 +179,13 @@ export const ONCALL_UPDATES_SCRIPT: TAgentScript = {
     {
       who: 'agent',
       steps: ['指派 SD-2318 給 Bob', '通知申請人'],
-      copyText: '已指派給你，也通知申請人你接手了。要我直接重新啟用 robot$payments-ci 嗎？',
-      body: <p className="mt-2">已指派給你，也通知申請人你接手了。要我直接重新啟用 robot$payments-ci 嗎？</p>,
+      copyText: '已指派給你，也通知申請人你接手了。' + SOP_HANDOFF_TEXT,
+      body: (
+        <>
+          <p className="mt-2">已指派給你，也通知申請人你接手了。</p>
+          {SOP_HANDOFF}
+        </>
+      ),
     },
     ...TAIL,
   ],
