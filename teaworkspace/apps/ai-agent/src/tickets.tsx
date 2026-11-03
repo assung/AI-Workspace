@@ -145,6 +145,7 @@ export function TicketPreview({ ticket }: { ticket: Ticket }) {
         <ButtonDivider />
       </AsideHeaderActions>
       <h2 className="text-h4 font-semibold">{ticket.title}</h2>
+      {/* Category / Environment 不在單子詳情顯示(2026-11-03 user:報案者與值班者兩邊都拿掉) */}
       <DescriptionList orientation="horizontal" divided>
         <DescriptionItem label="Status">
           <Tag size="sm" color={STATUS_COLOR[ticket.status]}>{ticket.status}</Tag>
@@ -153,9 +154,7 @@ export function TicketPreview({ ticket }: { ticket: Ticket }) {
         <DescriptionItem label="Requester">{ticket.requester}</DescriptionItem>
         <DescriptionItem label="Assignee">{ticket.assignee}</DescriptionItem>
         <DescriptionItem label="Team">{ticket.team}</DescriptionItem>
-        {ticket.category && <DescriptionItem label="Category">{ticket.category}</DescriptionItem>}
         {ticket.service && <DescriptionItem label="Service">{ticket.service}</DescriptionItem>}
-        {ticket.environment && <DescriptionItem label="Environment">{ticket.environment}</DescriptionItem>}
         <DescriptionItem label="Created">{ticket.created}</DescriptionItem>
         {ticket.linked && <DescriptionItem label="Linked">{ticket.linked.map((l) => `#${l}`).join(', ')}</DescriptionItem>}
       </DescriptionList>
