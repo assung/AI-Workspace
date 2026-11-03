@@ -1,6 +1,6 @@
 // 值班者(Bob,K8s 平台團隊)視角的 demo 劇本(2026-10-30 user:「以值班者角度的 user journey demo,由 K8s 團隊的 Bob 的視角展開,
 // Bob 在值班時,透過詢問 AI agent 目前待處理的單有哪些,來解這題 payments-api 問題」)。
-// 台詞 = AI 起草、user 2026-10-30 確認的劇本;收尾的後續單(第 12–13 步)是 user 同意加的一段。
+// 台詞 = AI 起草、user 2026-10-30 確認的劇本。收尾的「開後續單」2026-11-03 user 拿掉(避免 demo 太複雜),結案就是最後一步。
 // 與申請人劇本(tagentScripts.tsx)接得上:第 4 步「通知申請人」= 申請人那邊的「Bob 接手」;第 8 步草稿 = 申請人那邊第 10 步原文。
 // 隊列裡的另兩張單、帳號名、時間、namespace 是示範資料。
 // 2026-10-30 user:兩條都留 ——「人找事」= ONCALL_SCRIPT(#oncall,Bob 開口問隊列);
@@ -12,7 +12,7 @@
 // - 代理只做唯讀的事(查詢、比對、讀日誌、確認結果);重新啟用由 Bob 照 SOP 手動做。
 // - SOP 在右側面板開(articles.tsx `kb-robot-reenable`,同申請人那邊的知識庫文章)。
 // - 通知申請人仍是代理起草、Bob 按「送出」才發。
-// - 「詢問 SOP 是否要調整」user 2026-11-03 拿掉(避免太複雜),結案後照原本只問要不要開後續單。
+// - 「詢問 SOP 是否要調整」與「開後續單」user 2026-11-03 都拿掉(避免太複雜)。
 import type { ReactNode } from 'react'
 import { ArticleLink, TicketLink, type TAgentScript, type TAgentScriptStep } from './TAgent'
 import { OpenConversationButton, WorkOnTicketButton } from './updates'
@@ -33,7 +33,7 @@ const SOP_HANDOFF: ReactNode = (
   </p>
 )
 
-/** 兩條共用的後段(確認影響範圍 → Bob 手動重新啟用 → 代理唯讀確認 → 回覆申請人 → 結案 → 後續單) */
+/** 兩條共用的後段(確認影響範圍 → Bob 手動重新啟用 → 代理唯讀確認 → 回覆申請人 → 結案) */
 const TAIL: TAgentScriptStep[] = [
     { who: 'user', text: '先確認一下，還有其他服務用這個帳號嗎？' },
     {
@@ -81,22 +81,10 @@ const TAIL: TAgentScriptStep[] = [
           </>
         ),
       },
-      copyText:
-        '#SD-2318 申請人確認 pod 已經起來，已結案。這次是金鑰輪替後 robot account 被停用造成的，要不要開一張後續單，把 robot account 加進金鑰輪替的檢查清單，避免再發生？',
+      copyText: '#SD-2318 申請人確認 pod 已經起來，已結案。',
       body: (
         <p>
-          <TicketLink id="SD-2318" /> 申請人確認 pod 已經起來，已結案。這次是金鑰輪替後 robot account 被停用造成的，要不要開一張後續單，把 robot account 加進金鑰輪替的檢查清單，避免再發生？
-        </p>
-      ),
-    },
-    { who: 'user', text: '好，開吧。' },
-    {
-      who: 'agent',
-      steps: ['在 Service Desk 建立後續單 SD-2320', '連結到 SD-2318'],
-      copyText: '已開後續單 #SD-2320「金鑰輪替後檢查 robot account 狀態」，指派給 K8s 平台團隊，並連結到 #SD-2318。',
-      body: (
-        <p className="mt-2">
-          已開後續單 <TicketLink id="SD-2320" />「金鑰輪替後檢查 robot account 狀態」，指派給 K8s 平台團隊，並連結到 <TicketLink id="SD-2318" />。
+          <TicketLink id="SD-2318" /> 申請人確認 pod 已經起來，已結案。
         </p>
       ),
     },
@@ -148,7 +136,8 @@ export const ONCALL_SCRIPT: TAgentScript = {
 
 /** 劇本各步完成後,單子的狀態跟著變(tickets.tsx 讀;pos = engine.scriptPos,「第 n 步完成」⇔ pos > n) */
 export type TicketMilestones = { assigned: number; reenabled: number; replied: number; closed: number; followUpOpened: number }
-export const ONCALL_MILESTONES: TicketMilestones = { assigned: 3, reenabled: 7, replied: 9, closed: 10, followUpOpened: 12 }
+// 後續單已拿掉(2026-11-03)→ followUpOpened = Infinity(永遠不成立)
+export const ONCALL_MILESTONES: TicketMilestones = { assigned: 3, reenabled: 7, replied: 9, closed: 10, followUpOpened: Infinity }
 
 // ── 事找人(#oncall-updates)──────────────────────────────────────────────────
 /** Updates 開出來的對話:第一步是代理把前情整理好、問要不要接(前情 = 人找事版第 4 步的狀況整理逐字) */
@@ -190,7 +179,7 @@ export const ONCALL_UPDATES_SCRIPT: TAgentScript = {
     ...TAIL,
   ],
 }
-export const ONCALL_UPDATES_MILESTONES: TicketMilestones = { assigned: 2, reenabled: 6, replied: 8, closed: 9, followUpOpened: 11 }
+export const ONCALL_UPDATES_MILESTONES: TicketMilestones = { assigned: 2, reenabled: 6, replied: 8, closed: 9, followUpOpened: Infinity }
 
 /** 事找人的觸發點:打開 demo 5 秒後 Updates 收到新單(2026-10-30 user:「先五秒鐘自動出現」);時間 = 單子建立時間 */
 export const NEW_TICKET_UPDATE = {
