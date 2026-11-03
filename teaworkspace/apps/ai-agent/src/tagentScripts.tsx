@@ -59,22 +59,29 @@ export const K8S_IMAGEPULL_SCRIPT: TAgentScript = {
         </>
       ),
     },
-    { who: 'user', text: '照做了，還是一樣。幫我開單。' },
+    // 2026-11-03 user:「幫我開單」改由代理反問 → 使用者只說「照做了，還是一樣。」,代理問要不要整理成單,使用者答「好。」
+    { who: 'user', text: '照做了，還是一樣。' },
+    {
+      who: 'agent',
+      steps: ['比對處理結果：重新同步後仍回應 unauthorized'],
+      copyText: '看起來問題不在 pull secret。要我幫你整理成一張單，交給 K8s 平台團隊處理嗎？',
+      body: <p className="mt-2">看起來問題不在 pull secret。要我幫你整理成一張單，交給 K8s 平台團隊處理嗎？</p>,
+    },
+    { who: 'user', text: '好。' },
     {
       who: 'agent',
       steps: ['整理對話中的問題與已嘗試的步驟', '判斷負責團隊：K8s 平台團隊（執行環境）'],
-      // 2026-11-03 user:摘要太簡陋 → 改成右側面板的單子草稿(ticketDraft.tsx),使用者確認或修改後自己按 Create。
-      // 原台詞「內容正確嗎？如果負責團隊不對，直接回覆「不對」就好。」與下一句「對，開吧。」因此改掉(AI 起草,待 user 確認)。
-      copyText: '我把單子整理好了，請在右側確認內容；需要的話可以直接修改，沒問題就按 Create。我判斷這是 K8s 執行環境的故障，先指派給 K8s 平台團隊。',
+      // 2026-11-03 user:開單 = 產出 Title 與 What happened(列點),報案者確認後按 Submit;Priority 等欄位不在報案者這邊(ticketDraft.tsx)
+      copyText: '我把問題整理好了，請在右側確認標題和經過，沒問題就按 Submit。我判斷這是 K8s 執行環境的故障，送出後會交給 K8s 平台團隊。',
       body: (
         <>
-          <p className="mt-2">我把單子整理好了，請在右側確認內容；需要的話可以直接修改，沒問題就按 Create。</p>
-          <p className="mt-2">我判斷這是 K8s 執行環境的故障，先指派給 K8s 平台團隊。</p>
+          <p className="mt-2">我把問題整理好了，請在右側確認標題和經過，沒問題就按 Submit。</p>
+          <p className="mt-2">我判斷這是 K8s 執行環境的故障，送出後會交給 K8s 平台團隊。</p>
           <ReviewTicketButton />
         </>
       ),
     },
-    // 使用者按草稿面板的 Create(不是打字)
+    // 使用者按草稿面板的 Submit(不是打字)
     { who: 'user', text: '', viaAction: 'create-ticket' },
     {
       who: 'agent',

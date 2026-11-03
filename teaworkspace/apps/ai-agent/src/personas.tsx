@@ -10,6 +10,11 @@ import { OpenConversationButton } from './updates'
 
 export type Persona = {
   id: 'requester' | 'oncall' | 'oncall-updates'
+  /**
+   * 側欄頂端產品名稱後的情境標籤(2026-11-03 user:「方便 demo 時展示不易搞混」;DS Tag,一綠一藍)。
+   * 兩條值班網址(#oncall / #oncall-updates)同一個標籤。
+   */
+  role: { label: string; color: 'green' | 'blue' }
   /** 首頁問候用的名字 */
   userName: string
   homeDescription: string
@@ -56,12 +61,14 @@ const update = (id: string, time: string, text: ReactNode, copyText: string, act
 // ── 申請人(Aaron;2026-10-30 user 同意把品茶示範換成 IT 主題)────────────────────
 export const REQUESTER: Persona = {
   id: 'requester',
+  role: { label: 'Requester', color: 'green' },
   userName: 'Aaron',
   homeDescription: 'Tell me what’s broken. Paste an error or a link, and I’ll look into it or open a ticket for you.',
   suggestions: ['My deploy is stuck on staging', 'Request access to a repository', 'Check the status of my ticket'],
   script: K8S_IMAGEPULL_SCRIPT,
-  // 申請人劇本:第 9 步(Bob 接手)= 指派、第 10 步(已處理)= 重新啟用 + 回覆、第 12 步 = 結案;沒有後續單
-  milestones: { assigned: 8, reenabled: 9, replied: 9, closed: 11, followUpOpened: Infinity },
+  // 申請人劇本(步驟索引從 0):10 = Bob 接手 → 指派;11 = 已處理 → 重新啟用 + 回覆;13 = 結案;沒有後續單
+  // (2026-11-03 加了「代理反問要不要開單 / 使用者答好」兩步,索引往後 2)
+  milestones: { assigned: 10, reenabled: 11, replied: 11, closed: 13, followUpOpened: Infinity },
   updatesSeed: () => [
     update('u-ar', '2026/10/29 04:10 PM', 'Priya 核准了你的權限申請 AR-5170，你現在有 billing-service 的寫入權限。',
       'Priya 核准了你的權限申請 AR-5170，你現在有 billing-service 的寫入權限。', <OpenConversationButton conversationId="c-repo" />),
@@ -124,6 +131,7 @@ function ONCALL_UPDATES_SEED(): TAgentTurn[] {
 // ── 值班者(Bob,K8s 平台團隊;2026-10-30 user:「以值班者角度的 user journey demo」)──────────
 export const ONCALL: Persona = {
   id: 'oncall',
+  role: { label: 'On-call', color: 'blue' },
   userName: 'Bob',
   homeDescription: 'Ask about your queue, a ticket, or a cluster. I’ll pull the context together for you.',
   suggestions: ['Which tickets are close to their SLA?', 'Summarize last night’s alerts', 'Show tickets waiting on me'],

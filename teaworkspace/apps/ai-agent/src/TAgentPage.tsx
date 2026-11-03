@@ -37,6 +37,7 @@ import {
   SidebarMenuAction,
   SidebarMenuBadge,
   SidebarTrigger,
+  Tag,
   ChromeHeader,
   AgentConversation,
   AgentLogo,
@@ -231,7 +232,9 @@ export function TAgentPage({
   const sidebar = (
     <Sidebar collapsible="offcanvas" contentType="agent-nav" widthRange={MENU_WIDTH} className={`${CHROME_SIDEBAR_BG} ${CHROME_SIDEBAR_FILL_X}`}>
       <SidebarHeader>
-        <h2 className="flex-1 truncate text-body-lg font-medium">{TAGENT_LABEL}</h2>
+        {/* 產品名 + 情境標籤(personas.tsx role;DS Tag sm,header 內元素同 ChromeHeader gap-2) */}
+        <h2 className="min-w-0 truncate text-body-lg font-medium">{TAGENT_LABEL}</h2>
+        <Tag size="sm" color={persona.role.color} className="shrink-0">{persona.role.label}</Tag>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
@@ -390,15 +393,15 @@ export function TAgentPage({
               <ArticlePreview article={openArticle} />
             </AppShellAside>
           ) : openDraft ? (
-            <AppShellAside title="New ticket" contentType="ticket" widthRange={PANEL_WIDTH} className={CHROME_SIDEBAR_FILL_X}>
+            <AppShellAside title="Report an issue" contentType="ticket" widthRange={PANEL_WIDTH} className={CHROME_SIDEBAR_FILL_X}>
               <TicketDraftForm
                 draft={ticketDraft}
                 onDraftChange={setTicketDraft}
                 onCancel={() => setPanel(null)}
-                onCreate={(values) => {
+                onSubmit={(values) => {
                   setCreatedTicket(values)
                   engine.performScriptAction('create-ticket')
-                  // 建好 → 同一個面板直接換成單子詳情
+                  // 送出 → 同一個面板直接換成單子詳情
                   setPanel((prev) => (prev ? { ...prev, kind: 'ticket', id: 'SD-2318' } : prev))
                 }}
               />

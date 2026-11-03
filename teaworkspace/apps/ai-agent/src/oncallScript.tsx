@@ -12,10 +12,13 @@
 // - 代理只做唯讀的事(查詢、比對、讀日誌、確認結果);重新啟用由 Bob 照 SOP 手動做。
 // - SOP 在右側面板開(articles.tsx `kb-robot-reenable`,同申請人那邊的知識庫文章)。
 // - 通知申請人仍是代理起草、Bob 按「送出」才發。
-// - 「詢問 SOP 是否要調整」與「開後續單」user 2026-11-03 都拿掉(避免太複雜)。
+// - 「開後續單」user 2026-11-03 拿掉(避免太複雜);「詢問 SOP 是否要調整」先拿掉、同日 user 要求補回:
+//   結案後代理反問要不要優化 SOP,Bob 同意 → 代理把修改建議送給 SOP 負責人審核(只提建議、不直接改)。
+// - 狀況整理那則訊息下方有「Message Aaron」(contact.tsx;外開聊天平台,先做假連結)。
 import type { ReactNode } from 'react'
 import { ArticleLink, TicketLink, type TAgentScript, type TAgentScriptStep } from './TAgent'
 import { OpenConversationButton, WorkOnTicketButton } from './updates'
+import { MessageRequesterButton } from './contact'
 
 /** 主動發的結案通知的間隔(同申請人劇本 UPDATE_GAP_MS 8 秒:讓講者有時間切走,看得到通知與紅點) */
 const UPDATE_GAP_MS = 8000
@@ -81,10 +84,26 @@ const TAIL: TAgentScriptStep[] = [
           </>
         ),
       },
-      copyText: '#SD-2318 申請人確認 pod 已經起來，已結案。',
+      copyText:
+        '#SD-2318 申請人確認 pod 已經起來，已結案。這次照 SOP 處理時，有沒有需要調整的地方？例如在第 1 步加上「先查 registry 的金鑰輪替紀錄」，下次能更快判斷原因。',
       body: (
-        <p>
-          <TicketLink id="SD-2318" /> 申請人確認 pod 已經起來，已結案。
+        <>
+          <p>
+            <TicketLink id="SD-2318" /> 申請人確認 pod 已經起來，已結案。
+          </p>
+          <p className="mt-2">這次照 SOP 處理時，有沒有需要調整的地方？例如在第 1 步加上「先查 registry 的金鑰輪替紀錄」，下次能更快判斷原因。</p>
+        </>
+      ),
+    },
+    { who: 'user', text: '好，幫我提 SOP 修改建議。' },
+    {
+      who: 'agent',
+      steps: ['整理這次的處理經過', '起草 SOP 修改建議'],
+      copyText: '已把修改建議送給 SOP 負責人 Kenji 審核，審核通過後就會更新到〈Registry robot account 被停用：重新啟用〉。',
+      body: (
+        <p className="mt-2">
+          已把修改建議送給 SOP 負責人 Kenji 審核，審核通過後就會更新到〈
+          <ArticleLink articleId="kb-robot-reenable">Registry robot account 被停用：重新啟用</ArticleLink>〉。
         </p>
       ),
     },
@@ -127,6 +146,7 @@ export const ONCALL_SCRIPT: TAgentScript = {
             <li><strong>我查到的：</strong>registry 稽核日誌顯示，robot account robot$payments-ci 在昨晚 02:14 金鑰輪替後被停用。</li>
           </ul>
           {SOP_HANDOFF}
+          <MessageRequesterButton name="Aaron" />
         </>
       ),
     },
@@ -161,6 +181,7 @@ export const ONCALL_UPDATES_SCRIPT: TAgentScript = {
           <p className="mt-2">這是 <TicketLink id="SD-2318" /> 目前掌握的狀況：</p>
           {BRIEFING}
           <p className="mt-2">推測原因是這個帳號被停用。要接這張單嗎？我會指派給你，並通知申請人。</p>
+          <MessageRequesterButton name="Aaron" />
         </>
       ),
     },

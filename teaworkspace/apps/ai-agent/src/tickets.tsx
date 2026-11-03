@@ -13,7 +13,7 @@ import { Button, ButtonDivider, DescriptionItem, DescriptionList, Tag, Tooltip, 
 import { ExternalLink } from 'lucide-react'
 import { AsideHeaderActions } from './AsideHeaderActions'
 import type { TicketMilestones } from './oncallScript'
-import { categoryLabel, type TicketDraft } from './ticketDraft'
+import { whatHappenedItems, type TicketDraft } from './ticketDraft'
 
 type Status = 'New' | 'In progress' | 'Waiting for requester' | 'Closed'
 const STATUS_COLOR: Record<Status, 'neutral' | 'blue' | 'yellow' | 'green'> = {
@@ -47,34 +47,23 @@ const TODAY = '2026/10/30'
 export function getTicket(id: string, pos: number, M: TicketMilestones, created?: TicketDraft | null): Ticket | undefined {
   const done = (step: number) => pos > step
   if (id === 'SD-2318') {
-    // 申請人自己按 Create 建的單:欄位照草稿(使用者改過的內容);Description 每行「標籤：內容」拆成 Summary
+    // 申請人自己按 Submit 送出的單:Title 與 What happened 照草稿(使用者改過的內容);其他欄位由 Service Desk 判斷,不受草稿影響
     const fromDraft = created
-      ? {
-          title: created.title,
-          priority: created.priority,
-          team: created.team,
-          category: categoryLabel(created.category),
-          service: created.service,
-          environment: created.environment,
-          summary: created.description.split('\n').filter(Boolean).map((line) => {
-            const m = line.match(/^(.{1,8})：(.+)$/)
-            return m ? { label: m[1], text: m[2] } : { text: line }
-          }),
-        }
+      ? { title: created.title, summary: whatHappenedItems(created.whatHappened).map((text) => ({ text })) }
       : null
     const status: Status = done(M.closed) ? 'Closed' : done(M.replied) ? 'Waiting for requester' : done(M.assigned) ? 'In progress' : 'New'
     return {
       id,
       title: fromDraft?.title ?? 'payments-api 在 staging 拉不到映像檔（ImagePullBackOff）',
       status,
-      priority: fromDraft?.priority ?? 'P2',
+      priority: 'P2',
       requester: 'Aaron',
       assignee: done(M.assigned) ? 'Bob' : 'Unassigned',
-      team: fromDraft?.team ?? 'K8s 平台團隊',
-      category: fromDraft?.category ?? 'Kubernetes & deployments',
-      service: fromDraft?.service ?? 'payments-api',
+      team: 'K8s 平台團隊',
+      category: 'Kubernetes & deployments',
+      service: 'payments-api',
       created: `${TODAY} 10:42 AM`,
-      environment: fromDraft?.environment ?? 'stg-cluster-02 / payment-stg',
+      environment: 'stg-cluster-02 / payment-stg',
       // 申請人那邊代理開單前的摘要(tagentScripts.tsx 第 6 步)逐字;申請人自己建的單照草稿
       summary: fromDraft?.summary ?? [
         { label: '問題', text: 'payments-api 在 staging 拉不到映像檔（unauthorized），已重新同步 pull secret，無效。' },
