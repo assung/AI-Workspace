@@ -12,7 +12,9 @@
 // - 對話裡的報告檔 = DS FileItem compact、surface="form"、無 status(file-item.spec.md「表單 / 訊息附件」靜態態,點了打開 = 主要動作;
 //   rich 要縮圖,HTML 沒有縮圖會顯示檔名首字,不用)
 // - 預覽開在右側面板(2026-11-03 user 同意:照 Claude artifact 的做法);頂列 × 左邊 Download + Open in new tab(AsideHeaderActions,暫時做法)
-import { createContext, useContext, useRef, type ReactNode } from 'react'
+import { createContext, useContext, type ReactNode } from 'react'
+import { flushSync } from 'react-dom'
+import { createRoot } from 'react-dom/client'
 import {
   Button,
   ButtonDivider,
@@ -27,6 +29,7 @@ import {
   FileItem,
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
   type ChartConfig,
   type DataTableProps,
@@ -39,7 +42,12 @@ import { CATEGORIES, COMPARISON, OBSERVATIONS, OPEN_TICKETS, PERIOD, PREV_PERIOD
 
 type Columns<T> = DataTableProps<T>['columns']
 
-/** 對話 / 報告共用的唯讀表格 */
+/**
+ * 對話 / 報告共用的唯讀表格。
+ * 長文字欄(標題、類型)換行不截斷 = DataTable「自動行高」+ 欄位 `wrap`(data-table.spec.md 四、行高模式:
+ * 「適合描述、備註等需完整顯示的欄位」);只有一行的列高度同固定行高。
+ * 欄寬 = 最窄時的寬(加總 ≤ 右側面板 480 的內容寬,面板最窄也不必橫捲);容器比較寬時 DataTable 依比例撐開。
+ */
 function StaticTable<T>({ columns, data, label }: { columns: Columns<T>; data: T[]; label: string }) {
   return (
     <DataTable
@@ -48,6 +56,7 @@ function StaticTable<T>({ columns, data, label }: { columns: Columns<T>; data: T
       data={data}
       size="sm"
       height="auto"
+      autoRowHeight
       enableHover={false}
       tableOptions={{ enableSorting: false }}
     />
@@ -66,7 +75,7 @@ export const ComparisonTable = () => <StaticTable label="上週與前一週比�
 
 const categoryRows = CATEGORIES.map((c) => ({ ...c, share: pct(c.tickets, TOTALS.tickets) }))
 const categoryColumns: Columns<(typeof categoryRows)[number]> = [
-  { accessorKey: 'category', header: '類型', meta: { type: 'string', width: 180 } },
+  { accessorKey: 'category', header: '類型', meta: { type: 'string', width: 160, wrap: true } },
   { accessorKey: 'tickets', header: '件數', meta: { type: 'number', width: 90 } },
   { accessorKey: 'share', header: '占比', meta: { type: 'string', align: 'right', width: 90 } },
   { accessorKey: 'closed', header: '已結案', meta: { type: 'number', width: 90 } },
@@ -75,18 +84,14 @@ export const CategoryTable = () => <StaticTable label="問題類型排序" colum
 
 const openColumns: Columns<(typeof OPEN_TICKETS)[number]> = [
   // 單號 = TicketLink(點了在右側看單子,同其他劇本)
-  { accessorKey: 'id', header: '單號', meta: { width: 96 }, cell: ({ row }) => <TicketLink id={row.original.id} /> },
-  { accessorKey: 'title', header: '標題', meta: { type: 'string', width: 260 } },
-  { accessorKey: 'category', header: '類型', meta: { type: 'string', width: 150 } },
-  { accessorKey: 'assignee', header: '負責人', meta: { type: 'string', width: 90 } },
-  { id: 'age', accessorFn: (t) => `${t.ageDays} 天`, header: '已開', meta: { type: 'string', align: 'right', width: 72 } },
+  // 變寬時多出來的寬度給標題:其他欄設 maxWidth(DataTable 分配欄寬時撞到上限的欄先凍結、餘數分給其他欄,data-table.spec.md 欄寬段)
+  { accessorKey: 'id', header: '單號', meta: { width: 84, maxWidth: 100 }, cell: ({ row }) => <TicketLink id={row.original.id} /> },
+  { accessorKey: 'title', header: '標題', meta: { type: 'string', width: 132, wrap: true } },
+  { accessorKey: 'category', header: '類型', meta: { type: 'string', width: 92, maxWidth: 150, wrap: true } },
+  { accessorKey: 'assignee', header: '負責人', meta: { type: 'string', width: 68, maxWidth: 90 } },
+  { id: 'age', accessorFn: (t) => `${t.ageDays} 天`, header: '已開', meta: { type: 'string', align: 'right', width: 64, maxWidth: 72 } },
 ]
 export const OpenTicketsTable = () => <StaticTable label="未結案的單" columns={openColumns} data={OPEN_TICKETS} />
-/** 報告裡的版本:右側面板寬 480,拿掉「類型」(問題類型在上一段已有圖表與表格),其餘欄同對話 */
-const reportOpenColumns = openColumns
-  .filter((c) => (c as { accessorKey?: string }).accessorKey !== 'category')
-  .map((c) => ((c as { accessorKey?: string }).accessorKey === 'title' ? { ...c, meta: { ...c.meta, width: 180 } } : c))
-const ReportOpenTicketsTable = () => <StaticTable label="未結案的單" columns={reportOpenColumns} data={OPEN_TICKETS} />
 
 // ── 報告 ─────────────────────────────────────────────────────────────────────
 export const REPORT = {
@@ -99,9 +104,10 @@ const chartConfig = {
   prevTickets: { label: '前一週', color: 'var(--chart-2)' },
 } satisfies ChartConfig
 
-function CategoryChart() {
+/** 右側面板窄 → 4:3 才不會扁;下載的文件(880 寬)用 ChartContainer 預設 16:9(chart.spec.md「高度決定」) */
+function CategoryChart({ doc }: { doc?: boolean }) {
   return (
-    <ChartContainer config={chartConfig} className="aspect-[4/3]">
+    <ChartContainer config={chartConfig} className={doc ? undefined : 'aspect-[4/3]'}>
       <BarChart accessibilityLayer data={CATEGORIES} layout="vertical" margin={{ left: 8 }}>
         <CartesianGrid horizontal={false} />
         <YAxis dataKey="category" type="category" tickLine={false} axisLine={false} width={148} />
@@ -116,9 +122,52 @@ function CategoryChart() {
   )
 }
 
-/** 下載 / 新分頁用:把面板裡畫好的報告(含圖表的 SVG)連同目前頁面的樣式包成一份獨立的 HTML;
- *  寬度 = 面板當下的寬(圖表 SVG 與表格欄寬是照這個寬畫的,換寬會留白或截斷) */
-function toStandaloneHtml(node: HTMLElement) {
+/** 報告本文(右側預覽與下載共用同一份) */
+function ReportBody({ doc }: { doc?: boolean }) {
+  return (
+    <>
+      <h2 className="text-h3 font-semibold">{REPORT.title}</h2>
+      <DescriptionList orientation="horizontal">
+        <DescriptionItem label="期間">{PERIOD.label}（與前一週 {PREV_PERIOD.label} 比較）</DescriptionItem>
+        <DescriptionItem label="團隊">{TEAM}</DescriptionItem>
+        <DescriptionItem label="整理">AI agent（資料來源：IT Service Desk 工單）</DescriptionItem>
+      </DescriptionList>
+      <h3 className="text-h4 font-semibold">摘要</h3>
+      <ComparisonTable />
+      <h3 className="text-h4 font-semibold">問題類型</h3>
+      <CategoryChart doc={doc} />
+      <CategoryTable />
+      <h3 className="text-h4 font-semibold">未結案的單</h3>
+      <OpenTicketsTable />
+      <h3 className="text-h4 font-semibold">觀察</h3>
+      <ul className="flex list-disc flex-col gap-1 ps-[var(--layout-space-loose)] text-body">
+        {OBSERVATIONS.map((o) => <li key={o}>{o}</li>)}
+      </ul>
+    </>
+  )
+}
+
+const BODY_CLASS = 'flex flex-col gap-[var(--layout-space-loose)] p-[var(--layout-space-loose)]'
+/**
+ * 下載 / 新分頁的文件寬(2026-11-04 user:預覽太窄、下載後表格字被截斷,週報無法報告)= 對話欄寬上限 880(TAgentPage COLUMN_MAX_WIDTH 同值)。
+ * 不照右側面板當下的寬:另外在畫面外用這個寬畫一份,再連同頁面樣式包成獨立 HTML。
+ * 不做隨視窗縮放:下載後是靜態檔,DataTable 欄寬與圖表 SVG 是程式量出來的,檔案裡不會重算。
+ */
+const DOC_WIDTH = 880
+
+async function renderStandaloneHtml() {
+  const host = document.createElement('div')
+  host.style.cssText = `position:fixed;left:-10000px;top:0;width:${DOC_WIDTH}px`
+  host.className = 'bg-canvas text-foreground'
+  document.body.appendChild(host)
+  const root = createRoot(host)
+  // 另一個 React root,拿不到 app 的 Provider → 補上同一組 TooltipProvider(main.tsx 同值;DataTable 截斷提示要用)
+  flushSync(() => root.render(<TooltipProvider delayDuration={500} skipDelayDuration={300}><div className={BODY_CLASS}><ReportBody doc /></div></TooltipProvider>))
+  // 等 DataTable 量欄寬、圖表量容器(ResizeObserver)畫完
+  await new Promise((r) => setTimeout(r, 400))
+  const html = host.innerHTML
+  root.unmount()
+  host.remove()
   const css = Array.from(document.styleSheets)
     .flatMap((s) => {
       try {
@@ -133,60 +182,44 @@ function toStandaloneHtml(node: HTMLElement) {
 <html lang="zh-Hant" data-theme="${theme}">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${REPORT.title}</title>
 <style>${css}</style></head>
-<body class="bg-canvas text-foreground"><main style="max-width:${node.offsetWidth}px;margin:0 auto">${node.outerHTML}</main></body>
+<body class="bg-canvas text-foreground"><main style="max-width:${DOC_WIDTH}px;margin:0 auto">${html}</main></body>
 </html>`
 }
 
 export function ReportPreview() {
-  const ref = useRef<HTMLDivElement>(null)
-  const blobUrl = () => (ref.current ? URL.createObjectURL(new Blob([toStandaloneHtml(ref.current)], { type: 'text/html' })) : null)
-  const download = () => {
-    const url = blobUrl()
-    if (!url) return
+  const blobUrl = async () => URL.createObjectURL(new Blob([await renderStandaloneHtml()], { type: 'text/html' }))
+  const download = async () => {
+    const url = await blobUrl()
     const a = document.createElement('a')
     a.href = url
     a.download = REPORT.fileName
     a.click()
     URL.revokeObjectURL(url)
   }
-  const openInNewTab = () => {
-    const url = blobUrl()
-    if (url) window.open(url, '_blank', 'noopener')
+  const openInNewTab = async () => {
+    // 先開分頁再填網址:等報告畫完才 window.open 會被瀏覽器當成彈出視窗擋掉
+    const tab = window.open('', '_blank')
+    const url = await blobUrl()
+    if (tab) tab.location.href = url
   }
   return (
-    <div ref={ref} className="flex flex-col gap-[var(--layout-space-loose)] p-[var(--layout-space-loose)]">
+    <div className={BODY_CLASS}>
       <AsideHeaderActions deps="report">
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="text" size="sm" iconOnly startIcon={Download} aria-label="Download" title="" onClick={download} />
+            <Button variant="text" size="sm" iconOnly startIcon={Download} aria-label="Download" title="" onClick={() => void download()} />
           </TooltipTrigger>
           <TooltipContent>Download</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="text" size="sm" iconOnly startIcon={ExternalLink} aria-label="Open in new tab" title="" onClick={openInNewTab} />
+            <Button variant="text" size="sm" iconOnly startIcon={ExternalLink} aria-label="Open in new tab" title="" onClick={() => void openInNewTab()} />
           </TooltipTrigger>
           <TooltipContent>Open in new tab</TooltipContent>
         </Tooltip>
         <ButtonDivider />
       </AsideHeaderActions>
-      <h2 className="text-h3 font-semibold">{REPORT.title}</h2>
-      <DescriptionList orientation="horizontal">
-        <DescriptionItem label="期間">{PERIOD.label}（與前一週 {PREV_PERIOD.label} 比較）</DescriptionItem>
-        <DescriptionItem label="團隊">{TEAM}</DescriptionItem>
-        <DescriptionItem label="整理">AI agent（資料來源：IT Service Desk 工單）</DescriptionItem>
-      </DescriptionList>
-      <h3 className="text-h4 font-semibold">摘要</h3>
-      <ComparisonTable />
-      <h3 className="text-h4 font-semibold">問題類型</h3>
-      <CategoryChart />
-      <CategoryTable />
-      <h3 className="text-h4 font-semibold">未結案的單</h3>
-      <ReportOpenTicketsTable />
-      <h3 className="text-h4 font-semibold">觀察</h3>
-      <ul className="flex list-disc flex-col gap-1 ps-[var(--layout-space-loose)] text-body">
-        {OBSERVATIONS.map((o) => <li key={o}>{o}</li>)}
-      </ul>
+      <ReportBody />
     </div>
   )
 }
