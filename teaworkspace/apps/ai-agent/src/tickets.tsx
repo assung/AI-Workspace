@@ -145,12 +145,11 @@ export function TicketPreview({ ticket }: { ticket: Ticket }) {
         <ButtonDivider />
       </AsideHeaderActions>
       <h2 className="text-h4 font-semibold">{ticket.title}</h2>
-      {/* Category / Environment 不在單子詳情顯示(2026-11-03 user:報案者與值班者兩邊都拿掉) */}
+      {/* Category / Environment / Priority 不在單子詳情顯示(2026-11-03 user:報案者與值班者兩邊都拿掉) */}
       <DescriptionList orientation="horizontal" divided>
         <DescriptionItem label="Status">
           <Tag size="sm" color={STATUS_COLOR[ticket.status]}>{ticket.status}</Tag>
         </DescriptionItem>
-        <DescriptionItem label="Priority">{ticket.priority}</DescriptionItem>
         <DescriptionItem label="Requester">{ticket.requester}</DescriptionItem>
         <DescriptionItem label="Assignee">{ticket.assignee}</DescriptionItem>
         <DescriptionItem label="Team">{ticket.team}</DescriptionItem>

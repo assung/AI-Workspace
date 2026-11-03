@@ -13,12 +13,14 @@
 // - SOP 在右側面板開(articles.tsx `kb-robot-reenable`,同申請人那邊的知識庫文章)。
 // - 通知申請人仍是代理起草、Bob 按「送出」才發。
 // - 「開後續單」user 2026-11-03 拿掉(避免太複雜);「詢問 SOP 是否要調整」先拿掉、同日 user 要求補回:
-//   結案後代理反問要不要優化 SOP,Bob 同意 → 代理把修改建議送給 SOP 負責人審核(只提建議、不直接改)。
+//   結案後代理反問要不要優化 SOP,Bob 同意 → 代理起草修改建議、右側面板給 Bob 看,Bob 確認後按 Submit 才送給 SOP 負責人審核
+//   (2026-11-03 user:「Agent 要給值班者看修改的內容,確認無誤後再按下送出,讓 Kenji 審核」;sopDraft.tsx)。
 // - 狀況整理那則訊息下方有「Message Aaron」(contact.tsx;外開聊天平台,先做假連結)。
 import type { ReactNode } from 'react'
 import { ArticleLink, TicketLink, type TAgentScript, type TAgentScriptStep } from './TAgent'
 import { OpenConversationButton, WorkOnTicketButton } from './updates'
 import { MessageRequesterButton } from './contact'
+import { ReviewSopButton } from './sopDraft'
 
 /** 主動發的結案通知的間隔(同申請人劇本 UPDATE_GAP_MS 8 秒:讓講者有時間切走,看得到通知與紅點) */
 const UPDATE_GAP_MS = 8000
@@ -99,6 +101,19 @@ const TAIL: TAgentScriptStep[] = [
     {
       who: 'agent',
       steps: ['整理這次的處理經過', '起草 SOP 修改建議'],
+      copyText: '我起草好修改建議了，請在右側確認內容；需要的話可以直接修改，沒問題就按 Submit，我會送給 SOP 負責人 Kenji 審核。',
+      body: (
+        <>
+          <p className="mt-2">我起草好修改建議了，請在右側確認內容；需要的話可以直接修改，沒問題就按 Submit，我會送給 SOP 負責人 Kenji 審核。</p>
+          <ReviewSopButton />
+        </>
+      ),
+    },
+    // Bob 按 SOP 建議面板的 Submit(不是打字)
+    { who: 'user', text: '', viaAction: 'submit-sop' },
+    {
+      who: 'agent',
+      steps: ['把修改建議送給 Kenji 審核'],
       copyText: '已把修改建議送給 SOP 負責人 Kenji 審核，審核通過後就會更新到〈Registry robot account 被停用：重新啟用〉。',
       body: (
         <p className="mt-2">

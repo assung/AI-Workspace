@@ -81,6 +81,7 @@ import { UpdatesActionsProvider } from './updates'
 import { ARTICLES, ArticlePreview } from './articles'
 import { getTicket, TicketPreview } from './tickets'
 import { DraftActionsProvider, INITIAL_DRAFT, TicketDraftForm, type TicketDraft } from './ticketDraft'
+import { INITIAL_SOP_DRAFT, SopDraftActionsProvider, SopDraftForm, type SopDraft } from './sopDraft'
 import type { Persona } from './personas'
 import { CHROME_SIDEBAR_BG, CHROME_SIDEBAR_FILL_X } from './chrome'
 
@@ -98,7 +99,7 @@ const PANEL_WIDTH = { min: 320, initial: 480, max: 720 }
 /** 對話欄寬上限(訊息與輸入盒同一欄、置中);沿用 tWorkspace 880(TAgentPage COLUMN_MAX_WIDTH) */
 const COLUMN_MAX_WIDTH = 880
 
-type Panel = { conversationId: string; kind: 'article' | 'ticket' | 'draft'; id: string }
+type Panel = { conversationId: string; kind: 'article' | 'ticket' | 'draft' | 'sop-draft'; id: string }
 
 /** 新對話首頁的問候(沿用 tWorkspace:帶名字、依當地時間分早 / 午 / 晚) */
 function greeting(name: string, now = new Date()) {
@@ -147,6 +148,10 @@ export function TAgentPage({
   const [createdTicket, setCreatedTicket] = useState<TicketDraft | null>(null)
   /** 草稿只自動打開一次(使用者關掉後不再自己跳出來 —— 已關閉的面板不會自動重開,app-shell.spec.md §2) */
   const [draftAutoOpened, setDraftAutoOpened] = useState(false)
+  /** SOP 修改建議草稿(值班者;同報案草稿的做法) */
+  const [sopDraft, setSopDraft] = useState<SopDraft>(INITIAL_SOP_DRAFT)
+  const [sopSubmitted, setSopSubmitted] = useState(false)
+  const [sopAutoOpened, setSopAutoOpened] = useState(false)
 
   const activeConversation = route.startsWith('conversation:')
     ? engine.conversations.find((c) => `conversation:${c.id}` === route)
@@ -162,6 +167,7 @@ export function TAgentPage({
   // 單子跟著劇本進度變(狀態、負責人、活動紀錄)
   const openTicket = panel?.kind === 'ticket' ? getTicket(panel.id, engine.scriptPos, persona.milestones, createdTicket) : undefined
   const openDraft = panel?.kind === 'draft'
+  const openSopDraft = panel?.kind === 'sop-draft'
 
   // 代理整理好單子(劇本等著使用者按 Create)且使用者正看著那一則 → 自動打開草稿一次
   const awaitingCreate = engine.scriptAwaitingAction === 'create-ticket' && engine.scriptConvId !== null
@@ -170,6 +176,19 @@ export function TAgentPage({
     setDraftAutoOpened(true)
     setPanel({ conversationId: engine.scriptConvId!, kind: 'draft', id: 'new' })
   }, [awaitingCreate, draftAutoOpened, activeConversation?.id, engine.scriptConvId])
+  // 代理起草好 SOP 修改建議(劇本等著 Bob 按 Submit)→ 自動打開一次
+  const awaitingSop = engine.scriptAwaitingAction === 'submit-sop' && engine.scriptConvId !== null
+  useEffect(() => {
+    if (!awaitingSop || sopAutoOpened || activeConversation?.id !== engine.scriptConvId) return
+    setSopAutoOpened(true)
+    setPanel({ conversationId: engine.scriptConvId!, kind: 'sop-draft', id: 'kb-robot-reenable' })
+  }, [awaitingSop, sopAutoOpened, activeConversation?.id, engine.scriptConvId])
+  const sopActions = {
+    submitted: sopSubmitted,
+    review: () => {
+      if (activeConversation) setPanel({ conversationId: activeConversation.id, kind: 'sop-draft', id: 'kb-robot-reenable' })
+    },
+  }
   const draftActions = {
     created: createdTicket !== null,
     reviewTicket: () => {
@@ -331,6 +350,7 @@ export function TAgentPage({
       <div className="flex h-full min-h-0 flex-col">
         <PanelScope onOpen={(kind, id) => setPanel({ conversationId: activeConversation.id, kind, id })}>
           {/* className 落在 log 本體:同一欄置中;捲軸仍在整個 Main 右緣 */}
+          <SopDraftActionsProvider value={sopActions}>
           <DraftActionsProvider value={draftActions}>
           <UpdatesActionsProvider value={updatesActions}>
             <AgentConversation className="mx-auto w-full" style={{ maxWidth: COLUMN_MAX_WIDTH }}>
@@ -338,6 +358,7 @@ export function TAgentPage({
             </AgentConversation>
           </UpdatesActionsProvider>
           </DraftActionsProvider>
+          </SopDraftActionsProvider>
         </PanelScope>
         {/* AgentPromptInput 自帶 m-loose mt-0(與 AgentConversation 的 p-loose 同一條內緣)→ 外層不再加 padding */}
         <div className="mx-auto w-full" style={{ maxWidth: COLUMN_MAX_WIDTH }}>
@@ -384,13 +405,27 @@ export function TAgentPage({
         className="h-full"
         sidebar={sidebar}
         header={header}
-        asideOpen={!!(openArticle || openTicket || openDraft)}
+        asideOpen={!!(openArticle || openTicket || openDraft || openSopDraft)}
         onAsideOpenChange={(open) => { if (!open) setPanel(null) }}
         aside={
           // FILL_X:Right panel 內層 ScrollArea 同側欄的撐寬問題(chrome.ts CHROME_SIDEBAR_FILL_X 說明),長指令行改在區塊內橫捲
           openArticle ? (
             <AppShellAside title={openArticle.title} contentType="article" widthRange={PANEL_WIDTH} className={CHROME_SIDEBAR_FILL_X}>
               <ArticlePreview article={openArticle} />
+            </AppShellAside>
+          ) : openSopDraft ? (
+            <AppShellAside title="Suggest an SOP change" contentType="ticket" widthRange={PANEL_WIDTH} className={CHROME_SIDEBAR_FILL_X}>
+              <SopDraftForm
+                draft={sopDraft}
+                onDraftChange={setSopDraft}
+                onCancel={() => setPanel(null)}
+                onSubmit={(values) => {
+                  setSopDraft(values)
+                  setSopSubmitted(true)
+                  engine.performScriptAction('submit-sop')
+                  setPanel(null)
+                }}
+              />
             </AppShellAside>
           ) : openDraft ? (
             <AppShellAside title="Report an issue" contentType="ticket" widthRange={PANEL_WIDTH} className={CHROME_SIDEBAR_FILL_X}>
