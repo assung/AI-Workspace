@@ -8,6 +8,7 @@
 // 從 apps/chat/src/tagentScripts.tsx 複製(2026-10-30 獨立產品);第 4 步思考改回 handoff §3 的寫法(獨立產品沒有 Docs 分頁,user 同意)。
 import { ArticleLink, TicketLink, type TAgentScript } from './TAgent'
 import { OpenConversationButton } from './updates'
+import { ReviewTicketButton } from './ticketDraft'
 
 // 進度「兩邊都放」(2026-10-30 user):第 9、10、12 步同時發一則到 Updates(時間 = 單子活動紀錄同一組,tickets.tsx),
 // 附「Open conversation」回到這一則對話(`script` = 劇本那一則)。Updates 那一份只記紅點、不再跳 Toast(對話那一份已通知過)。
@@ -62,21 +63,19 @@ export const K8S_IMAGEPULL_SCRIPT: TAgentScript = {
     {
       who: 'agent',
       steps: ['整理對話中的問題與已嘗試的步驟', '判斷負責團隊：K8s 平台團隊（執行環境）'],
-      copyText:
-        '好，我先摘要給你確認：問題：payments-api 在 staging 拉不到映像檔（unauthorized），已重新同步 pull secret，無效。影響：Payments 團隊的 staging 部署被阻斷。我們判斷：這是 K8s 執行環境的故障，由 K8s 平台團隊處理。內容正確嗎？如果負責團隊不對，直接回覆「不對」就好。',
+      // 2026-11-03 user:摘要太簡陋 → 改成右側面板的單子草稿(ticketDraft.tsx),使用者確認或修改後自己按 Create。
+      // 原台詞「內容正確嗎？如果負責團隊不對，直接回覆「不對」就好。」與下一句「對，開吧。」因此改掉(AI 起草,待 user 確認)。
+      copyText: '我把單子整理好了，請在右側確認內容；需要的話可以直接修改，沒問題就按 Create。我判斷這是 K8s 執行環境的故障，先指派給 K8s 平台團隊。',
       body: (
         <>
-          <p className="mt-2">好，我先摘要給你確認：</p>
-          <ul className="mt-2 flex list-disc flex-col gap-1 pl-5">
-            <li><strong>問題：</strong>payments-api 在 staging 拉不到映像檔（unauthorized），已重新同步 pull secret，無效。</li>
-            <li><strong>影響：</strong>Payments 團隊的 staging 部署被阻斷。</li>
-            <li><strong>我們判斷：</strong>這是 K8s 執行環境的故障，由 K8s 平台團隊處理。</li>
-          </ul>
-          <p className="mt-2">內容正確嗎？如果負責團隊不對，直接回覆「不對」就好。</p>
+          <p className="mt-2">我把單子整理好了，請在右側確認內容；需要的話可以直接修改，沒問題就按 Create。</p>
+          <p className="mt-2">我判斷這是 K8s 執行環境的故障，先指派給 K8s 平台團隊。</p>
+          <ReviewTicketButton />
         </>
       ),
     },
-    { who: 'user', text: '對，開吧。' },
+    // 使用者按草稿面板的 Create(不是打字)
+    { who: 'user', text: '', viaAction: 'create-ticket' },
     {
       who: 'agent',
       steps: ['在 Service Desk 建立單號 SD-2318', '通知 K8s 平台團隊值班'],

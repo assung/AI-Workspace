@@ -110,7 +110,8 @@ export function TicketLink({ id }: { id: string }) {
 // `update` = 這一步完成時也發一則到 Updates(2026-10-30 user:進度通知「兩邊都放」—— 對話裡一則、Updates 一則)。
 export type TAgentUpdate = { time: string; body: ReactNode; copyText: string }
 export type TAgentScriptStep =
-  | { who: 'user'; text: string }
+  // `viaAction` = 這一步不是打字,是使用者在畫面上按某個鈕(例:草稿面板的 Create);不預填、打字不推進,由 performScriptAction 推進
+  | { who: 'user'; text: string; viaAction?: string }
   | { who: 'agent'; steps: string[]; body: ReactNode; copyText: string; afterMs?: number; update?: TAgentUpdate }
 export type TAgentScript = { title: string; steps: TAgentScriptStep[] }
 
@@ -240,6 +241,14 @@ export function useTAgentEngine({ seed, updatesSeed, script, isViewing, onBackgr
     else start()
   }, [script, runAgent, setScript, postUpdate])
 
+  /** 使用者在畫面上按了劇本在等的那個鈕 → 跳過那一步(不產生使用者泡泡),接著播代理回合 */
+  const performScriptAction = useCallback((action: string) => {
+    const sc = scriptRef.current
+    const st = script?.steps[sc.pos]
+    if (!sc.convId || st?.who !== 'user' || st.viaAction !== action) return
+    playScriptFrom(sc.convId, sc.pos + 1)
+  }, [script, playScriptFrom])
+
   /**
    * 從 Updates 的「Work on this ticket」開一則帶前情的新對話(對照 Your Dot「分出帶前情的新對話」):
    * 劇本第一步是代理的整理,開出來就開始播。劇本已經開始過 → 回傳那一則,不重開。
@@ -281,7 +290,8 @@ export function useTAgentEngine({ seed, updatesSeed, script, isViewing, onBackgr
     // 劇本:下一步是使用者的話,而且是「新對話起頭」或「劇本那一則對話」→ 照劇本推進
     const sc = scriptRef.current
     const isFresh = convId === null || !conversationsRef.current.find((c) => c.id === convId)?.turns.length
-    const scripted = !!script && script.steps[sc.pos]?.who === 'user'
+    const next = script?.steps[sc.pos]
+    const scripted = !!script && next?.who === 'user' && !next.viaAction
       && (sc.convId === null ? isFresh && sc.pos === 0 : convId === sc.convId)
     setConversations((prev) => {
       const existing = prev.find((c) => c.id === id)
@@ -336,7 +346,16 @@ export function useTAgentEngine({ seed, updatesSeed, script, isViewing, onBackgr
     busyConvId,
     busy: busyConvId !== null,
     /** 劇本的下一句使用者台詞(輪到使用者時才有),輸入盒預先填入;以及劇本跑在哪一則對話 */
-    scriptPrefill: script && script.steps[scriptPos]?.who === 'user' ? (script.steps[scriptPos] as { text: string }).text : null,
+    scriptPrefill: (() => {
+      const st = script?.steps[scriptPos]
+      return st?.who === 'user' && !st.viaAction ? st.text : null
+    })(),
+    /** 劇本現在等的畫面動作(例:'create-ticket');沒有 = null */
+    scriptAwaitingAction: (() => {
+      const st = script?.steps[scriptPos]
+      return st?.who === 'user' && st.viaAction ? st.viaAction : null
+    })(),
+    performScriptAction,
     scriptConvId,
     /** 劇本下一步的位置(右側面板的單子狀態跟著它走) */
     scriptPos,

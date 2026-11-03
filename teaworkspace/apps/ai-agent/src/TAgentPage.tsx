@@ -79,6 +79,7 @@ import {
 import { UpdatesActionsProvider } from './updates'
 import { ARTICLES, ArticlePreview } from './articles'
 import { getTicket, TicketPreview } from './tickets'
+import { DraftActionsProvider, INITIAL_DRAFT, TicketDraftForm, type TicketDraft } from './ticketDraft'
 import type { Persona } from './personas'
 import { CHROME_SIDEBAR_BG, CHROME_SIDEBAR_FILL_X } from './chrome'
 
@@ -96,7 +97,7 @@ const PANEL_WIDTH = { min: 320, initial: 480, max: 720 }
 /** 對話欄寬上限(訊息與輸入盒同一欄、置中);沿用 tWorkspace 880(TAgentPage COLUMN_MAX_WIDTH) */
 const COLUMN_MAX_WIDTH = 880
 
-type Panel = { conversationId: string; kind: 'article' | 'ticket'; id: string }
+type Panel = { conversationId: string; kind: 'article' | 'ticket' | 'draft'; id: string }
 
 /** 新對話首頁的問候(沿用 tWorkspace:帶名字、依當地時間分早 / 午 / 晚) */
 function greeting(name: string, now = new Date()) {
@@ -139,6 +140,12 @@ export function TAgentPage({
   const [deleteTarget, setDeleteTarget] = useState<TAgentConversation | null>(null)
   /** 右側面板開著的內容,記在哪一則對話開的(換對話時收起;回到那則也不自動重開 —— 已關閉的面板不自動重開,§2) */
   const [panel, setPanel] = useState<Panel | null>(null)
+  /** 開單草稿(使用者改過的內容留著;關掉面板再開不會丟) */
+  const [ticketDraft, setTicketDraft] = useState<TicketDraft>(INITIAL_DRAFT)
+  /** 按了 Create 之後的單子內容(單子詳情照這份) */
+  const [createdTicket, setCreatedTicket] = useState<TicketDraft | null>(null)
+  /** 草稿只自動打開一次(使用者關掉後不再自己跳出來 —— 已關閉的面板不會自動重開,app-shell.spec.md §2) */
+  const [draftAutoOpened, setDraftAutoOpened] = useState(false)
 
   const activeConversation = route.startsWith('conversation:')
     ? engine.conversations.find((c) => `conversation:${c.id}` === route)
@@ -152,7 +159,22 @@ export function TAgentPage({
   }, [activeConversation?.id])
   const openArticle = panel?.kind === 'article' ? ARTICLES[panel.id] : undefined
   // 單子跟著劇本進度變(狀態、負責人、活動紀錄)
-  const openTicket = panel?.kind === 'ticket' ? getTicket(panel.id, engine.scriptPos, persona.milestones) : undefined
+  const openTicket = panel?.kind === 'ticket' ? getTicket(panel.id, engine.scriptPos, persona.milestones, createdTicket) : undefined
+  const openDraft = panel?.kind === 'draft'
+
+  // 代理整理好單子(劇本等著使用者按 Create)且使用者正看著那一則 → 自動打開草稿一次
+  const awaitingCreate = engine.scriptAwaitingAction === 'create-ticket' && engine.scriptConvId !== null
+  useEffect(() => {
+    if (!awaitingCreate || draftAutoOpened || activeConversation?.id !== engine.scriptConvId) return
+    setDraftAutoOpened(true)
+    setPanel({ conversationId: engine.scriptConvId!, kind: 'draft', id: 'new' })
+  }, [awaitingCreate, draftAutoOpened, activeConversation?.id, engine.scriptConvId])
+  const draftActions = {
+    created: createdTicket !== null,
+    reviewTicket: () => {
+      if (activeConversation) setPanel({ conversationId: activeConversation.id, kind: 'draft', id: 'new' })
+    },
+  }
 
   // 劇本台詞預先填入輸入盒(2026-10-29 user:「第一句話先預設填入輸入框內」):劇本還沒開始 → 新對話首頁;
   // 開始後 → 劇本那一則對話,輪到使用者時填下一句。只在台詞或位置改變時填,不蓋掉使用者正在打的字。
@@ -306,11 +328,13 @@ export function TAgentPage({
       <div className="flex h-full min-h-0 flex-col">
         <PanelScope onOpen={(kind, id) => setPanel({ conversationId: activeConversation.id, kind, id })}>
           {/* className 落在 log 本體:同一欄置中;捲軸仍在整個 Main 右緣 */}
+          <DraftActionsProvider value={draftActions}>
           <UpdatesActionsProvider value={updatesActions}>
             <AgentConversation className="mx-auto w-full" style={{ maxWidth: COLUMN_MAX_WIDTH }}>
               {renderTurns(activeConversation)}
             </AgentConversation>
           </UpdatesActionsProvider>
+          </DraftActionsProvider>
         </PanelScope>
         {/* AgentPromptInput 自帶 m-loose mt-0(與 AgentConversation 的 p-loose 同一條內緣)→ 外層不再加 padding */}
         <div className="mx-auto w-full" style={{ maxWidth: COLUMN_MAX_WIDTH }}>
@@ -357,13 +381,27 @@ export function TAgentPage({
         className="h-full"
         sidebar={sidebar}
         header={header}
-        asideOpen={!!(openArticle || openTicket)}
+        asideOpen={!!(openArticle || openTicket || openDraft)}
         onAsideOpenChange={(open) => { if (!open) setPanel(null) }}
         aside={
           // FILL_X:Right panel 內層 ScrollArea 同側欄的撐寬問題(chrome.ts CHROME_SIDEBAR_FILL_X 說明),長指令行改在區塊內橫捲
           openArticle ? (
             <AppShellAside title={openArticle.title} contentType="article" widthRange={PANEL_WIDTH} className={CHROME_SIDEBAR_FILL_X}>
               <ArticlePreview article={openArticle} />
+            </AppShellAside>
+          ) : openDraft ? (
+            <AppShellAside title="New ticket" contentType="ticket" widthRange={PANEL_WIDTH} className={CHROME_SIDEBAR_FILL_X}>
+              <TicketDraftForm
+                draft={ticketDraft}
+                onDraftChange={setTicketDraft}
+                onCancel={() => setPanel(null)}
+                onCreate={(values) => {
+                  setCreatedTicket(values)
+                  engine.performScriptAction('create-ticket')
+                  // 建好 → 同一個面板直接換成單子詳情
+                  setPanel((prev) => (prev ? { ...prev, kind: 'ticket', id: 'SD-2318' } : prev))
+                }}
+              />
             </AppShellAside>
           ) : openTicket ? (
             <AppShellAside title={`#${openTicket.id}`} contentType="ticket" widthRange={PANEL_WIDTH} className={CHROME_SIDEBAR_FILL_X}>

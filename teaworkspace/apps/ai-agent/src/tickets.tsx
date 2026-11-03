@@ -13,6 +13,7 @@ import { Button, ButtonDivider, DescriptionItem, DescriptionList, Tag, Tooltip, 
 import { ExternalLink } from 'lucide-react'
 import { AsideHeaderActions } from './AsideHeaderActions'
 import type { TicketMilestones } from './oncallScript'
+import { categoryLabel, type TicketDraft } from './ticketDraft'
 
 type Status = 'New' | 'In progress' | 'Waiting for requester' | 'Closed'
 const STATUS_COLOR: Record<Status, 'neutral' | 'blue' | 'yellow' | 'green'> = {
@@ -32,6 +33,8 @@ export type Ticket = {
   team: string
   created: string
   environment?: string
+  category?: string
+  service?: string
   summary: Array<{ label?: string; text: string }>
   linked?: string[]
   activity: Array<{ time: string; text: string }>
@@ -41,22 +44,39 @@ export type Ticket = {
 const TODAY = '2026/10/30'
 
 /** 單子目前的樣子;`pos` = 這個身分的劇本進度(還沒開始 = 0),`M` = 這份劇本的里程碑 */
-export function getTicket(id: string, pos: number, M: TicketMilestones): Ticket | undefined {
+export function getTicket(id: string, pos: number, M: TicketMilestones, created?: TicketDraft | null): Ticket | undefined {
   const done = (step: number) => pos > step
   if (id === 'SD-2318') {
+    // 申請人自己按 Create 建的單:欄位照草稿(使用者改過的內容);Description 每行「標籤：內容」拆成 Summary
+    const fromDraft = created
+      ? {
+          title: created.title,
+          priority: created.priority,
+          team: created.team,
+          category: categoryLabel(created.category),
+          service: created.service,
+          environment: created.environment,
+          summary: created.description.split('\n').filter(Boolean).map((line) => {
+            const m = line.match(/^(.{1,8})：(.+)$/)
+            return m ? { label: m[1], text: m[2] } : { text: line }
+          }),
+        }
+      : null
     const status: Status = done(M.closed) ? 'Closed' : done(M.replied) ? 'Waiting for requester' : done(M.assigned) ? 'In progress' : 'New'
     return {
       id,
-      title: 'payments-api 在 staging 拉不到映像檔（ImagePullBackOff）',
+      title: fromDraft?.title ?? 'payments-api 在 staging 拉不到映像檔（ImagePullBackOff）',
       status,
-      priority: 'P2',
+      priority: fromDraft?.priority ?? 'P2',
       requester: 'Aaron',
       assignee: done(M.assigned) ? 'Bob' : 'Unassigned',
-      team: 'K8s 平台團隊',
+      team: fromDraft?.team ?? 'K8s 平台團隊',
+      category: fromDraft?.category ?? 'Kubernetes & deployments',
+      service: fromDraft?.service ?? 'payments-api',
       created: `${TODAY} 10:42 AM`,
-      environment: 'stg-cluster-02 / payment-stg',
-      // 申請人那邊代理開單前的摘要(tagentScripts.tsx 第 6 步)逐字
-      summary: [
+      environment: fromDraft?.environment ?? 'stg-cluster-02 / payment-stg',
+      // 申請人那邊代理開單前的摘要(tagentScripts.tsx 第 6 步)逐字;申請人自己建的單照草稿
+      summary: fromDraft?.summary ?? [
         { label: '問題', text: 'payments-api 在 staging 拉不到映像檔（unauthorized），已重新同步 pull secret，無效。' },
         { label: '影響', text: 'Payments 團隊的 staging 部署被阻斷。' },
       ],
@@ -141,6 +161,8 @@ export function TicketPreview({ ticket }: { ticket: Ticket }) {
         <DescriptionItem label="Requester">{ticket.requester}</DescriptionItem>
         <DescriptionItem label="Assignee">{ticket.assignee}</DescriptionItem>
         <DescriptionItem label="Team">{ticket.team}</DescriptionItem>
+        {ticket.category && <DescriptionItem label="Category">{ticket.category}</DescriptionItem>}
+        {ticket.service && <DescriptionItem label="Service">{ticket.service}</DescriptionItem>}
         {ticket.environment && <DescriptionItem label="Environment">{ticket.environment}</DescriptionItem>}
         <DescriptionItem label="Created">{ticket.created}</DescriptionItem>
         {ticket.linked && <DescriptionItem label="Linked">{ticket.linked.map((l) => `#${l}`).join(', ')}</DescriptionItem>}

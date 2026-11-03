@@ -38,3 +38,33 @@ export function AsideHeaderActions({ children, deps }: { children: ReactNode; de
     </>
   )
 }
+
+// ⚠️ 暫時做法(2026-11-03 user:「按鈕放在底部,先使用 DS 裡面的 Footer 元件,我後續會再跟 DS 那邊提請他們新增」)——
+// DS 出 AppShellAside 的 footer 位置後整支刪掉。
+//
+// 需求:Right panel 底部固定一條動作列(單子草稿的 Cancel / Create),內文捲動時它不動。
+// DS 現況(beta.148):AppShellAside 只有「頂列 + ScrollArea」,children 全部進 ScrollArea、沒有 footer 位置。
+// 做法:把 children 插到 aside 最後(ScrollArea 之後);aside 是 flex-col、ScrollArea 是 flex-1 min-h-0 → 動作列自然貼底。
+// 動作列本身由呼叫端用 DS 對外的 Footer 元件(SheetFooter)組,這裡只負責放位置。依賴 DS 內部 DOM,只為示意。
+export function AsideFooter({ children }: { children: ReactNode }) {
+  const probe = useRef<HTMLSpanElement>(null)
+  const [slot, setSlot] = useState<HTMLElement | null>(null)
+  useLayoutEffect(() => {
+    const aside = probe.current?.closest('aside[data-app-shell-panel="right"]')
+    if (!aside) return
+    const el = document.createElement('div')
+    el.className = 'shrink-0'
+    aside.appendChild(el)
+    setSlot(el)
+    return () => {
+      el.remove()
+      setSlot(null)
+    }
+  }, [])
+  return (
+    <>
+      <span ref={probe} hidden />
+      {slot && createPortal(children, slot)}
+    </>
+  )
+}
