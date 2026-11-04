@@ -9,10 +9,9 @@
 //   顏色走 ChartConfig → `var(--color-{key})`,chart.spec.md「不硬寫色值」)。兩個數列(上週 / 前一週)→ 要 legend。
 //   類型名稱長(「Registry 與映像檔」)→ 橫條(layout="vertical"),類別名稱放左邊一行讀完,不用斜字或換行。
 // - 報告段落標題 / 條列 / 字級 = articles.tsx 同一組(text-h4、list utilities、text-body);期間等 metadata = DescriptionList horizontal
-// - 對話裡的報告檔 = DS FileItem compact、surface="form"、無 status(file-item.spec.md「表單 / 訊息附件」靜態態,點了打開 = 主要動作;
+// - 對話裡的報告檔(artifacts.tsx ArtifactCard)= DS FileItem compact、surface="form"、無 status(file-item.spec.md「表單 / 訊息附件」靜態態,點了打開 = 主要動作;
 //   rich 要縮圖,HTML 沒有縮圖會顯示檔名首字,不用)
 // - 預覽開在右側面板(2026-11-03 user 同意:照 Claude artifact 的做法);頂列 × 左邊 Download + Open in new tab(AsideHeaderActions,暫時做法)
-import { createContext, useContext, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import {
@@ -26,7 +25,6 @@ import {
   DataTable,
   DescriptionItem,
   DescriptionList,
-  FileItem,
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -37,6 +35,8 @@ import {
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 import { Download, ExternalLink } from 'lucide-react'
 import { AsideHeaderActions } from './AsideHeaderActions'
+import { inArtifactViewer, saveFile } from './download'
+import type { ArtifactItem } from './artifacts'
 import { TicketLink } from './TAgent'
 import { CATEGORIES, COMPARISON, OBSERVATIONS, OPEN_TICKETS, PERIOD, PREV_PERIOD, TEAM, TOTALS, pct } from './teamStats'
 
@@ -97,6 +97,15 @@ export const OpenTicketsTable = () => <StaticTable label="未結案的單" colum
 export const REPORT = {
   title: `${TEAM}週報：${PERIOD.label}`,
   fileName: `k8s-platform-weekly-${PERIOD.from.replaceAll('/', '')}.html`,
+}
+/** 劇本跑完後收進側欄 Artifacts 的那一筆(2026-11-04 user:Artifacts 承載代理產出的草稿產物) */
+export const WEEKLY_REPORT_ARTIFACT: ArtifactItem = {
+  id: 'a-weekly',
+  name: REPORT.title,
+  fileName: REPORT.fileName,
+  type: 'HTML',
+  conversationId: 'script',
+  updated: '2026/10/30 09:40 AM',
 }
 
 const chartConfig = {
@@ -186,35 +195,9 @@ async function renderStandaloneHtml() {
 </html>`
 }
 
-/**
- * 分享用的 demo 放在 claude.ai artifact 的框裡:框不允許頁面自己下載(2026-11-04 user 回報「按了下載後沒有反應」),
- * 要透過平台的 downloads 功能存檔(會先跳確認)。`window.claude` 只有在 artifact 框裡才有;
- * 其他地方(本機、Netlify)沒有 → 照一般網頁用 <a download>。
- */
-type ArtifactDownloads = { save: (req: { filename: string; data: string }) => Promise<unknown> }
-const artifactRuntime = () => (window as unknown as { claude?: { use?: (name: string) => Promise<unknown> } }).claude
-const inArtifactViewer = () => typeof artifactRuntime()?.use === 'function'
-
-async function saveHtml(html: string) {
-  if (inArtifactViewer()) {
-    const downloads = (await artifactRuntime()!.use!('downloads')) as ArtifactDownloads | null
-    if (downloads) {
-      // 使用者在確認框按取消 = 正常結果,不另外提示
-      await downloads.save({ filename: REPORT.fileName, data: html }).catch(() => {})
-      return
-    }
-  }
-  const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }))
-  const a = document.createElement('a')
-  a.href = url
-  a.download = REPORT.fileName
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
 export function ReportPreview() {
   const blobUrl = async () => URL.createObjectURL(new Blob([await renderStandaloneHtml()], { type: 'text/html' }))
-  const download = async () => saveHtml(await renderStandaloneHtml())
+  const download = async () => saveFile(REPORT.fileName, await renderStandaloneHtml(), 'text/html')
   const openInNewTab = async () => {
     // 先開分頁再填網址:等報告畫完才 window.open 會被瀏覽器當成彈出視窗擋掉
     const tab = window.open('', '_blank')
@@ -240,20 +223,6 @@ export function ReportPreview() {
         <ButtonDivider />
       </AsideHeaderActions>
       <ReportBody />
-    </div>
-  )
-}
-
-// ── 對話裡的報告檔 ────────────────────────────────────────────────────────────
-const ReportActionsContext = createContext<(() => void) | null>(null)
-export function ReportActionsProvider({ open, children }: { open: () => void; children: ReactNode }) {
-  return <ReportActionsContext.Provider value={open}>{children}</ReportActionsContext.Provider>
-}
-export function ReportFileCard() {
-  const open = useContext(ReportActionsContext)
-  return (
-    <div className="mt-2">
-      <FileItem name={REPORT.fileName} description="HTML" onClick={open ?? undefined} actionAriaLabel={`Open ${REPORT.fileName}`} />
     </div>
   )
 }

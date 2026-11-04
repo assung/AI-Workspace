@@ -13,14 +13,15 @@
 // - SOP 在右側面板開(articles.tsx `kb-robot-reenable`,同申請人那邊的知識庫文章)。
 // - 通知申請人仍是代理起草、Bob 按「送出」才發。
 // - 「開後續單」user 2026-11-03 拿掉(避免太複雜);「詢問 SOP 是否要調整」先拿掉、同日 user 要求補回:
-//   結案後代理反問要不要優化 SOP,Bob 同意 → 代理起草修改建議、右側面板給 Bob 看,Bob 確認後按 Submit 才送給 SOP 負責人審核
-//   (2026-11-03 user:「Agent 要給值班者看修改的內容,確認無誤後再按下送出,讓 Kenji 審核」;sopDraft.tsx)。
-// - 狀況整理那則訊息下方有「Message Aaron」(contact.tsx;外開聊天平台,先做假連結)。
+//   結案後代理反問要不要優化 SOP,Bob 同意 → 代理把修改後的 SOP 起草成 markdown 草稿,右側預覽、收進側欄 Artifacts
+//   (2026-11-04 user:「先產出一個 artifact 的 markdown 展示在右側 panel,後續送出部分先不用」;artifacts.tsx)。
+//   11-03 那版「Bob 確認後按 Submit 送給 Kenji 審核」先拿掉。
+// - 接案後的那則訊息下方有「Chat with requester」(contact.tsx;外開聊天平台,先做假連結)。
 import type { ReactNode } from 'react'
 import { ArticleLink, TicketLink, type TAgentScript, type TAgentScriptStep } from './TAgent'
 import { OpenConversationButton, WorkOnTicketButton } from './updates'
 import { MessageRequesterButton } from './contact'
-import { ReviewSopButton } from './sopDraft'
+import { ArtifactCard, SOP_DRAFT_ARTIFACT } from './artifacts'
 
 /** 主動發的結案通知的間隔(同申請人劇本 UPDATE_GAP_MS 8 秒:讓講者有時間切走,看得到通知與紅點) */
 const UPDATE_GAP_MS = 8000
@@ -98,28 +99,17 @@ const TAIL: TAgentScriptStep[] = [
       ),
     },
     { who: 'user', text: '好，幫我提 SOP 修改建議。' },
+    // 2026-11-04 user:SOP 修改「先產出一個 artifact 的 markdown 展示在右側 panel,後續送出部分先不用」;
+    // 代理回「我建立好草稿了，右側可以預覽。」+ 草稿卡,右側自動打開(TAgentPage),劇本到這裡結束
     {
       who: 'agent',
-      steps: ['整理這次的處理經過', '起草 SOP 修改建議'],
-      copyText: '我起草好修改建議了，請在右側確認內容；需要的話可以直接修改，沒問題就按 Submit，我會送給 SOP 負責人 Kenji 審核。',
+      steps: ['整理這次的處理經過', '起草 SOP 修改版本'],
+      copyText: '我建立好草稿了，右側可以預覽。',
       body: (
         <>
-          <p className="mt-2">我起草好修改建議了，請在右側確認內容；需要的話可以直接修改，沒問題就按 Submit，我會送給 SOP 負責人 Kenji 審核。</p>
-          <ReviewSopButton />
+          <p className="mt-2">我建立好草稿了，右側可以預覽。</p>
+          <ArtifactCard artifact={SOP_DRAFT_ARTIFACT} />
         </>
-      ),
-    },
-    // Bob 按 SOP 建議面板的 Submit(不是打字)
-    { who: 'user', text: '', viaAction: 'submit-sop' },
-    {
-      who: 'agent',
-      steps: ['把修改建議送給 Kenji 審核'],
-      copyText: '已把修改建議送給 SOP 負責人 Kenji 審核，審核通過後就會更新到〈Registry robot account 被停用：重新啟用〉。',
-      body: (
-        <p className="mt-2">
-          已把修改建議送給 SOP 負責人 Kenji 審核，審核通過後就會更新到〈
-          <ArticleLink articleId="kb-robot-reenable">Registry robot account 被停用：重新啟用</ArticleLink>〉。
-        </p>
       ),
     },
 ]
@@ -132,15 +122,15 @@ export const ONCALL_SCRIPT: TAgentScript = {
       who: 'agent',
       steps: ['查詢 K8s 平台團隊的待處理單', '依優先順序與 SLA 排序'],
       copyText:
-        '你目前有 3 張待處理的單：#SD-2318 payments-api 在 staging 拉不到映像檔 · P2 · 2 分鐘前，阻斷 Payments 團隊部署；#SD-2311 search-api namespace 資源配額調整 · P3 · 昨天；#SD-2305 stg-cluster-01 節點磁碟用量 85% · P3 · 2 天前。建議先處理 #SD-2318，它正在阻斷部署。要接這張嗎？',
+        '你目前有 3 張待處理的單：#SD-2318 payments-api 在 staging 拉不到映像檔 · 2 分鐘前，阻斷 Payments 團隊部署；#SD-2311 search-api namespace 資源配額調整 · 昨天；#SD-2305 stg-cluster-01 節點磁碟用量 85% · 2 天前。建議先處理 #SD-2318，它正在阻斷部署。要接這張嗎？',
       body: (
         <>
           <p className="mt-2">你目前有 3 張待處理的單：</p>
           {/* 條列(2026-10-30 user:「先用條列」;DS agent-panel.stories 代理回覆內條列同款) */}
           <ul className="mt-2 flex list-disc flex-col gap-1 pl-5">
-            <li><TicketLink id="SD-2318" /> payments-api 在 staging 拉不到映像檔 · P2 · 2 分鐘前，阻斷 Payments 團隊部署</li>
-            <li><TicketLink id="SD-2311" /> search-api namespace 資源配額調整 · P3 · 昨天</li>
-            <li><TicketLink id="SD-2305" /> stg-cluster-01 節點磁碟用量 85% · P3 · 2 天前</li>
+            <li><TicketLink id="SD-2318" /> payments-api 在 staging 拉不到映像檔 · 2 分鐘前，阻斷 Payments 團隊部署</li>
+            <li><TicketLink id="SD-2311" /> search-api namespace 資源配額調整 · 昨天</li>
+            <li><TicketLink id="SD-2305" /> stg-cluster-01 節點磁碟用量 85% · 2 天前</li>
           </ul>
           <p className="mt-2">建議先處理 <TicketLink id="SD-2318" />，它正在阻斷部署。要接這張嗎？</p>
         </>
@@ -161,7 +151,7 @@ export const ONCALL_SCRIPT: TAgentScript = {
             <li><strong>我查到的：</strong>registry 稽核日誌顯示，robot account robot$payments-ci 在昨晚 02:14 金鑰輪替後被停用。</li>
           </ul>
           {SOP_HANDOFF}
-          <MessageRequesterButton name="Aaron" />
+          <MessageRequesterButton />
         </>
       ),
     },
@@ -204,12 +194,12 @@ export const ONCALL_UPDATES_SCRIPT: TAgentScript = {
       who: 'agent',
       steps: ['指派 SD-2318 給 Bob', '通知申請人'],
       copyText: '已指派給你，也通知申請人你接手了。' + SOP_HANDOFF_TEXT,
-      // Message Aaron 放在接案之後(2026-11-03 user:還沒接案不該先出現聯絡申請人;同人找事版,出現在指派後的回覆)
+      // Chat with requester 放在接案之後(2026-11-03 user:還沒接案不該先出現聯絡申請人;同人找事版,出現在指派後的回覆)
       body: (
         <>
           <p className="mt-2">已指派給你，也通知申請人你接手了。</p>
           {SOP_HANDOFF}
-          <MessageRequesterButton name="Aaron" />
+          <MessageRequesterButton />
         </>
       ),
     },
@@ -223,11 +213,11 @@ export const NEW_TICKET_UPDATE = {
   afterMs: 5000,
   time: '10:42 AM',
   copyText:
-    '新的 P2 單 #SD-2318 指派給 K8s 平台團隊：payments-api 在 staging 拉不到映像檔（ImagePullBackOff），Payments 團隊的 staging 部署被阻斷。申請人已照知識庫文章重新同步 pull secret，無效。',
+    '新單 #SD-2318 指派給 K8s 平台團隊：payments-api 在 staging 拉不到映像檔（ImagePullBackOff），Payments 團隊的 staging 部署被阻斷。申請人已照知識庫文章重新同步 pull secret，無效。',
   body: (
     <>
       <p>
-        新的 P2 單 <TicketLink id="SD-2318" /> 指派給 K8s 平台團隊：payments-api 在 staging 拉不到映像檔（ImagePullBackOff），Payments 團隊的 staging 部署被阻斷。申請人已照知識庫文章重新同步 pull secret，無效。
+        新單 <TicketLink id="SD-2318" /> 指派給 K8s 平台團隊：payments-api 在 staging 拉不到映像檔（ImagePullBackOff），Payments 團隊的 staging 部署被阻斷。申請人已照知識庫文章重新同步 pull secret，無效。
       </p>
       <WorkOnTicketButton />
     </>

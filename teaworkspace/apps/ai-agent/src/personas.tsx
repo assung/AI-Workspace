@@ -9,6 +9,8 @@ import { K8S_IMAGEPULL_SCRIPT } from './tagentScripts'
 import { NEW_TICKET_UPDATE, ONCALL_MILESTONES, ONCALL_SCRIPT, ONCALL_UPDATES_MILESTONES, ONCALL_UPDATES_SCRIPT, type TicketMilestones } from './oncallScript'
 import { OpenConversationButton } from './updates'
 import { MANAGER_SCRIPT } from './managerScript'
+import { WEEKLY_REPORT_ARTIFACT } from './managerReport'
+import { MANAGER_ARTIFACTS, ONCALL_ARTIFACTS, REQUESTER_ARTIFACTS, SOP_DRAFT_ARTIFACT, type ArtifactItem } from './artifacts'
 
 export type Persona = {
   id: 'requester' | 'oncall' | 'oncall-updates' | 'manager'
@@ -30,6 +32,10 @@ export type Persona = {
   script: TAgentScript
   /** 劇本各步對單子狀態的影響(右側面板的單子跟著變) */
   milestones: TicketMilestones
+  /** 側欄 Artifacts 一開始就有的(2026-11-04 user) */
+  artifacts: ArtifactItem[]
+  /** 劇本跑完後代理產出的那一筆:收進 Artifacts、右側自動打開一次 */
+  scriptArtifact?: ArtifactItem
 }
 
 const agent = (id: string, steps: string[], text: ReactNode, copyText: string): TAgentTurn => ({
@@ -71,6 +77,7 @@ export const REQUESTER: Persona = {
   // 申請人劇本(步驟索引從 0):10 = Bob 接手 → 指派;11 = 已處理 → 重新啟用 + 回覆;13 = 結案;沒有後續單
   // (2026-11-03 加了「代理反問要不要開單 / 使用者答好」兩步,索引往後 2)
   milestones: { assigned: 10, reenabled: 11, replied: 11, closed: 13, followUpOpened: Infinity },
+  artifacts: REQUESTER_ARTIFACTS,
   updatesSeed: () => [
     update('u-ar', '2026/10/29 04:10 PM', 'Priya 核准了你的權限申請 AR-5170，你現在有 billing-service 的寫入權限。',
       'Priya 核准了你的權限申請 AR-5170，你現在有 billing-service 的寫入權限。', <OpenConversationButton conversationId="c-repo" />),
@@ -139,6 +146,8 @@ export const ONCALL: Persona = {
   suggestions: ['Which tickets are close to their SLA?', 'Summarize last night’s alerts', 'Show tickets waiting on me'],
   script: ONCALL_SCRIPT,
   milestones: ONCALL_MILESTONES,
+  artifacts: ONCALL_ARTIFACTS,
+  scriptArtifact: SOP_DRAFT_ARTIFACT,
   updatesSeed: () => ONCALL_UPDATES_SEED(),
   seed: () => [
     {
@@ -203,6 +212,8 @@ export const MANAGER: Persona = {
   script: MANAGER_SCRIPT,
   // 不影響 SD-2318(管理者劇本沒有這張單的進度)
   milestones: { assigned: Infinity, reenabled: Infinity, replied: Infinity, closed: Infinity, followUpOpened: Infinity },
+  artifacts: MANAGER_ARTIFACTS,
+  scriptArtifact: WEEKLY_REPORT_ARTIFACT,
   updatesSeed: () => [
     update('u-oncall', '2026/10/29 06:00 PM', '11 月的值班表排好了：第一週是 Bob 和 Wei。', '11 月的值班表排好了：第一週是 Bob 和 Wei。'),
     update('u-morning-k', '08:30 AM',

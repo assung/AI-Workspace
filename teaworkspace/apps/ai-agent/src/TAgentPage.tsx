@@ -4,7 +4,8 @@
 // ── 版面 ─────────────────────────────────────────────────────────────────────
 // DS AppShell(app-shell.spec.md「版面規則」):Menu = 側欄、Main = 對話 / 清單、Right panel = 知識庫文章預覽;不用 AI agent 區
 // (這一頁本身就是代理)。
-// 側欄項目 New / Updates / Pinned / Recents(2026-10-30 user:拿掉 Projects / Artifacts,新增 Updates):
+// 側欄項目 New / Updates / Artifacts / Pinned / Recents(2026-10-30 user:拿掉 Projects / Artifacts,新增 Updates;
+//   2026-11-04 user:Artifacts 加回、放在 Updates 下方,承載代理起草的產物 → artifacts.tsx):
 //   Updates 放在 New 下方 = ChatGPT「Your Dot」的位置(側欄 New chat 正下方,zapier.com/blog/chatgpt-dots);內容見 TAgent.tsx UPDATES_ID。
 //   Pinned / Recents 分開 = Claude 側欄獨立 Starred 區的做法;Gemini 則把釘選放在 Recent 最上面(support.google.com/gemini/answer/13666746)。
 // 右側面板(2026-10-30 user:「開在 right panel,走跟 Claude 右邊面板預覽一樣的方式」):代理內文的文章連結,
@@ -65,7 +66,7 @@ import {
   useAppShell,
   useFormValidation,
 } from '@qijenchen/design-system'
-import { SquarePen, Bell, MoreHorizontal, Pin, PinOff, Pencil, Trash2 } from 'lucide-react'
+import { SquarePen, Bell, Shapes, MoreHorizontal, Pin, PinOff, Pencil, Trash2 } from 'lucide-react'
 import {
   TAGENT_LABEL,
   TAgentOpenArticleProvider,
@@ -81,14 +82,16 @@ import { UpdatesActionsProvider } from './updates'
 import { ARTICLES, ArticlePreview } from './articles'
 import { getTicket, TicketPreview } from './tickets'
 import { DraftActionsProvider, INITIAL_DRAFT, TicketDraftForm, type TicketDraft } from './ticketDraft'
-import { INITIAL_SOP_DRAFT, SopDraftActionsProvider, SopDraftForm, type SopDraft } from './sopDraft'
-import { REPORT, ReportActionsProvider, ReportPreview } from './managerReport'
-import { REPORT_STEP } from './managerScript'
+import { ReportPreview } from './managerReport'
+import { ArtifactActionsProvider, ArtifactPreview, ArtifactsView, type ArtifactItem } from './artifacts'
 import type { Persona } from './personas'
 import { CHROME_SIDEBAR_BG, CHROME_SIDEBAR_FILL_X } from './chrome'
 
-/** 整頁的位置:新對話首頁 / 某一則對話(Updates 也是一則對話,id = UPDATES_ID)。也是側欄 SidebarProvider 的 activeId(單選高亮)。 */
-export type TAgentRoute = 'new' | `conversation:${string}`
+/**
+ * 整頁的位置:新對話首頁 / Artifacts 列表 / 某一則對話(Updates 也是一則對話,id = UPDATES_ID)。
+ * 也是側欄 SidebarProvider 的 activeId(單選高亮)。
+ */
+export type TAgentRoute = 'new' | 'artifacts' | `conversation:${string}`
 
 export const conversationRoute = (id: string): TAgentRoute => `conversation:${id}`
 
@@ -101,7 +104,8 @@ const PANEL_WIDTH = { min: 320, initial: 480, max: 720 }
 /** 對話欄寬上限(訊息與輸入盒同一欄、置中);沿用 tWorkspace 880(TAgentPage COLUMN_MAX_WIDTH) */
 const COLUMN_MAX_WIDTH = 880
 
-type Panel = { conversationId: string; kind: 'article' | 'ticket' | 'draft' | 'sop-draft' | 'report'; id: string }
+/** `scope` = 在哪裡打開的(對話 id 或 'artifacts' 列表);換地方就收起 */
+type Panel = { scope: string; kind: 'article' | 'ticket' | 'draft' | 'artifact'; id: string }
 
 /** 新對話首頁的問候(沿用 tWorkspace:帶名字、依當地時間分早 / 午 / 晚) */
 function greeting(name: string, now = new Date()) {
@@ -128,6 +132,12 @@ function PanelScope({ onOpen, children }: { onOpen: (kind: Panel['kind'], id: st
   )
 }
 
+/** Artifacts 列表:點 Name 在右側預覽(同 PanelScope,要在 AppShell 子樹內才拿得到 requestAside) */
+function ArtifactsScope({ onOpen, children }: { onOpen: (id: string) => void; children: (open: (id: string) => void) => ReactNode }) {
+  const { requestAside } = useAppShell()
+  return <>{children((id) => { onOpen(id); requestAside('artifact') })}</>
+}
+
 export function TAgentPage({
   engine,
   route,
@@ -150,12 +160,8 @@ export function TAgentPage({
   const [createdTicket, setCreatedTicket] = useState<TicketDraft | null>(null)
   /** 草稿只自動打開一次(使用者關掉後不再自己跳出來 —— 已關閉的面板不會自動重開,app-shell.spec.md §2) */
   const [draftAutoOpened, setDraftAutoOpened] = useState(false)
-  /** SOP 修改建議草稿(值班者;同報案草稿的做法) */
-  const [sopDraft, setSopDraft] = useState<SopDraft>(INITIAL_SOP_DRAFT)
-  const [sopSubmitted, setSopSubmitted] = useState(false)
-  const [sopAutoOpened, setSopAutoOpened] = useState(false)
-  /** 管理者的週報:代理產生後自動打開一次(同草稿) */
-  const [reportAutoOpened, setReportAutoOpened] = useState(false)
+  /** 劇本產出的 artifact(值班者的 SOP 草稿、管理者的週報):產出後自動打開一次(同草稿) */
+  const [artifactAutoOpened, setArtifactAutoOpened] = useState(false)
 
   const activeConversation = route.startsWith('conversation:')
     ? engine.conversations.find((c) => `conversation:${c.id}` === route)
@@ -163,51 +169,49 @@ export function TAgentPage({
   // 開著的對話被刪掉 → 回新對話首頁
   const effectiveRoute: TAgentRoute = route.startsWith('conversation:') && !activeConversation ? 'new' : route
 
-  // 換對話 / 離開對話 → 收起右側面板
+  // 換對話 / 離開對話 / 離開 Artifacts 列表 → 收起右側面板
+  const scope = activeConversation?.id ?? effectiveRoute
   useEffect(() => {
-    setPanel((prev) => (prev && prev.conversationId !== activeConversation?.id ? null : prev))
-  }, [activeConversation?.id])
+    setPanel((prev) => (prev && prev.scope !== scope ? null : prev))
+  }, [scope])
+
+  // Artifacts:一開始就有的 + 劇本跑完後代理產出的那一筆(來源 = 劇本那一則對話)
+  const scriptDone = engine.scriptConvId !== null && engine.scriptPos >= persona.script.steps.length
+  const artifacts: ArtifactItem[] = [
+    ...(scriptDone && persona.scriptArtifact ? [{ ...persona.scriptArtifact, conversationId: engine.scriptConvId! }] : []),
+    ...persona.artifacts,
+  ]
+  // 來源對話已被刪除的不列(2026-10-30 版同規則)
+  const artifactRows = artifacts.flatMap((a) => {
+    const source = engine.conversations.find((c) => c.id === a.conversationId)
+    return source ? [{ ...a, createdIn: source.title, sourceId: source.id }] : []
+  })
   const openArticle = panel?.kind === 'article' ? ARTICLES[panel.id] : undefined
   // 單子跟著劇本進度變(狀態、負責人、活動紀錄)
   const openTicket = panel?.kind === 'ticket' ? getTicket(panel.id, engine.scriptPos, persona.milestones, createdTicket) : undefined
   const openDraft = panel?.kind === 'draft'
-  const openSopDraft = panel?.kind === 'sop-draft'
-  const openReport = panel?.kind === 'report'
+  const openArtifact = panel?.kind === 'artifact' ? artifactRows.find((a) => a.id === panel.id) : undefined
 
   // 代理整理好單子(劇本等著使用者按 Create)且使用者正看著那一則 → 自動打開草稿一次
   const awaitingCreate = engine.scriptAwaitingAction === 'create-ticket' && engine.scriptConvId !== null
   useEffect(() => {
     if (!awaitingCreate || draftAutoOpened || activeConversation?.id !== engine.scriptConvId) return
     setDraftAutoOpened(true)
-    setPanel({ conversationId: engine.scriptConvId!, kind: 'draft', id: 'new' })
+    setPanel({ scope: engine.scriptConvId!, kind: 'draft', id: 'new' })
   }, [awaitingCreate, draftAutoOpened, activeConversation?.id, engine.scriptConvId])
-  // 代理起草好 SOP 修改建議(劇本等著 Bob 按 Submit)→ 自動打開一次
-  const awaitingSop = engine.scriptAwaitingAction === 'submit-sop' && engine.scriptConvId !== null
+  // 劇本跑完、代理產出 artifact(SOP 草稿 / 週報)且使用者正看著那一則 → 右側自動打開一次
   useEffect(() => {
-    if (!awaitingSop || sopAutoOpened || activeConversation?.id !== engine.scriptConvId) return
-    setSopAutoOpened(true)
-    setPanel({ conversationId: engine.scriptConvId!, kind: 'sop-draft', id: 'kb-robot-reenable' })
-  }, [awaitingSop, sopAutoOpened, activeConversation?.id, engine.scriptConvId])
-  // 管理者:代理產生好週報 → 自動打開一次
-  const reportReady = persona.id === 'manager' && engine.scriptConvId !== null && engine.scriptPos > REPORT_STEP
-  useEffect(() => {
-    if (!reportReady || reportAutoOpened || activeConversation?.id !== engine.scriptConvId) return
-    setReportAutoOpened(true)
-    setPanel({ conversationId: engine.scriptConvId!, kind: 'report', id: 'weekly' })
-  }, [reportReady, reportAutoOpened, activeConversation?.id, engine.scriptConvId])
-  const openReportPanel = () => {
-    if (activeConversation) setPanel({ conversationId: activeConversation.id, kind: 'report', id: 'weekly' })
-  }
-  const sopActions = {
-    submitted: sopSubmitted,
-    review: () => {
-      if (activeConversation) setPanel({ conversationId: activeConversation.id, kind: 'sop-draft', id: 'kb-robot-reenable' })
-    },
+    if (!scriptDone || !persona.scriptArtifact || artifactAutoOpened || activeConversation?.id !== engine.scriptConvId) return
+    setArtifactAutoOpened(true)
+    setPanel({ scope: engine.scriptConvId!, kind: 'artifact', id: persona.scriptArtifact.id })
+  }, [scriptDone, persona.scriptArtifact, artifactAutoOpened, activeConversation?.id, engine.scriptConvId])
+  const openArtifactPanel = (id: string) => {
+    if (activeConversation) setPanel({ scope: activeConversation.id, kind: 'artifact', id })
   }
   const draftActions = {
     created: createdTicket !== null,
     reviewTicket: () => {
-      if (activeConversation) setPanel({ conversationId: activeConversation.id, kind: 'draft', id: 'new' })
+      if (activeConversation) setPanel({ scope: activeConversation.id, kind: 'draft', id: 'new' })
     },
   }
 
@@ -282,6 +286,10 @@ export function TAgentPage({
                 {/* 未讀紅點:同對話列(2026-10-30 user:「一樣有紅點機制」);這一列沒有 ⋯,紅點常駐 */}
                 {engine.unreadIds.has(UPDATES_ID) && <SidebarMenuBadge dot variant="critical" aria-label="New update" className="!bg-[#EC540F]" />}
               </SidebarMenuItem>
+              {/* Artifacts(2026-11-04 user:放在 Updates 下方;圖示沿用 2026-10-30 版 Shapes) */}
+              <SidebarMenuItem>
+                <SidebarMenuButton id="artifacts" startIcon={Shapes} tooltip="Artifacts">Artifacts</SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -303,7 +311,7 @@ export function TAgentPage({
     </Sidebar>
   )
 
-  const headerTitle = activeConversation ? activeConversation.title : 'New conversation'
+  const headerTitle = activeConversation ? activeConversation.title : effectiveRoute === 'artifacts' ? 'Artifacts' : 'New conversation'
   // Updates 不能釘選 / 改名 / 刪除(它是固定入口,不是一般對話)
   const isUpdates = activeConversation?.id === UPDATES_ID
 
@@ -363,10 +371,9 @@ export function TAgentPage({
   if (activeConversation)
     main = (
       <div className="flex h-full min-h-0 flex-col">
-        <PanelScope onOpen={(kind, id) => setPanel({ conversationId: activeConversation.id, kind, id })}>
+        <PanelScope onOpen={(kind, id) => setPanel({ scope: activeConversation.id, kind, id })}>
           {/* className 落在 log 本體:同一欄置中;捲軸仍在整個 Main 右緣 */}
-          <ReportActionsProvider open={openReportPanel}>
-          <SopDraftActionsProvider value={sopActions}>
+          <ArtifactActionsProvider open={openArtifactPanel}>
           <DraftActionsProvider value={draftActions}>
           <UpdatesActionsProvider value={updatesActions}>
             <AgentConversation className="mx-auto w-full" style={{ maxWidth: COLUMN_MAX_WIDTH }}>
@@ -374,14 +381,19 @@ export function TAgentPage({
             </AgentConversation>
           </UpdatesActionsProvider>
           </DraftActionsProvider>
-          </SopDraftActionsProvider>
-          </ReportActionsProvider>
+          </ArtifactActionsProvider>
         </PanelScope>
         {/* AgentPromptInput 自帶 m-loose mt-0(與 AgentConversation 的 p-loose 同一條內緣)→ 外層不再加 padding */}
         <div className="mx-auto w-full" style={{ maxWidth: COLUMN_MAX_WIDTH }}>
           <TAgentPrompt key={activeConversation.id} engine={engine} draft={draft} onDraftChange={setDraft} onSend={send} />
         </div>
       </div>
+    )
+  else if (effectiveRoute === 'artifacts')
+    main = (
+      <ArtifactsScope onOpen={(id) => setPanel({ scope: 'artifacts', kind: 'artifact', id })}>
+        {(openInPanel) => <ArtifactsView rows={artifactRows} onOpenConversation={openConversation} onOpenArtifact={openInPanel} />}
+      </ArtifactsScope>
     )
   else
     main = (
@@ -422,7 +434,7 @@ export function TAgentPage({
         className="h-full"
         sidebar={sidebar}
         header={header}
-        asideOpen={!!(openArticle || openTicket || openDraft || openSopDraft || openReport)}
+        asideOpen={!!(openArticle || openTicket || openDraft || openArtifact)}
         onAsideOpenChange={(open) => { if (!open) setPanel(null) }}
         aside={
           // FILL_X:Right panel 內層 ScrollArea 同側欄的撐寬問題(chrome.ts CHROME_SIDEBAR_FILL_X 說明),長指令行改在區塊內橫捲
@@ -430,23 +442,15 @@ export function TAgentPage({
             <AppShellAside title={openArticle.title} contentType="article" widthRange={PANEL_WIDTH} className={CHROME_SIDEBAR_FILL_X}>
               <ArticlePreview article={openArticle} />
             </AppShellAside>
-          ) : openReport ? (
-            <AppShellAside title={REPORT.fileName} contentType="report" widthRange={PANEL_WIDTH} className={CHROME_SIDEBAR_FILL_X}>
-              <ReportPreview />
-            </AppShellAside>
-          ) : openSopDraft ? (
-            <AppShellAside title="Suggest an SOP change" contentType="ticket" widthRange={PANEL_WIDTH} className={CHROME_SIDEBAR_FILL_X}>
-              <SopDraftForm
-                draft={sopDraft}
-                onDraftChange={setSopDraft}
-                onCancel={() => setPanel(null)}
-                onSubmit={(values) => {
-                  setSopDraft(values)
-                  setSopSubmitted(true)
-                  engine.performScriptAction('submit-sop')
-                  setPanel(null)
-                }}
-              />
+          ) : openArtifact ? (
+            // 週報 = HTML(managerReport.tsx 畫,頂列標題用檔名);其他 = markdown 草稿(名稱)
+            <AppShellAside
+              title={openArtifact.type === 'HTML' ? openArtifact.fileName : openArtifact.name}
+              contentType="artifact"
+              widthRange={PANEL_WIDTH}
+              className={CHROME_SIDEBAR_FILL_X}
+            >
+              {openArtifact.type === 'HTML' ? <ReportPreview /> : <ArtifactPreview artifact={openArtifact} createdIn={openArtifact.createdIn} />}
             </AppShellAside>
           ) : openDraft ? (
             <AppShellAside title="Report an issue" contentType="ticket" widthRange={PANEL_WIDTH} className={CHROME_SIDEBAR_FILL_X}>

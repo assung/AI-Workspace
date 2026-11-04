@@ -4,7 +4,8 @@
 // 台詞是 AI 起草的示範內容;數字全部從 teamStats.ts 算,台詞不另寫數字。
 import { type TAgentScript } from './TAgent'
 import { TicketLink } from './TAgent'
-import { CategoryTable, ComparisonTable, OpenTicketsTable, ReportFileCard } from './managerReport'
+import { CategoryTable, ComparisonTable, OpenTicketsTable, WEEKLY_REPORT_ARTIFACT } from './managerReport'
+import { ArtifactCard } from './artifacts'
 import { CATEGORIES, PERIOD, PREV_PERIOD, TEAM, TOTALS, closeRate, pct, prevCloseRate } from './teamStats'
 
 const open = TOTALS.tickets - TOTALS.closed
@@ -16,9 +17,6 @@ const S2 = `比前一週（${PREV_PERIOD.label}）多 ${TOTALS.tickets - TOTALS.
 const S3 = `依件數排序如下。${top.category}最多，比前一週多了 ${top.tickets - top.prevTickets} 張：`
 const S4 = `依開單時間排序，最久的是 #${oldest}，已經開了 11 天：`
 const S5 = '報告整理好了，右側可以預覽，也可以下載成 HTML 檔。內容有：與前一週的比較、問題類型分布圖、未結案清單，以及 3 點觀察。'
-
-/** 報告那一步的索引(第 10 步;代理回完 → 右側自動打開報告,TAgentPage) */
-export const REPORT_STEP = 9
 
 export const MANAGER_SCRIPT: TAgentScript = {
   title: 'K8s 平台團隊上週的單',
@@ -75,7 +73,7 @@ export const MANAGER_SCRIPT: TAgentScript = {
       body: (
         <>
           <p className="mt-2">{S5}</p>
-          <ReportFileCard />
+          <ArtifactCard artifact={WEEKLY_REPORT_ARTIFACT} />
         </>
       ),
     },

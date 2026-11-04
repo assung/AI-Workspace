@@ -5,11 +5,13 @@
 import { Button } from '@qijenchen/design-system'
 import { ExternalLink, MessageCircle } from 'lucide-react'
 
-export function MessageRequesterButton({ name }: { name: string }) {
+// 文字(2026-11-04 user:「可以調整動詞嗎?例如 Chat with Reporter 或 Requester」)→「Chat with requester」:
+// 對象用單子欄位的同一個詞(tickets.tsx「Requester」),動詞用 Chat(外開的是聊天平台)。
+export function MessageRequesterButton() {
   return (
     <div className="mt-2 flex flex-wrap gap-2">
       <Button variant="tertiary" size="sm" startIcon={MessageCircle} endIcon={ExternalLink} onClick={() => {}}>
-        Message {name}
+        Chat with requester
       </Button>
     </div>
   )

@@ -23,7 +23,7 @@ function readStoredRoute(key: string): TAgentRoute {
   try {
     const v = window.localStorage.getItem(key)
     // Projects / Artifacts 已拿掉(2026-10-30):以前記住的這兩個位置回首頁
-    if (v === 'new' || v?.startsWith('conversation:')) return v as TAgentRoute
+    if (v === 'new' || v === 'artifacts' || v?.startsWith('conversation:')) return v as TAgentRoute
   } catch {
     // 私密視窗 / 被封鎖的儲存:從首頁開始
   }
