@@ -59,24 +59,18 @@ export const K8S_IMAGEPULL_SCRIPT: TAgentScript = {
         </>
       ),
     },
-    // 2026-11-03 user:「幫我開單」改由代理反問 → 使用者只說「照做了，還是一樣。」,代理問要不要整理成單,使用者答「好。」
+    // 2026-11-03 user:「幫我開單」改由代理接手 → 使用者只說「照做了，還是一樣。」
+    // 2026-11-04 user 選 A:代理不再反問「要我幫你整理成一張單…嗎？」(連同使用者的「好。」一起拿掉),
+    // 直接說會交給 K8s 平台團隊、摘要在右側;「看起來問題不在 pull secret。」不保留;Summary 用中文「摘要」
     { who: 'user', text: '照做了，還是一樣。' },
     {
       who: 'agent',
-      steps: ['比對處理結果：重新同步後仍回應 unauthorized'],
-      copyText: '看起來問題不在 pull secret。要我幫你整理成一張單，交給 K8s 平台團隊處理嗎？',
-      body: <p className="mt-2">看起來問題不在 pull secret。要我幫你整理成一張單，交給 K8s 平台團隊處理嗎？</p>,
-    },
-    { who: 'user', text: '好。' },
-    {
-      who: 'agent',
-      steps: ['整理對話中的問題與已嘗試的步驟', '判斷負責團隊：K8s 平台團隊（執行環境）'],
-      // 2026-11-03 user:開單 = 產出 Title 與 What happened(列點),報案者確認後按 Submit;Priority 等欄位不在報案者這邊(ticketDraft.tsx)
-      copyText: '我把問題整理好了，請在右側確認標題和經過，沒問題就按 Submit。我判斷這是 K8s 執行環境的故障，送出後會交給 K8s 平台團隊。',
+      steps: ['比對處理結果：重新同步後仍回應 unauthorized', '整理對話中的問題與已嘗試的步驟', '判斷負責團隊：K8s 平台團隊（執行環境）'],
+      // 開單 = 產出 Title 與 What happened(列點),報案者確認後按 Submit;Priority 等欄位不在報案者這邊(ticketDraft.tsx)
+      copyText: '我會交給 K8s 平台團隊處理，目前處理過程的摘要整理在右側，請確認標題和經過，沒問題就按 Submit。',
       body: (
         <>
-          <p className="mt-2">我把問題整理好了，請在右側確認標題和經過，沒問題就按 Submit。</p>
-          <p className="mt-2">我判斷這是 K8s 執行環境的故障，送出後會交給 K8s 平台團隊。</p>
+          <p className="mt-2">我會交給 K8s 平台團隊處理，目前處理過程的摘要整理在右側，請確認標題和經過，沒問題就按 Submit。</p>
           <ReviewTicketButton />
         </>
       ),

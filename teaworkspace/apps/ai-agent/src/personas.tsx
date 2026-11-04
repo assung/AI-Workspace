@@ -74,9 +74,9 @@ export const REQUESTER: Persona = {
   homeDescription: 'Tell me what’s broken. Paste an error or a link, and I’ll look into it or open a ticket for you.',
   suggestions: ['My deploy is stuck on staging', 'Request access to a repository', 'Check the status of my ticket'],
   script: K8S_IMAGEPULL_SCRIPT,
-  // 申請人劇本(步驟索引從 0):10 = Bob 接手 → 指派;11 = 已處理 → 重新啟用 + 回覆;13 = 結案;沒有後續單
-  // (2026-11-03 加了「代理反問要不要開單 / 使用者答好」兩步,索引往後 2)
-  milestones: { assigned: 10, reenabled: 11, replied: 11, closed: 13, followUpOpened: Infinity },
+  // 申請人劇本(步驟索引從 0):8 = Bob 接手 → 指派;9 = 已處理 → 重新啟用 + 回覆;11 = 結案;沒有後續單
+  // (2026-11-03 加了「代理反問要不要開單 / 使用者答好」兩步;2026-11-04 user 選 A 又拿掉、和整理草稿合成一步,索引往前 2)
+  milestones: { assigned: 8, reenabled: 9, replied: 9, closed: 11, followUpOpened: Infinity },
   artifacts: REQUESTER_ARTIFACTS,
   updatesSeed: () => [
     update('u-ar', '2026/10/29 04:10 PM', 'Priya 核准了你的權限申請 AR-5170，你現在有 billing-service 的寫入權限。',
