@@ -93,6 +93,7 @@ import { TAgentPage, type TAgentRoute } from './TAgentPage'
 import { TasksPage, type TasksRoute } from './TasksPage'
 import { DrivePage, type DriveRoute } from './DrivePage'
 import { DocsPage, type DocsRoute } from './DocsPage'
+import { BannerStack, routeNotification, useBannerStack, type BannerData, type IncomingEvent } from './NotificationBanner'
 import { WorkspaceSettingsModal, WorkspaceAccountMenu, defaultNotificationPrefs, isPaused, type NotificationPrefs, type SettingsRoute } from './WorkspaceSettings'
 import { K8S_IMAGEPULL_SCRIPT } from './tagentScripts'
 import { CHROME_RAIL_BG, CHROME_SIDEBAR_BG, CHROME_SIDEBAR_FILL_X, NO_MOUNT_PANEL_TRANSITION, SHELL_SETTLE_MS } from './chrome'
@@ -3115,6 +3116,8 @@ export type ChatVariantConfig = {
   initialAgentRoute?: TAgentRoute
   /** config.agent:一打開就開著 Settings 的哪一頁(story 用;未給 = 不開)。 */
   initialSettingsRoute?: SettingsRoute
+  /** config.agent:開啟後依序送出 3 則示範通知(5 / 12 / 20 秒),照通知設定決定跳不跳橫幅(NotificationBanner.tsx)。 */
+  demoBanners?: boolean
 }
 
 // 依 seed 做穩定洗牌(各版本不同 seed → 不同排序,但同版本每次一致)。
@@ -3204,6 +3207,38 @@ export default function App({
     const t = window.setTimeout(() => setNotifPrefs((p) => (isPaused(p) ? p : { ...p, pauseUntil: null })), Math.max(0, ms) + 50)
     return () => window.clearTimeout(t)
   }, [notifPrefs.pauseUntil])
+  // Push banner(右上角疊放區)。示範劇本:每則事件先過 routeNotification(流程圖關卡),結果 = banner 才跳卡。
+  const bannerStack = useBannerStack()
+  const notifPrefsRef = useRef(notifPrefs)
+  notifPrefsRef.current = notifPrefs
+  useEffect(() => {
+    if (!(config?.agent && config?.demoBanners)) return
+    const script: { at: number; event: IncomingEvent; banner: BannerData }[] = [
+      {
+        at: 5000,
+        event: { app: 'chats', kind: 'messages', actorId: 'shinichi' },
+        banner: { id: 'demo-dm', threadKey: 'chat:shinichi', app: 'chats', actor: { name: PEOPLE.shinichi.name, avatarUrl: PEOPLE.shinichi.avatar }, body: 'The Lugu Co-op samples arrived. Can you confirm the 20 kg order before 3 PM?', reply: true, time: 'now' },
+      },
+      {
+        at: 12000,
+        event: { app: 'chats', kind: 'mentions', actorId: 'guanyu', directMention: true },
+        banner: { id: 'demo-mention', threadKey: 'chat:product-team', app: 'chats', context: 'Product Team 產品團隊', actor: { name: PEOPLE.guanyu.name, avatarUrl: PEOPLE.guanyu.avatar }, body: '@Me 我 can you confirm the launch date for the Q4 tasting kit?', reply: true, time: 'now' },
+      },
+      {
+        at: 20000,
+        event: { app: 'drive', kind: 'access', actorId: 'yating' },
+        banner: { id: 'demo-access', app: 'drive', context: 'Packaging mockups – Q4.fig', actor: { name: PEOPLE.yating.name, avatarUrl: PEOPLE.yating.avatar }, body: 'Requested edit access', actions: [{ label: 'Approve', primary: true, result: 'Access granted to Lin Ya-Ting' }, { label: 'Open' }], time: 'now' },
+      },
+    ]
+    const timers = script.map(({ at, event, banner }) =>
+      window.setTimeout(() => {
+        const r = routeNotification(event, notifPrefsRef.current, { inMeeting: false, systemDnd: false })
+        if (r.outcome === 'banner') bannerStack.push({ ...banner, reason: r.reason ?? banner.reason })
+      }, at),
+    )
+    return () => timers.forEach((t) => window.clearTimeout(t))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [mutedIds, setMutedIds] = useState<Set<string>>(new Set())
   const [fullWidth, setFullWidth] = useState(config?.initialFullWidth ?? true)
   const [favOrder, setFavOrder] = useState<string[]>(
@@ -3529,6 +3564,17 @@ export default function App({
       />
       {/* AI agent 背景回覆的通知;落點照 DS 預設(右下、以整個視窗為準,toast.spec.md「落點」) */}
       <Toaster containerAriaLabel="Notifications" />
+      {/* Push banner(右上;別人找你。Toast 右下 = 操作回饋)。點卡片內容 = 打開來源:聊天 → 切到 Chat 分頁該聊天室 */}
+      <BannerStack
+        items={bannerStack.items}
+        onDismiss={bannerStack.dismiss}
+        showPreview={notifPrefs.showPreview}
+        onOpen={(b) => {
+          const roomId = b.threadKey?.startsWith('chat:') ? b.threadKey.slice(5) : undefined
+          if (roomId && rooms.some((r) => r.id === roomId)) { handleNavTabChange('chat'); setActiveId(roomId) }
+          else if (b.app === 'drive') handleNavTabChange('drive')
+        }}
+      />
       {/* AppShell 不撐滿視窗(左邊是 NavRail)→ 這一層當 Menu 浮層的定位框:transform 讓 fixed 以它為準,
           ChatList 左側浮層與遮罩從 AppShell 左緣起、不蓋 NavRail(app-shell.spec.md「版面規則」§9「從版面左緣開始」+
           API `portalContainer`;DS stories-helpers/scene/simulated-browser.tsx 畫布同款 translateZ(0)) */}

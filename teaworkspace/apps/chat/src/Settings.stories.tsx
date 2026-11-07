@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react'
 import App from './App'
+import { BannerGallery } from './BannerGallery'
 
 // @story-baseline: node_modules/@qijenchen/design-system — Dialog/展示、Switch/展示、Select/展示、PeoplePicker/展示、AccountMenu/展示
 //
@@ -38,4 +39,16 @@ export const ChatsNotifications: Story = {
 export const PriorityContacts: Story = {
   name: 'Notifications › Priority contacts',
   render: () => <App config={{ agent: true, initialSettingsRoute: 'notifications/priority' }} />,
+}
+
+/** Push banner 情境總覽:每張卡對到流程圖的一道關卡;Play 送進右上角疊放區看計時與合併(BannerGallery.tsx)。 */
+export const BannerScenarios: Story = {
+  name: 'Push banner 情境總覽',
+  render: () => <BannerGallery />,
+}
+
+/** Prototype 內的示範通知:開啟後 5 / 12 / 20 秒依序送出,照目前的通知設定決定跳不跳(先從頭像選單暫停,只剩優先聯絡人)。 */
+export const LiveBanners: Story = {
+  name: 'Push banner 實際觸發',
+  render: () => <App config={{ agent: true, demoBanners: true }} />,
 }

@@ -475,6 +475,17 @@ user：「我想照我寫好的對話劇本來演示」→ 劇本 `K8S_IMAGEPULL
 - App 狀態：`notifPrefs`（`NotificationPrefs`，優先名單預設 guanyu / kenji）、`settingsRoute`；`config.initialSettingsRoute` 給 story 直接開某頁。
 - Story：`Apps/chat/Settings`（`Settings.stories.tsx`）› Notifications / Notifications › Chats / Notifications › Priority contacts。
 
+## Push banner — `apps/chat/src/NotificationBanner.tsx` + `BannerGallery.tsx`（2026-11-07）
+
+App 內通知卡（別人找你）。**不用 DS Toast**：toast.spec.md 規定需要使用者處理的內容不放 Toast；本卡要在卡上回覆 / 核准（專案目標 2）。外框值全部沿用 Toast / Notice：寬 360、`rounded-lg` + `--elevation-200`、`px-4 py-3`、`z-[60]`、離視窗邊 24px。
+
+- 結構：來源列（app 圖示 + app · 脈絡 + 時間 + Urgent 標籤 + 關閉）→ 內容列（Family 2：ItemAvatar block / 沒有發送人時 app 圖示圓底 + ItemContent，整列可點 = 打開來源）→「為什麼收到」一行 → 動作列（Reply 展開就地回覆輸入框；最多 2 個 Button）。動作完成 → 卡片換成結果句（Reply sent / Access granted…），3 秒後收起。
+- `BannerStack`：**右上角**（Toast 在右下 = 操作回饋，banner = 別人找你，不搶同一角）。最新在上、最多 3 張、同 `threadKey` 取代並累計則數；10 秒收起（DS Toast 含 action 的預設），滑鼠停留 / 回覆中暫停；Urgent 不自動收起、`role="alert"`。
+- `routeNotification(event, prefs, ctx)`：照流程圖第 1 張圖關卡順序 → `banner` / `badge` / `none`，並回傳「為什麼收到」的句子。緊急 → 類別設定 → 聊天靜音（直接 @ 放行）→ 暫停（優先聯絡人放行）→ 會議中靜音（本場會議聊天放行）→ 系統勿擾。
+- App：`config.demoBanners`（demo 預設開）→ 5 / 12 / 20 秒送出 Shinichi 一對一訊息、Guan-Yu 在 Product Team @我、Ya-Ting 申請 Drive 存取；每則先過 `routeNotification`。點聊天卡 → 切到 Chat 分頁該聊天室；Drive 卡 → Drive 分頁。被擋下的通知目前沒有實際加到未讀徽章（示範資料）。
+- `BannerGallery`：情境總覽頁（說明中文、UI 英文）；demo 網址 `#banners`。Story：`Apps/chat/Settings` › Push banner 情境總覽 / Push banner 實際觸發。
+- demo 入口 hash：`#banners` = 總覽、`#notification-settings` = 打開就是 Settings › Notifications（claude.ai 保留 `#settings`，不能用）。
+
 ---
 
 ## 共用元件 / helper

@@ -6,13 +6,19 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { TooltipProvider } from '@qijenchen/design-system'
 import App from './App'
+import { BannerGallery } from './BannerGallery'
 import './globals.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <TooltipProvider delayDuration={500} skipDelayDuration={300}>
-      {/* #settings = 打開就是 Settings › Notifications(2026-11-07 通知設定 demo;同 IT Service Desk #oncall 以 hash 切換的先例) */}
-      <App config={{ agent: true, initialSettingsRoute: location.hash === '#settings' ? 'notifications' : undefined }} />
+      {/* #notification-settings = 打開就是 Settings › Notifications(2026-11-07 通知設定 demo;同 IT Service Desk #oncall 以 hash 切換的先例) */}
+      {/* #banners = Push banner 情境總覽;其餘 = prototype(開啟後 5 / 12 / 20 秒送出示範通知,照設定決定跳不跳) */}
+      {location.hash === '#banners' ? (
+        <BannerGallery />
+      ) : (
+        <App config={{ agent: true, demoBanners: true, initialSettingsRoute: location.hash === '#notification-settings' ? 'notifications' : undefined }} />
+      )}
     </TooltipProvider>
   </StrictMode>,
 )
