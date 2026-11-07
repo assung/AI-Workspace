@@ -1,0 +1,26 @@
+# IT Service Desk demo — Netlify site `service-desk`(2026-11-07 user:「請幫我推上 netlify」)
+#
+# 這個 repo 根目錄的 teaworkspace/netlify.toml 是 Storybook 用的;這支站要讀「這一份」:
+# Netlify 設 Base directory = teaworkspace、Package directory = teaworkspace/apps/ai-agent
+# → 有 package directory 時 netlify.toml 先找 package directory(docs.netlify.com/configure-builds/monorepos/)。
+# build 指令在 base directory(teaworkspace)跑、publish 也相對於 base directory。
+#
+# 密碼:同 claude.ai artifact 那份 demo 的做法 —— app 用密碼加密(scripts/protect-demo.mjs),只有密碼畫面是明文。
+# 密碼只放 Netlify 環境變數 DEMO_PASSWORD(Site configuration → Environment variables),不進 repo;
+# 沒設 → protect-demo 直接報錯、build 失敗,不會發佈沒上鎖的版本。
+
+[build]
+  command = "npm run build:demo --workspace=@product/ai-agent && node apps/ai-agent/scripts/protect-demo.mjs apps/ai-agent/dist-demo apps/ai-agent/dist \"$DEMO_PASSWORD\""
+  publish = "apps/ai-agent/dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# 同 Storybook 站:不讓搜尋引擎收錄(只防 SEO;擋人靠上面的密碼)
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "SAMEORIGIN"
