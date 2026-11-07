@@ -93,6 +93,7 @@ import { TAgentPage, type TAgentRoute } from './TAgentPage'
 import { TasksPage, type TasksRoute } from './TasksPage'
 import { DrivePage, type DriveRoute } from './DrivePage'
 import { DocsPage, type DocsRoute } from './DocsPage'
+import { WorkspaceSettingsModal, WorkspaceAccountMenu, defaultNotificationPrefs, isPaused, type NotificationPrefs, type SettingsRoute } from './WorkspaceSettings'
 import { K8S_IMAGEPULL_SCRIPT } from './tagentScripts'
 import { CHROME_RAIL_BG, CHROME_SIDEBAR_BG, CHROME_SIDEBAR_FILL_X, NO_MOUNT_PANEL_TRANSITION, SHELL_SETTLE_MS } from './chrome'
 import photoSunsetLake from './assets/photos/sunset-lake.jpg'
@@ -283,6 +284,8 @@ const PEOPLE: Record<string, Person> = {
 // tAgent 首頁問候用的名字(2026-10-23 user 同意「Good afternoon, Aaron」這種帶名字的問候)
 const ME_GREETING_NAME = 'Aaron'
 const ME: Person = { name: 'Me 我', color: 'green', status: 'online', role: 'You', email: 'me@teachat.app', avatar: AVATAR['me'] }
+// 可加入通知優先名單的人(WorkspaceSettings PeoplePicker;DS PersonData 形狀)
+const PRIORITY_CANDIDATES = Object.entries(PEOPLE).map(([id, p]) => ({ id, name: p.name, avatarUrl: p.avatar, description: p.role, status: p.status }))
 
 // 20 unique 1-on-1 DM partners. Registered into PEOPLE below so message author
 // lookups (PEOPLE[author]) resolve name + avatar in the conversation view.
@@ -868,6 +871,7 @@ function NavRail({
   backgroundClassName = 'bg-surface',
   showHome = true,
   variant = 'default',
+  accountMenu,
 }: {
   unreadCount: number
   /** AI agent 有未讀回覆(劇本在背景處理完)→ AI agent 圖示右上角紅點(同 Chat 列表未讀點) */
@@ -888,6 +892,8 @@ function NavRail({
    * 此模式下 showAgent / showHome 不作用。
    */
   variant?: 'default' | 'workspace'
+  /** 取代底部頭像的帳號入口(tWorkspace:WorkspaceAccountMenu,含暫停通知捷徑,2026-11-07)。未傳 = 原本的頭像 + ProfileCard。 */
+  accountMenu?: React.ReactNode
 }) {
   const [internalTab, setInternalTab] = useState<NavTab>('chat')
   const tab = tabProp ?? internalTab
@@ -979,7 +985,7 @@ function NavRail({
             <DropdownMenuItem startIcon={LogOut}>Sign out</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <Avatar src={ME.avatar} alt={ME.name} color={ME.color} size={32} hoverCard={makeProfileCard(ME)} />
+        {accountMenu ?? <Avatar src={ME.avatar} alt={ME.name} color={ME.color} size={32} hoverCard={makeProfileCard(ME)} />}
       </div>
     </nav>
   )
@@ -3107,6 +3113,8 @@ export type ChatVariantConfig = {
   initialTab?: 'chat' | 'tasks' | 'docs' | 'drive' | 'agent'
   /** config.agent:tAgent 整頁的初始位置(預設 'new' = 新對話首頁)。 */
   initialAgentRoute?: TAgentRoute
+  /** config.agent:一打開就開著 Settings 的哪一頁(story 用;未給 = 不開)。 */
+  initialSettingsRoute?: SettingsRoute
 }
 
 // 依 seed 做穩定洗牌(各版本不同 seed → 不同排序,但同版本每次一致)。
@@ -3185,7 +3193,17 @@ export default function App({
   const [listOpen, setListOpen] = useState(config?.initialListOpen ?? true)
   const [listWidth, setListWidth] = useState(320)
   const [showPreview, setShowPreview] = useState(config?.initialShowPreview ?? true)
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(config?.initialSettingsRoute != null)
+  // tWorkspace 通知偏好(WorkspaceSettings.tsx;切換即生效)。優先名單預設兩位,方便 demo「暫停中仍收到誰」。
+  const [settingsRoute, setSettingsRoute] = useState<SettingsRoute>(config?.initialSettingsRoute ?? 'notifications')
+  const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>(() => defaultNotificationPrefs(['guanyu', 'kenji']))
+  // 暫停到期 → 自動恢復(Teams:時間到依原設定恢復,MC1465768)
+  useEffect(() => {
+    if (typeof notifPrefs.pauseUntil !== 'number') return
+    const ms = notifPrefs.pauseUntil - Date.now()
+    const t = window.setTimeout(() => setNotifPrefs((p) => (isPaused(p) ? p : { ...p, pauseUntil: null })), Math.max(0, ms) + 50)
+    return () => window.clearTimeout(t)
+  }, [notifPrefs.pauseUntil])
   const [mutedIds, setMutedIds] = useState<Set<string>>(new Set())
   const [fullWidth, setFullWidth] = useState(config?.initialFullWidth ?? true)
   const [favOrder, setFavOrder] = useState<string[]>(
@@ -3500,6 +3518,14 @@ export default function App({
         variant="workspace"
         backgroundClassName={CHROME_RAIL_BG}
         agentUnread={agentEngine.hasUnread}
+        accountMenu={
+          <WorkspaceAccountMenu
+            user={{ name: ME.name, avatar: { src: ME.avatar, color: ME.color } }}
+            prefs={notifPrefs}
+            onChange={setNotifPrefs}
+            onOpenNotificationSettings={() => { setSettingsRoute('notifications'); setSettingsOpen(true); onAction?.({ type: 'open-settings' }) }}
+          />
+        }
       />
       {/* AI agent 背景回覆的通知;落點照 DS 預設(右下、以整個視窗為準,toast.spec.md「落點」) */}
       <Toaster containerAriaLabel="Notifications" />
@@ -3645,12 +3671,25 @@ export default function App({
       ) : (
         <div className="flex h-screen w-full overflow-hidden bg-canvas text-foreground">{columns}</div>
       )}
-      <SettingsModal
-        open={settingsOpen}
-        onOpenChange={setSettingsOpen}
-        showPreview={showPreview}
-        onConfirm={(v) => { setShowPreview(v); onAction?.({ type: 'toggle-preview', value: v }) }}
-      />
+      {agentEnabled ? (
+        <WorkspaceSettingsModal
+          open={settingsOpen}
+          onOpenChange={(v) => { setSettingsOpen(v); if (!v) setSettingsRoute('notifications') }}
+          initialRoute={settingsRoute}
+          prefs={notifPrefs}
+          onPrefsChange={setNotifPrefs}
+          people={PRIORITY_CANDIDATES}
+          showChatPreview={showPreview}
+          onShowChatPreviewChange={(v) => { setShowPreview(v); onAction?.({ type: 'toggle-preview', value: v }) }}
+        />
+      ) : (
+        <SettingsModal
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+          showPreview={showPreview}
+          onConfirm={(v) => { setShowPreview(v); onAction?.({ type: 'toggle-preview', value: v }) }}
+        />
+      )}
       {searchOpen && (
         <SearchModal
           rooms={rooms}

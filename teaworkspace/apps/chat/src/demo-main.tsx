@@ -11,7 +11,8 @@ import './globals.css'
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <TooltipProvider delayDuration={500} skipDelayDuration={300}>
-      <App config={{ agent: true }} />
+      {/* #settings = 打開就是 Settings › Notifications(2026-11-07 通知設定 demo;同 IT Service Desk #oncall 以 hash 切換的先例) */}
+      <App config={{ agent: true, initialSettingsRoute: location.hash === '#settings' ? 'notifications' : undefined }} />
     </TooltipProvider>
   </StrictMode>,
 )

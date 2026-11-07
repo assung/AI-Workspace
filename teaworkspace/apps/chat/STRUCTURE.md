@@ -456,6 +456,24 @@ user：「我想照我寫好的對話劇本來演示」→ 劇本 `K8S_IMAGEPULL
 
 - 左側 nav（Settings → Chats）+ 右側內容（Show message previews 開關）。
 - Dialog 固定高 480px，內層 flex 填滿，footer（Cancel / Save changes）pin 在底部。
+- **只用在 base / UT 版本**（UT 依賴 Save changes 觸發 `toggle-preview`）。tWorkspace（`config.agent`）改用下方 `WorkspaceSettingsModal`。
+
+## Settings（tWorkspace）— `apps/chat/src/WorkspaceSettings.tsx`（2026-11-07）
+
+依「Teams 通知機制規格」與「Teams 通知決策流程圖」設計；**切換即生效，沒有 Save / Cancel**（2026-11-07 user 決定；Teams、DS Switch spec 同）。
+
+- `WorkspaceSettingsModal`：DS Dialog `maxWidth={720}` `height="fill"`；左欄分類 Notifications / Chats；右欄頁首有子頁時帶返回鈕。路由 `SettingsRoute` = `notifications` / `notifications/<chats|tasks|docs|drive>` / `notifications/priority` / `chats`。
+- 設定列 `SettingRow` = DS `ItemContent`（label + description）左、控制項右，flush rows + 分隔線（item-anatomy.spec.md settings row 6 家共識）。不用 Field horizontal：它的 description 落在控制項欄，不在 label 下方。
+- Notifications 頁三區：
+  - **Focus**：Pause notifications（Pause ▾：For 1 hour / For 2 hours / For the rest of today / Until I turn them back on；暫停中變 Resume + 「Paused until …」）、Let priority contacts through、Priority contacts（Edit → 子頁）、Mute during meetings and calls、Follow Do Not Disturb on this computer（預設開，規格第 10 節第 8 點）。
+  - **Display**：Show message preview（橫幅內文）、Play sound。
+  - **Native apps**：Chats / Tasks / Docs / Drive，各一列 Edit → 子頁；子頁每種通知一個 Select：Banner and badge / Badge only / Off（tWorkspace 沒有活動摘要，被擋下的通知只留未讀徽章，2026-11-07 user 決定）。
+- Priority contacts 子頁：上方 PeoplePicker 加人，下方逐列（ItemAvatar block + 名字 + 職稱 + Remove）。
+- 流程圖關卡 → 控制項對照寫在檔頭註解。
+- **頭像選單** `WorkspaceAccountMenu`（DS AccountMenu，取代 NavRail 底部頭像；NavRail `accountMenu` prop）：Pause notifications ▸（同四個時長）/ 暫停中 = Resume notifications + 到期時間；Notification settings。Teams 的暫停也在個人頭像選單（MC1465768）。
+- 暫停開始 → DS Toast「Notifications paused」+ Undo；到期自動恢復（App 內 `useEffect` 計時）。
+- App 狀態：`notifPrefs`（`NotificationPrefs`，優先名單預設 guanyu / kenji）、`settingsRoute`；`config.initialSettingsRoute` 給 story 直接開某頁。
+- Story：`Apps/chat/Settings`（`Settings.stories.tsx`）› Notifications / Notifications › Chats / Notifications › Priority contacts。
 
 ---
 
