@@ -463,11 +463,13 @@ user：「我想照我寫好的對話劇本來演示」→ 劇本 `K8S_IMAGEPULL
 依「Teams 通知機制規格」與「Teams 通知決策流程圖」設計；**切換即生效，沒有 Save / Cancel**（2026-11-07 user 決定；Teams、DS Switch spec 同）。
 
 - `WorkspaceSettingsModal`：DS Dialog `maxWidth={720}` `height="fill"`；左欄分類 Notifications / Chats；右欄頁首有子頁時帶返回鈕。路由 `SettingsRoute` = `notifications` / `notifications/<chats|tasks|docs|drive>` / `notifications/priority` / `chats`。
-- 設定列 `SettingRow` = DS `ItemContent`（label + description）左、控制項右，flush rows + 分隔線（item-anatomy.spec.md settings row 6 家共識）。不用 Field horizontal：它的 description 落在控制項欄，不在 label 下方。
+- 控制項（2026-11-10 user 決定，完全對標 Teams）：**選項一律 Checkbox**（Checkbox 在前、文字在後，切換即生效）；**Switch 只放在功能區塊標題列當總開關**，關閉 → 區塊內 Select disabled、保留原值。有右側按鈕 / Select 的列用 `SettingRow`（ItemContent + 控制項靠右，無分隔線，字級明訂 text-body 14 = Checkbox md label）。
 - Notifications 頁三區：
-  - **Focus**：Pause notifications（Pause ▾：For 1 hour / For 2 hours / For the rest of today / Until I turn them back on；暫停中變 Resume + 「Paused until …」）、Let priority contacts through、Priority contacts（Edit → 子頁）、Mute during meetings and calls、Follow Do Not Disturb on this computer（預設開，規格第 10 節第 8 點）。
-  - **Display**：Show message preview（橫幅內文）、Group notifications（預設開；同一來源的橫幅收合成一張並累計則數，關閉 = 每則各一張；2026-11-10 user 新增）、Play sound。
-  - **Native apps**：Chats / Tasks / Docs / Drive，各一列 Edit → 子頁；子頁每種通知一個 Select：Banner and badge / Badge only / Off（tWorkspace 沒有活動摘要，被擋下的通知只留未讀徽章，2026-11-07 user 決定）。
+  - **Focus**：Pause notifications（Pause ▾：For 1 hour / For 2 hours / For the rest of today / Until I turn them back on；暫停中變 Resume + 「Paused until …」）、☑ Let priority contacts through、Priority contacts（Edit → 子頁）、☑ Follow Do Not Disturb on this computer（預設勾，規格第 10 節第 8 點）。
+  - **Display**（文案照 user 設計稿）：☑ Show message and content previews in notifications、☑ Show notifications while "In a Call" status（取消勾選 = 會議 / 通話中只放行該場聊天與緊急；取代原 Focus 的 Mute during meetings and calls）、☑ Group banners from the same chat（預設勾；同一聊天的橫幅收合成一張並累計則數）。Sound 之後另立一區，目前移除。
+  - **Native apps**：目前只有 Chats（2026-11-10 user：功能目前只有 chat）。Edit → Chats 子頁：
+    - **@Mentions**（標題列總開關）：Everyone in the chat @mentions / Personal @mentions，Select：Show in banner / Off，預設 Show in banner。
+    - **Messages**：New messages / Replies（預設 Show in banner）、Reactions（預設 Off）。
 - Priority contacts 子頁：上方 PeoplePicker 加人，下方逐列（ItemAvatar block + 名字 + 職稱 + Remove）。
 - 流程圖關卡 → 控制項對照寫在檔頭註解。
 - **頭像選單** `WorkspaceAccountMenu`（DS AccountMenu，取代 NavRail 底部頭像；NavRail `accountMenu` prop）：Pause notifications ▸（同四個時長）/ 暫停中 = Resume notifications + 到期時間；Notification settings。Teams 的暫停也在個人頭像選單（MC1465768）。
@@ -480,9 +482,9 @@ user：「我想照我寫好的對話劇本來演示」→ 劇本 `K8S_IMAGEPULL
 App 內通知卡（別人找你）。**不用 DS Toast**：toast.spec.md 規定需要使用者處理的內容不放 Toast；本卡要在卡上回覆 / 核准（專案目標 2）。外框值全部沿用 Toast / Notice：寬 360、`rounded-lg` + `--elevation-200`、`px-4 py-3`、`z-[60]`、離視窗邊 24px。
 
 - 結構：來源列（app 圖示 + app · 脈絡 + 時間 + Urgent 標籤 + 關閉）→ 內容列（Family 2：ItemAvatar block / 沒有發送人時 app 圖示圓底 + ItemContent，整列可點 = 打開來源）→「為什麼收到」一行 → 動作列（Reply 展開就地回覆輸入框；最多 2 個 Button）。動作完成 → 卡片換成結果句（Reply sent / Access granted…），3 秒後收起。
-- `BannerStack`：**右上角**（Toast 在右下 = 操作回饋，banner = 別人找你，不搶同一角）。最新在上、最多 3 張、同 `threadKey` 取代並累計則數（`push(b, group)`，group = 設定 Group notifications，關閉時不收合）；10 秒收起（DS Toast 含 action 的預設），滑鼠停留 / 回覆中暫停；Urgent 不自動收起、`role="alert"`。
-- `routeNotification(event, prefs, ctx)`：照流程圖第 1 張圖關卡順序 → `banner` / `badge` / `none`，並回傳「為什麼收到」的句子。緊急 → 類別設定 → 聊天靜音（直接 @ 放行）→ 暫停（優先聯絡人放行）→ 會議中靜音（本場會議聊天放行）→ 系統勿擾。
-- App：`config.demoBanners`（demo 預設開）→ 5 / 8 / 12 / 20 秒送出 Shinichi 一對一訊息兩則（示範收合）、Guan-Yu 在 Product Team @我、Ya-Ting 申請 Drive 存取；每則先過 `routeNotification`。點聊天卡 → 切到 Chat 分頁該聊天室；Drive 卡 → Drive 分頁。被擋下的通知目前沒有實際加到未讀徽章（示範資料）。
+- `BannerStack`：**右上角**（Toast 在右下 = 操作回饋，banner = 別人找你，不搶同一角）。最新在上、最多 3 張、同 `threadKey` 取代並累計則數（`push(b, group)`，group = 設定 Group banners from the same chat，關閉時不收合）；10 秒收起（DS Toast 含 action 的預設），滑鼠停留 / 回覆中暫停；Urgent 不自動收起、`role="alert"`。
+- `routeNotification(event, prefs, ctx)`：照流程圖第 1 張圖關卡順序 → `banner` / `badge` / `none`，並回傳「為什麼收到」的句子。緊急 → 功能區塊總開關 → 該種通知 Show in banner / Off → 聊天靜音（只放行 Personal @mention，Everyone @mentions 不放行）→ 暫停（優先聯絡人放行）→ 通話 / 會議中（未勾 Show notifications while "In a Call" status 時只放行本場會議聊天）→ 系統勿擾。
+- App：`config.demoBanners`（demo 預設開）→ 5 / 8 / 12 秒送出 Shinichi 一對一訊息兩則（示範收合）、Guan-Yu 在 Product Team Personal @mention；每則先過 `routeNotification`。點聊天卡 → 切到 Chat 分頁該聊天室；Drive 卡 → Drive 分頁。被擋下的通知目前沒有實際加到未讀徽章（示範資料）。
 - `BannerGallery`：情境總覽頁（說明中文、UI 英文）；demo 網址 `#banners`。Story：`Apps/chat/Settings` › Push banner 情境總覽 / Push banner 實際觸發。
 - demo 入口 hash：`#banners` = 總覽、`#notification-settings` = 打開就是 Settings › Notifications（claude.ai 保留 `#settings`，不能用）。
 

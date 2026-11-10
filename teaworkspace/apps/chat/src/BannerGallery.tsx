@@ -2,7 +2,7 @@
 // 「Play」把那張卡送進右上角的真疊放區,看計時、停留暫停、同對話合併、最多 3 張。
 // UI 文案英文;說明文字中文(給設計 / PM 審閱)。
 import { useState } from 'react'
-import { Button, DataTable, Separator, Switch } from '@qijenchen/design-system'
+import { Button, Checkbox, DataTable, Separator } from '@qijenchen/design-system'
 import { Play } from 'lucide-react'
 import { BannerStack, NotificationBanner, useBannerStack, type BannerData } from './NotificationBanner'
 
@@ -25,45 +25,27 @@ type Scenario = { title: string; gate: string; behavior: string; data: BannerDat
 const DELIVERED: Scenario[] = [
   {
     title: 'Chats — 一對一新訊息',
-    gate: 'Chats › New messages = Banner and badge',
+    gate: 'Chats › Messages › New messages = Show in banner',
     behavior: '10 秒後收起;滑鼠停留或回覆中暫停。Reply 直接在卡上回,送出後顯示「Reply sent」3 秒收起。點內容 = 打開該聊天。',
     data: { id: 'dm', threadKey: 'chat:shinichi', app: 'chats', actor: P.shinichi, body: 'The Lugu Co-op samples arrived. Can you confirm the 20 kg order before 3 PM?', reply: true, time: 'now' },
   },
   {
-    title: 'Chats — 群組 @提及',
-    gate: 'Chats › @mentions',
+    title: 'Chats — Personal @mention',
+    gate: 'Chats › @Mentions › Personal @mentions',
     behavior: '來源列帶群組名;「為什麼收到」寫 You were @mentioned。',
     data: { id: 'mention', threadKey: 'chat:product-team', app: 'chats', context: 'Product Team 產品團隊', actor: P.guanyu, body: '@Me 我 can you confirm the launch date for the Q4 tasting kit?', reason: 'You were @mentioned', reply: true, time: 'now' },
   },
   {
+    title: 'Chats — Everyone in the chat @mention',
+    gate: 'Chats › @Mentions › Everyone in the chat @mentions',
+    behavior: '@所有人 的廣播。「為什麼收到」寫 Everyone in the chat was @mentioned,跟點名自己的 Personal @mention 分開;在已靜音的聊天不會跳。',
+    data: { id: 'everyone', threadKey: 'chat:tea-team', app: 'chats', context: 'Tea Tasting 品茶小組', actor: P.kenji, body: '@everyone Friday’s blind tasting moves to 3 PM in room No.3.', reason: 'Everyone in the chat was @mentioned', reply: true, time: 'now' },
+  },
+  {
     title: 'Chats — 同一對話連續訊息(合併)',
-    gate: 'Display › Group notifications = On(預設)',
+    gate: 'Display › Group banners from the same chat = 勾選(預設)',
     behavior: '不疊出一排同一個人:新訊息取代舊卡,標題後顯示則數,內文換成最新一則,計時重來。設定關閉時每則各一張。',
     data: { id: 'grouped', threadKey: 'chat:kenji', app: 'chats', actor: P.kenji, count: 3, body: 'Also, the roaster is free on Thursday if we need a second batch.', reply: true, time: 'now' },
-  },
-  {
-    title: 'Tasks — 指派給你',
-    gate: 'Tasks › Assigned to you',
-    behavior: 'Open task 打開任務;沒有其他就地動作(接不接任務要看內容,不在卡上決定)。',
-    data: { id: 'assigned', app: 'tasks', context: 'Q4 Tasting Program', actor: P.guanyu, body: 'Assigned you “Prepare blind tasting scorecard” · Due Fri, Nov 14', actions: [{ label: 'Open task' }], time: '2m' },
-  },
-  {
-    title: 'Tasks — 到期提醒(系統)',
-    gate: 'Tasks › Due date reminders',
-    behavior: '沒有發送人 → 用 app 圖示取代頭像。Mark complete 就地完成,卡片換成結果後收起。',
-    data: { id: 'due', app: 'tasks', context: 'Q4 Tasting Program', title: 'Due in 2 hours', body: 'Send moisture readings for batch #3 to the lab', actions: [{ label: 'Mark complete', primary: true, result: 'Marked complete' }, { label: 'Open task' }], time: 'now' },
-  },
-  {
-    title: 'Docs — 留言 @提及',
-    gate: 'Docs › @mentions',
-    behavior: 'Reply 回覆的是那則留言串,不是整份文件。',
-    data: { id: 'doc', app: 'docs', context: 'Q4 Launch Plan', actor: P.yui, body: '@Me 我 can you add the vendor list to section 3 before Monday’s review?', reason: 'You were @mentioned in a comment', reply: true, actions: [{ label: 'Open doc' }], time: 'now' },
-  },
-  {
-    title: 'Drive — 存取申請(就地核准)',
-    gate: 'Drive › Access requests',
-    behavior: '專案目標 2「在情境內完成」的代表:Approve 直接授權,卡片換成「Access granted…」3 秒後收起;Open 去檔案頁再決定。',
-    data: { id: 'access', app: 'drive', context: 'Packaging mockups – Q4.fig', actor: P.yating, body: 'Requested edit access', actions: [{ label: 'Approve', primary: true, result: 'Access granted to Lin Ya-Ting' }, { label: 'Open' }], time: 'now' },
   },
 ]
 
@@ -81,20 +63,20 @@ const VARIANTS: Scenario[] = [
     data: { id: 'priority', threadKey: 'chat:guanyu', app: 'chats', actor: P.guanyu, body: 'Quick one — are we still on for the 4 PM tasting?', reason: 'Priority contact · notifications are paused', reply: true, time: 'now' },
   },
   {
-    title: '靜音的聊天,被直接 @',
+    title: '靜音的聊天,被 Personal @mention',
     gate: '第 3 關:聊天被靜音 → 有直接 @你',
-    behavior: '靜音只擋一般訊息;直接 @ 仍跳,並說明這是靜音聊天。',
+    behavior: '靜音只擋一般訊息和 Everyone @mentions;點名你的 Personal @mention 仍跳,並說明這是靜音聊天。',
     data: { id: 'muted', threadKey: 'chat:engineering', app: 'chats', context: 'Engineering', actor: P.kenji, body: '@Me 我 the PR for the tasting form is ready for your review.', reason: 'You were @mentioned · this chat is muted', reply: true, time: 'now' },
   },
   {
-    title: '會議中,只放行這場會議的聊天',
-    gate: '第 5 關:會議中靜音',
-    behavior: '開了 Mute during meetings and calls 時,只有目前會議的聊天會跳。',
+    title: '通話 / 會議中,只放行這場會議的聊天',
+    gate: '第 5 關:Display › Show notifications while "In a Call" status = 未勾選',
+    behavior: '取消勾選時,通話或會議中只有這場會議的聊天(和緊急訊息)會跳。',
     data: { id: 'meeting', threadKey: 'chat:weekly', app: 'chats', context: 'Weekly tasting sync', actor: P.yui, body: 'Sharing the scorecard link here for everyone.', reason: 'From your current meeting', reply: true, time: 'now' },
   },
   {
     title: '訊息預覽關閉',
-    gate: 'Display › Show message preview = Off',
+    gate: 'Display › Show message and content previews in notifications = 未勾選',
     behavior: '只說誰、在哪裡;內文不顯示(投影、分享螢幕時不洩漏)。',
     showPreview: false,
     data: { id: 'nopreview', threadKey: 'chat:product-team-2', app: 'chats', context: 'Product Team 產品團隊', actor: P.guanyu, body: 'Budget numbers for Q4 are attached.', reply: true, time: 'now' },
@@ -102,12 +84,12 @@ const VARIANTS: Scenario[] = [
 ]
 
 const SUPPRESSED: { gate: string; outcome: string; example: string }[] = [
-  { gate: '這類通知 = Off', outcome: '不通知,也不加徽章', example: 'Chats › Reactions 設成 Off' },
-  { gate: '這類通知 = Badge only', outcome: '只加未讀徽章', example: 'Drive › Shared with you(預設)' },
-  { gate: '聊天被靜音,沒有直接 @', outcome: '不通知', example: '在已靜音的 Engineering 收到一般訊息' },
-  { gate: '暫停中,寄件人不在優先名單', outcome: '只加未讀徽章', example: '暫停 1 小時期間,Shinichi 傳訊息' },
-  { gate: '會議中靜音,不是這場會議', outcome: '只加未讀徽章', example: '開會時 Tasks 指派通知' },
-  { gate: '系統勿擾 / 專注模式開著', outcome: '只加未讀徽章', example: 'macOS 專注模式期間任何非緊急通知' },
+  { gate: '@Mentions 總開關關閉', outcome: '兩種 @ 都不跳卡', example: 'Chats › @Mentions 的 Switch 關掉,下方兩個 Select 變 disabled' },
+  { gate: '這種通知 = Off', outcome: '不跳卡(聊天本身的未讀數照常)', example: 'Chats › Messages › Reactions(預設 Off)' },
+  { gate: '聊天被靜音,不是 Personal @mention', outcome: '不通知', example: '已靜音的 Engineering 有人 @everyone' },
+  { gate: '暫停中,寄件人不在優先名單', outcome: '不跳卡', example: '暫停 1 小時期間,Shinichi 傳訊息' },
+  { gate: '通話 / 會議中且未勾選「Show notifications while "In a Call" status」', outcome: '不跳卡', example: '開會時 Product Team 的一般訊息' },
+  { gate: '系統勿擾 / 專注模式開著', outcome: '不跳卡', example: 'macOS 專注模式期間任何非緊急通知' },
 ]
 
 const SUPPRESSED_COLUMNS = [
@@ -118,7 +100,7 @@ const SUPPRESSED_COLUMNS = [
 
 export function BannerGallery() {
   const stack = useBannerStack()
-  // 對應設定 Display › Group notifications;在總覽頁可直接切換,按兩次同一張 Play 看差別
+  // 對應設定 Display › Group banners from the same chat;在總覽頁可直接切換,按兩次同一張 Play 看差別
   const [group, setGroup] = useState(true)
   let n = 0
   const play = (s: Scenario) => stack.push({ ...s.data, id: `${s.data.id}-${Date.now()}-${n++}`, count: undefined }, group)
@@ -127,29 +109,29 @@ export function BannerGallery() {
     <div className="h-screen overflow-y-auto bg-canvas text-foreground">
       <div className="mx-auto flex max-w-[1080px] flex-col gap-10 px-6 py-10">
         <header className="flex flex-col gap-2">
-          <p className="text-caption font-semibold uppercase tracking-wide text-fg-secondary">tWorkspace · In-app notifications</p>
+          <p className="text-caption font-semibold uppercase tracking-wide text-fg-secondary">tWorkspace · In-app notifications · Chats</p>
           <h1 className="text-h3 font-semibold">Push banner scenarios</h1>
           <p className="max-w-[68ch] text-body text-fg-secondary">
             每張卡對到「Teams 通知決策流程圖」的一道關卡。按 Play 會把卡片送進右上角真的疊放區:10 秒收起、滑鼠停留暫停、同一對話合併、最多 3 張。
             操作回饋的 Toast 在右下,別人找你的 banner 在右上,兩者不搶同一個角落。
           </p>
-          <Switch
+          <Checkbox
             className="pt-2"
-            label="Group notifications"
-            description="對應設定 Display › Group notifications。開:同一來源連按 Play 會收合成一張並累計則數;關:每則各一張。"
+            label="Group banners from the same chat"
+            description="對應設定 Display 的同名選項。勾選:同一聊天連按 Play 會收合成一張並累計則數;不勾:每則各一張。"
             checked={group}
-            onCheckedChange={setGroup}
+            onCheckedChange={(v) => setGroup(v === true)}
           />
         </header>
 
-        <ScenarioSection title="會跳橫幅:各 app 的一般情境" items={DELIVERED} onPlay={play} />
+        <ScenarioSection title="會跳橫幅:Chats 的一般情境" items={DELIVERED} onPlay={play} />
         <Separator />
         <ScenarioSection title="會跳橫幅:流程圖關卡造成的變體" items={VARIANTS} onPlay={play} />
         <Separator />
 
         <section className="flex flex-col gap-4">
           <h2 className="text-h5 font-semibold">不跳橫幅的情況</h2>
-          <p className="max-w-[68ch] text-body text-fg-secondary">tWorkspace 沒有活動摘要,被擋下的通知只留未讀徽章(NavRail 分頁上的數字、列表上的紅點)。</p>
+          <p className="max-w-[68ch] text-body text-fg-secondary">目前只有 Chats 有通知。tWorkspace 沒有活動摘要,被擋下的訊息仍在聊天的未讀數裡(NavRail 分頁上的數字、列表上的紅點)。</p>
           <DataTable
             columns={SUPPRESSED_COLUMNS}
             data={SUPPRESSED}

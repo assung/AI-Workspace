@@ -14,7 +14,7 @@ const meta: Meta<typeof App> = {
     docs: {
       description: {
         component:
-          'tWorkspace 的通知設定:Focus(暫停通知、優先名單、會議中靜音、跟系統勿擾連動)/ Display(訊息預覽、音效)/ Native apps(Chats / Tasks / Docs / Drive 各種通知選 Banner and badge / Badge only / Off)。左下頭像選單也能暫停通知。',
+          'tWorkspace 的通知設定:Focus(暫停通知、優先名單、跟系統勿擾連動)/ Display(訊息預覽、通話中顯示通知、同一聊天收合橫幅)/ Native apps(目前只有 Chats:@Mentions 區塊有總開關,各種通知選 Show in banner / Off)。選項為 Checkbox,Switch 只當功能區塊總開關。左下頭像選單也能暫停通知。',
       },
     },
   },
@@ -29,7 +29,7 @@ export const Notifications: Story = {
   render: () => <App config={{ agent: true, initialSettingsRoute: 'notifications' }} />,
 }
 
-/** Chats 子頁:每種聊天通知選擇送達方式;說明靜音聊天被直接 @ 仍會通知。 */
+/** Chats 子頁:@Mentions 區塊(標題列總開關 + Everyone / Personal 兩個 Select)與 Messages 區塊。 */
 export const ChatsNotifications: Story = {
   name: 'Notifications › Chats',
   render: () => <App config={{ agent: true, initialSettingsRoute: 'notifications/chats' }} />,

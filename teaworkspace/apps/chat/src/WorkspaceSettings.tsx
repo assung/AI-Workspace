@@ -1,19 +1,22 @@
 // tWorkspace Settings(2026-11-07):Notifications 分類 + 原 Chats 分類,切換即生效(無 Save / Cancel)。
+// 控制項(2026-11-10 user 決定,完全對標 Teams):選項一律 Checkbox;Switch 只用在功能區塊標題列當總開關。
 // 設計依據:Teams 通知機制規格 + Teams 通知決策流程圖(兩張圖的每道關卡對到一個控制項,見 STRUCTURE.md §Settings)。
 //
 // 關卡 → 控制項:
 //   寄件人標緊急           → 無設定(收件人不能拒收,同 Teams)
-//   這類通知怎麼設定        → Native apps 子頁:每種通知選 Banner and badge / Badge only / Off
-//                            (tWorkspace 沒有活動摘要;被擋下的通知只留未讀徽章 —— 2026-11-07 user 決定)
+//   這類通知怎麼設定        → Native apps › Chats 子頁:每種通知選 Show in banner / Off;功能區塊標題列的 Switch = 總開關
+//                            (關閉 → 子項 Select disabled、保留原值,同 Teams;2026-11-10 user 決定)
+//                            目前只有 Chats 有通知(2026-11-10 user:功能目前只有 chat)
 //   這個聊天被靜音          → 聊天列表的 Mute(既有);被直接 @ 仍通知,寫在 Chats 子頁說明
 //   暫停所有通知            → Pause notifications(1 小時 / 2 小時 / 今天 / 直到手動恢復;頭像選單也有捷徑)
 //   勿擾 + 優先名單         → Let priority contacts through + Priority contacts 子頁(tWorkspace 尚無勿擾狀態,名單先作用於暫停)
-//   會議中靜音              → Mute during meetings and calls
+//   會議中靜音              → Display › Show notifications while "In a Call" status(取消勾選 = 會議中靜音)
 //   第 2 張圖:系統勿擾連動  → Follow Do Not Disturb on this computer
 import { useEffect, useId, useState } from 'react'
 import {
   AccountMenu,
   Button,
+  Checkbox,
   Dialog,
   DialogContent,
   DialogHeader,
@@ -42,9 +45,6 @@ import {
   Bell,
   BellOff,
   ChevronDown,
-  FileText,
-  HardDrive,
-  ListChecks,
   MessageCircle,
   MessagesSquare,
   Settings,
@@ -55,8 +55,8 @@ import {
 // 資料模型
 // ════════════════════════════════════════════════════════════════════════════
 
-/** 每種通知怎麼送達(對應 Teams 的 Banner and feed / Only show in feed / Off;沒有摘要 → 徽章)。 */
-export type DeliveryMode = 'banner' | 'badge' | 'off'
+/** 每種通知怎麼送達(2026-11-10 user:Show in banner / Off;聊天的未讀數本來就在,不另設 Badge only)。 */
+export type DeliveryMode = 'banner' | 'off'
 
 export type NativeAppKey = 'chats' | 'tasks' | 'docs' | 'drive'
 
@@ -68,67 +68,49 @@ export type NotificationPrefs = {
   allowPriority: boolean
   /** PersonData.id */
   priorityIds: string[]
-  muteInMeetings: boolean
+  /** Display › Show notifications while "In a Call" status;取消勾選 = 會議 / 通話中只放行該場聊天與緊急 */
+  showDuringCalls: boolean
   followSystemFocus: boolean
   showPreview: boolean
-  /** 同一來源(同一聊天 / 任務 / 檔案)的橫幅收合成一張;關閉 = 每則各一張(2026-11-10 user 新增,預設開) */
+  /** Display › Group banners from the same chat(2026-11-10 user 新增,預設開);關閉 = 每則各一張 */
   groupBanners: boolean
-  playSound: boolean
-  delivery: Record<NativeAppKey, Record<string, DeliveryMode>>
+  delivery: Partial<Record<NativeAppKey, Record<string, DeliveryMode>>>
+  /** 功能區塊總開關(key = EventSection.key);關閉 → 該區塊通知全部不送,子項保留原值 */
+  sectionEnabled: Record<string, boolean>
 }
 
-type EventDef = { key: string; label: string; description: string; defaultMode: DeliveryMode }
+type EventDef = { key: string; label: string; description?: string; defaultMode: DeliveryMode }
+/** 功能區塊:有 key = 標題列帶總開關 Switch */
+type EventSection = { key?: string; title: string; events: EventDef[] }
 
 /**
- * 每個 native app 的通知種類。預設值對照 Teams:@提及 / 回覆 = 橫幅;按讚與表情 = 只進摘要(這裡 = 只留徽章)。
- * 種類與文案依各 app 實際會發生的事,同 Jira / Notion / Google Drive 的通知分類。
+ * 有通知的 native app。目前只有 Chats(2026-11-10 user);Tasks / Docs / Drive 之後再加。
+ * @Mentions 區塊照 user 設計稿:Everyone in the chat @mentions / Personal @mentions,預設 Show in banner。
+ * Messages 區塊沿用 Teams 聊天分類(新訊息 / 回覆 / 表情回應);表情回應預設 Off(Teams 預設只進摘要)。
  */
-export const NATIVE_APPS: { key: NativeAppKey; label: string; icon: LucideIcon; intro: string; events: EventDef[] }[] = [
+export const NATIVE_APPS: { key: NativeAppKey; label: string; icon: LucideIcon; intro: string; sections: EventSection[] }[] = [
   {
     key: 'chats',
     label: 'Chats',
     icon: MessageCircle,
     intro: 'Muted a chat? You still get a banner when someone @mentions you there directly.',
-    events: [
-      { key: 'mentions', label: '@mentions', description: 'Someone mentions you by name', defaultMode: 'banner' },
-      { key: 'messages', label: 'New messages', description: 'One-on-one and group chats', defaultMode: 'banner' },
-      { key: 'replies', label: 'Replies', description: 'Replies in threads you started or joined', defaultMode: 'banner' },
-      { key: 'reactions', label: 'Reactions', description: 'Someone reacts to your message', defaultMode: 'badge' },
-    ],
-  },
-  {
-    key: 'tasks',
-    label: 'Tasks',
-    icon: ListChecks,
-    intro: 'Notifications for tasks you own, are assigned to, or follow.',
-    events: [
-      { key: 'assigned', label: 'Assigned to you', description: 'A task is assigned or reassigned to you', defaultMode: 'banner' },
-      { key: 'mentions', label: '@mentions in comments', description: 'Someone mentions you in a task comment', defaultMode: 'banner' },
-      { key: 'due', label: 'Due date reminders', description: 'A task you own is due within 24 hours', defaultMode: 'banner' },
-      { key: 'updates', label: 'Status changes', description: 'A task you follow moves to a new status', defaultMode: 'badge' },
-    ],
-  },
-  {
-    key: 'docs',
-    label: 'Docs',
-    icon: FileText,
-    intro: 'Notifications for docs you created or were shared with.',
-    events: [
-      { key: 'mentions', label: '@mentions', description: 'Someone mentions you in a doc or comment', defaultMode: 'banner' },
-      { key: 'comments', label: 'Comments on your docs', description: 'New comments and replies on docs you own', defaultMode: 'banner' },
-      { key: 'shared', label: 'Shared with you', description: 'Someone gives you access to a doc', defaultMode: 'badge' },
-      { key: 'access', label: 'Access requests', description: 'Someone asks to view or edit your doc', defaultMode: 'banner' },
-    ],
-  },
-  {
-    key: 'drive',
-    label: 'Drive',
-    icon: HardDrive,
-    intro: 'Notifications for files and folders in your drive.',
-    events: [
-      { key: 'shared', label: 'Shared with you', description: 'Someone shares a file or folder with you', defaultMode: 'badge' },
-      { key: 'comments', label: 'Comments on your files', description: 'New comments on files you own', defaultMode: 'banner' },
-      { key: 'access', label: 'Access requests', description: 'Someone asks to open your file or folder', defaultMode: 'banner' },
+    sections: [
+      {
+        key: 'mentions',
+        title: '@Mentions',
+        events: [
+          { key: 'mentionsEveryone', label: 'Everyone in the chat @mentions', defaultMode: 'banner' },
+          { key: 'mentionsPersonal', label: 'Personal @mentions', defaultMode: 'banner' },
+        ],
+      },
+      {
+        title: 'Messages',
+        events: [
+          { key: 'messages', label: 'New messages', description: 'One-on-one and group chats', defaultMode: 'banner' },
+          { key: 'replies', label: 'Replies', description: 'Replies in threads you started or joined', defaultMode: 'banner' },
+          { key: 'reactions', label: 'Reactions', description: 'Someone reacts to your message', defaultMode: 'off' },
+        ],
+      },
     ],
   },
 ]
@@ -136,25 +118,27 @@ export const NATIVE_APPS: { key: NativeAppKey; label: string; icon: LucideIcon; 
 export function defaultNotificationPrefs(priorityIds: string[] = []): NotificationPrefs {
   const delivery = {} as NotificationPrefs['delivery']
   for (const app of NATIVE_APPS) {
-    delivery[app.key] = Object.fromEntries(app.events.map((e) => [e.key, e.defaultMode]))
+    delivery[app.key] = Object.fromEntries(app.sections.flatMap((sec) => sec.events).map((e) => [e.key, e.defaultMode]))
   }
+  const sectionEnabled = Object.fromEntries(
+    NATIVE_APPS.flatMap((app) => app.sections).filter((sec) => sec.key).map((sec) => [sec.key as string, true]),
+  )
   return {
     pauseUntil: null,
     allowPriority: true,
     priorityIds,
-    muteInMeetings: false,
+    showDuringCalls: true,
     // 規格第 10 節第 8 點:預設就尊重系統勿擾(Teams 的 Windows 連動預設關,這裡刻意不同)
     followSystemFocus: true,
     showPreview: true,
     groupBanners: true,
-    playSound: true,
     delivery,
+    sectionEnabled,
   }
 }
 
 const DELIVERY_OPTIONS = [
-  { value: 'banner', label: 'Banner and badge' },
-  { value: 'badge', label: 'Badge only' },
+  { value: 'banner', label: 'Show in banner' },
   { value: 'off', label: 'Off' },
 ]
 
@@ -223,50 +207,50 @@ function SettingRow({
   const labelId = useId()
   const descriptionId = useId()
   return (
-    <div className="flex items-center gap-4 border-b border-divider py-3 last:border-b-0">
+    // 2026-11-10:選項改 Checkbox 後,列與列不再用分隔線(Teams 設定頁同),字級統一 body 14(ItemContent size md = Checkbox md)
+    <div className="flex items-center gap-4 py-2">
       {icon && <ItemIcon icon={icon} />}
       {avatar && <ItemAvatar mode="block" src={avatar.src} alt={avatar.alt} />}
       <ItemContent
         className="min-w-0 flex-1"
+        size="md"
         labelTruncate={false}
-        label={<span id={labelId}>{label}</span>}
-        description={description ? <span id={descriptionId}>{description}</span> : undefined}
+        // ItemContent 在 MenuItem 外不帶字級(由容器決定),這裡明訂 text-body 14 = Checkbox md label(checkbox.tsx「md:label text-body」)
+        label={<span id={labelId} className="text-body text-foreground">{label}</span>}
+        description={description ? <span id={descriptionId} className="text-body">{description}</span> : undefined}
       />
       <div className="flex shrink-0 items-center gap-2">{control({ labelId, descriptionId: description ? descriptionId : undefined })}</div>
     </div>
   )
 }
 
-function SettingSection({ title, children }: { title: string; children: React.ReactNode }) {
+function SettingSection({
+  title,
+  enabled,
+  onEnabledChange,
+  children,
+}: {
+  title: string
+  /** 有傳 = 功能區塊:標題列右側放總開關 Switch(2026-11-10 user:Switch 只用在這裡) */
+  enabled?: boolean
+  onEnabledChange?: (v: boolean) => void
+  children: React.ReactNode
+}) {
   const id = useId()
   return (
     <section aria-labelledby={id} className="flex flex-col gap-[var(--layout-space-tight)]">
-      <h3 id={id} className="text-body font-semibold text-foreground">{title}</h3>
+      <div className="flex items-center justify-between gap-4">
+        <h3 id={id} className="text-body font-semibold text-foreground">{title}</h3>
+        {onEnabledChange && <Switch checked={!!enabled} onCheckedChange={onEnabledChange} aria-labelledby={id} />}
+      </div>
       <div className="flex flex-col">{children}</div>
     </section>
   )
 }
 
-function SwitchRow({
-  label,
-  description,
-  checked,
-  onCheckedChange,
-}: {
-  label: string
-  description?: string
-  checked: boolean
-  onCheckedChange: (v: boolean) => void
-}) {
-  return (
-    <SettingRow
-      label={label}
-      description={description}
-      control={({ labelId, descriptionId }) => (
-        <Switch checked={checked} onCheckedChange={onCheckedChange} aria-labelledby={labelId} aria-describedby={descriptionId} />
-      )}
-    />
-  )
+/** 勾選項(Teams 設定頁同款:Checkbox 在前、文字在後;切換即生效) */
+function CheckboxList({ children }: { children: React.ReactNode }) {
+  return <div className="flex flex-col gap-3 py-2">{children}</div>
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -426,12 +410,14 @@ export function WorkspaceSettingsModal({
             </DialogHeader>
             <div className="flex-1 overflow-y-auto px-6 py-4">
               {category === 'chats' ? (
-                <SwitchRow
-                  label="Show message previews for chats"
-                  description="Display the latest message below each chat name"
-                  checked={showChatPreview}
-                  onCheckedChange={onShowChatPreviewChange}
-                />
+                <CheckboxList>
+                  <Checkbox
+                    label="Show message previews for chats"
+                    description="Display the latest message below each chat name"
+                    checked={showChatPreview}
+                    onCheckedChange={(v) => onShowChatPreviewChange(v === true)}
+                  />
+                </CheckboxList>
               ) : app ? (
                 <AppDeliveryPage app={app} prefs={prefs} onChange={onPrefsChange} />
               ) : isPriority ? (
@@ -477,12 +463,14 @@ function NotificationsPage({
           description={paused ? pauseStatusText(prefs.pauseUntil) : 'Stop banners and sounds for a while. Unread badges keep counting.'}
           control={() => <PauseControl prefs={prefs} onChange={onChange} />}
         />
-        <SwitchRow
-          label="Let priority contacts through"
-          description="Banners from people on your priority list still show while notifications are paused."
-          checked={prefs.allowPriority}
-          onCheckedChange={(v) => onChange({ ...prefs, allowPriority: v })}
-        />
+        <CheckboxList>
+          <Checkbox
+            label="Let priority contacts through"
+            description="Banners from people on your priority list still show while notifications are paused."
+            checked={prefs.allowPriority}
+            onCheckedChange={(v) => onChange({ ...prefs, allowPriority: v === true })}
+          />
+        </CheckboxList>
         <SettingRow
           label="Priority contacts"
           description={prioritySummary}
@@ -490,47 +478,43 @@ function NotificationsPage({
             <Button variant="secondary" size="sm" aria-describedby={labelId} onClick={() => onNavigate('notifications/priority')}>Edit</Button>
           )}
         />
-        <SwitchRow
-          label="Mute during meetings and calls"
-          description="Only the meeting chat and urgent messages show banners while you're in a meeting or call."
-          checked={prefs.muteInMeetings}
-          onCheckedChange={(v) => onChange({ ...prefs, muteInMeetings: v })}
-        />
-        <SwitchRow
-          label="Follow Do Not Disturb on this computer"
-          description="Hide banners while Focus (macOS) or Do Not Disturb (Windows) is on."
-          checked={prefs.followSystemFocus}
-          onCheckedChange={(v) => onChange({ ...prefs, followSystemFocus: v })}
-        />
+        <CheckboxList>
+          <Checkbox
+            label="Follow Do Not Disturb on this computer"
+            description="Hide banners while Focus (macOS) or Do Not Disturb (Windows) is on."
+            checked={prefs.followSystemFocus}
+            onCheckedChange={(v) => onChange({ ...prefs, followSystemFocus: v === true })}
+          />
+        </CheckboxList>
       </SettingSection>
 
+      {/* 文案照 user 設計稿(2026-11-10);第 2 項取代原 Focus 區的 Mute during meetings and calls(同一道關卡,方向相反);Sound 之後另立一區 */}
       <SettingSection title="Display">
-        <SwitchRow
-          label="Show message preview"
-          description="Show the message text in banners. Turn off to show only who sent it."
-          checked={prefs.showPreview}
-          onCheckedChange={(v) => onChange({ ...prefs, showPreview: v })}
-        />
-        <SwitchRow
-          label="Group notifications"
-          description="Combine banners from the same chat, task, or file into one. Turn off to show each one separately."
-          checked={prefs.groupBanners}
-          onCheckedChange={(v) => onChange({ ...prefs, groupBanners: v })}
-        />
-        <SwitchRow
-          label="Play sound"
-          description="Play a sound when a banner appears."
-          checked={prefs.playSound}
-          onCheckedChange={(v) => onChange({ ...prefs, playSound: v })}
-        />
+        <CheckboxList>
+          <Checkbox
+            label="Show message and content previews in notifications"
+            checked={prefs.showPreview}
+            onCheckedChange={(v) => onChange({ ...prefs, showPreview: v === true })}
+          />
+          <Checkbox
+            label={'Show notifications while "In a Call" status'}
+            checked={prefs.showDuringCalls}
+            onCheckedChange={(v) => onChange({ ...prefs, showDuringCalls: v === true })}
+          />
+          <Checkbox
+            label="Group banners from the same chat"
+            checked={prefs.groupBanners}
+            onCheckedChange={(v) => onChange({ ...prefs, groupBanners: v === true })}
+          />
+        </CheckboxList>
       </SettingSection>
 
       <SettingSection title="Native apps">
         {NATIVE_APPS.map((a) => {
-          const modes = Object.values(prefs.delivery[a.key])
+          const modes = Object.values(prefs.delivery[a.key] ?? {})
           const banners = modes.filter((m) => m === 'banner').length
           const off = modes.filter((m) => m === 'off').length
-          const summary = `${banners} with banners${off ? ` · ${off} off` : ''}`
+          const summary = `${banners} shown in banners${off ? ` · ${off} off` : ''}`
           return (
             <SettingRow
               key={a.key}
@@ -557,34 +541,44 @@ function AppDeliveryPage({
   prefs: NotificationPrefs
   onChange: (p: NotificationPrefs) => void
 }) {
+  const modes = prefs.delivery[app.key] ?? {}
   return (
-    <div className="flex flex-col gap-[var(--layout-space-tight)]">
+    <div className="flex flex-col gap-[var(--layout-space-loose)]">
       <p className="text-body text-fg-secondary">{app.intro}</p>
-      <div className="flex flex-col">
-        {app.events.map((e) => (
-          <SettingRow
-            key={e.key}
-            label={e.label}
-            description={e.description}
-            control={({ labelId }) => (
-              <Select
-                className="w-44"
-                size="sm"
-                aria-label={`${e.label} notifications`}
-                aria-describedby={labelId}
-                options={DELIVERY_OPTIONS}
-                value={prefs.delivery[app.key][e.key]}
-                onChange={(v) =>
-                  onChange({
-                    ...prefs,
-                    delivery: { ...prefs.delivery, [app.key]: { ...prefs.delivery[app.key], [e.key]: v as DeliveryMode } },
-                  })
-                }
+      {app.sections.map((sec) => {
+        const enabled = sec.key ? prefs.sectionEnabled[sec.key] !== false : true
+        return (
+          <SettingSection
+            key={sec.title}
+            title={sec.title}
+            enabled={enabled}
+            onEnabledChange={sec.key ? (v) => onChange({ ...prefs, sectionEnabled: { ...prefs.sectionEnabled, [sec.key as string]: v } }) : undefined}
+          >
+            {sec.events.map((e) => (
+              <SettingRow
+                key={e.key}
+                label={e.label}
+                description={e.description}
+                control={({ labelId }) => (
+                  <Select
+                    className="w-40"
+                    size="sm"
+                    aria-label={`${e.label} notifications`}
+                    aria-describedby={labelId}
+                    // 總開關關閉 → disabled,保留原值(Teams 同)
+                    disabled={!enabled}
+                    options={DELIVERY_OPTIONS}
+                    value={modes[e.key] ?? e.defaultMode}
+                    onChange={(v) =>
+                      onChange({ ...prefs, delivery: { ...prefs.delivery, [app.key]: { ...modes, [e.key]: v as DeliveryMode } } })
+                    }
+                  />
+                )}
               />
-            )}
-          />
-        ))}
-      </div>
+            ))}
+          </SettingSection>
+        )
+      })}
     </div>
   )
 }

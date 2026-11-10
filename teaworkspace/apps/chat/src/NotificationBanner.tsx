@@ -10,14 +10,14 @@
 // 行為(對照 Teams 規格第 3 節流程圖、第 10 節建議):
 // - 一般:10 秒後自動收起(DS Toast 含 action 的預設 10000ms,WCAG 2.2.1);滑鼠停在卡上 / 正在回覆時暫停計時。
 // - 緊急:不自動收起,直到讀取或關閉;Teams 每 2 分鐘再提醒、最多 20 分鐘。
-// - 同一個對話又有新訊息 → 取代原卡、顯示則數(不疊出一排同一個人)。設定 Display › Group notifications 關閉時每則各一張。
+// - 同一個對話又有新訊息 → 取代原卡、顯示則數(不疊出一排同一個人)。設定 Display › Group banners from the same chat 關閉時每則各一張。
 // - 最多同時 3 張(toast.spec.md 同規則),更舊的收起,只留未讀徽章。
 // - 在任何地方讀過 → 卡片收起(規格第 10 節第 3 點)。
 // - 卡上「為什麼收到」一行(規格第 10 節第 1 點)。
 import { useEffect, useRef, useState } from 'react'
 import { Button, Input, ItemAvatar, ItemContent, Tag } from '@qijenchen/design-system'
 import { Check, FileText, HardDrive, ListChecks, MessageCircle, Send, Sparkles, X, type LucideIcon } from 'lucide-react'
-import type { NativeAppKey } from './WorkspaceSettings'
+import { NATIVE_APPS, type NativeAppKey } from './WorkspaceSettings'
 
 export type BannerApp = NativeAppKey | 'agent'
 
@@ -214,7 +214,7 @@ const MAX_VISIBLE = 3
 
 export function useBannerStack() {
   const [items, setItems] = useState<BannerData[]>([])
-  /** group = 設定「Group notifications」:開 → 同 threadKey 收合成一張並累計則數;關 → 每則各一張 */
+  /** group = 設定「Group banners from the same chat」:開 → 同 threadKey 收合成一張並累計則數;關 → 每則各一張 */
   const push = (b: BannerData, group = true) =>
     setItems((list) => {
       if (!group) return [b, ...list].slice(0, MAX_VISIBLE)
@@ -290,7 +290,7 @@ function TimedBanner({
 // ════════════════════════════════════════════════════════════════════════════
 export type IncomingEvent = {
   app: NativeAppKey
-  /** NATIVE_APPS[].events[].key */
+  /** NATIVE_APPS[].sections[].events[].key(Chats:mentionsEveryone / mentionsPersonal / messages / replies / reactions) */
   kind: string
   actorId?: string
   urgent?: boolean
@@ -314,14 +314,17 @@ export function routeNotification(
 ): RouteResult {
   // 1. 寄件人標緊急 → 一律通知(可穿過暫停、勿擾、會議靜音;收件人不能拒收)
   if (e.urgent) return { outcome: 'banner', gate: 'Urgent', reason: undefined }
-  // 2. 這類通知的設定
+  // 2. 這類通知的設定:功能區塊總開關 → 該種通知 Show in banner / Off
+  //    (聊天訊息的未讀數本來就在,所以 Off / 被擋下 = 不跳卡、只剩原本的未讀)
+  const section = NATIVE_APPS.find((a) => a.key === e.app)?.sections.find((sec) => sec.events.some((x) => x.key === e.kind))
+  if (section?.key && prefs.sectionEnabled[section.key] === false) return { outcome: 'badge', gate: `${section.title}: off` }
   const mode = prefs.delivery[e.app]?.[e.kind] ?? 'banner'
-  if (mode === 'off') return { outcome: 'none', gate: 'Delivery: Off' }
-  if (mode === 'badge') return { outcome: 'badge', gate: 'Delivery: Badge only' }
-  // 3. 這個聊天被靜音 → 只有直接 @ 我才放行
-  let reason: string | undefined = e.directMention ? 'You were @mentioned' : undefined
+  if (mode === 'off') return { outcome: 'badge', gate: 'Delivery: Off' }
+  // 3. 這個聊天被靜音 → 只有 Personal @mention 才放行(Everyone @mentions 不放行)
+  const personal = e.kind === 'mentionsPersonal' || e.directMention
+  let reason: string | undefined = personal ? 'You were @mentioned' : e.kind === 'mentionsEveryone' ? 'Everyone in the chat was @mentioned' : undefined
   if (e.muted) {
-    if (!e.directMention) return { outcome: 'none', gate: 'Chat muted' }
+    if (!personal) return { outcome: 'none', gate: 'Chat muted' }
     reason = 'You were @mentioned · this chat is muted'
   }
   // 4. 暫停所有通知 → 只放行優先聯絡人(開著 Let priority contacts through 時)
@@ -331,8 +334,8 @@ export function routeNotification(
     if (!(prefs.allowPriority && isPriority)) return { outcome: 'badge', gate: 'Notifications paused' }
     reason = 'Priority contact · notifications are paused'
   }
-  // 5. 會議中靜音 → 只放行這場會議的聊天
-  if (ctx.inMeeting && prefs.muteInMeetings) {
+  // 5. 會議 / 通話中(Display › Show notifications while "In a Call" status 取消勾選)→ 只放行這場會議的聊天
+  if (ctx.inMeeting && !prefs.showDuringCalls) {
     if (!e.meetingChat) return { outcome: 'badge', gate: 'Muted during meeting' }
     reason = 'From your current meeting'
   }
