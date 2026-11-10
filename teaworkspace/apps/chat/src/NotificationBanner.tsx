@@ -10,7 +10,7 @@
 // 行為(對照 Teams 規格第 3 節流程圖、第 10 節建議):
 // - 一般:10 秒後自動收起(DS Toast 含 action 的預設 10000ms,WCAG 2.2.1);滑鼠停在卡上 / 正在回覆時暫停計時。
 // - 緊急:不自動收起,直到讀取或關閉;Teams 每 2 分鐘再提醒、最多 20 分鐘。
-// - 同一個對話又有新訊息 → 取代原卡、顯示則數(不疊出一排同一個人)。
+// - 同一個對話又有新訊息 → 取代原卡、顯示則數(不疊出一排同一個人)。設定 Display › Group notifications 關閉時每則各一張。
 // - 最多同時 3 張(toast.spec.md 同規則),更舊的收起,只留未讀徽章。
 // - 在任何地方讀過 → 卡片收起(規格第 10 節第 3 點)。
 // - 卡上「為什麼收到」一行(規格第 10 節第 1 點)。
@@ -214,8 +214,10 @@ const MAX_VISIBLE = 3
 
 export function useBannerStack() {
   const [items, setItems] = useState<BannerData[]>([])
-  const push = (b: BannerData) =>
+  /** group = 設定「Group notifications」:開 → 同 threadKey 收合成一張並累計則數;關 → 每則各一張 */
+  const push = (b: BannerData, group = true) =>
     setItems((list) => {
+      if (!group) return [b, ...list].slice(0, MAX_VISIBLE)
       const prev = b.threadKey ? list.find((x) => x.threadKey === b.threadKey) : undefined
       const merged = prev ? { ...b, count: (prev.count ?? 1) + 1 } : b
       const rest = list.filter((x) => !(b.threadKey && x.threadKey === b.threadKey))

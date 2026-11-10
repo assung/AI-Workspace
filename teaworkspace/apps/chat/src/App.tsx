@@ -3116,7 +3116,7 @@ export type ChatVariantConfig = {
   initialAgentRoute?: TAgentRoute
   /** config.agent:一打開就開著 Settings 的哪一頁(story 用;未給 = 不開)。 */
   initialSettingsRoute?: SettingsRoute
-  /** config.agent:開啟後依序送出 3 則示範通知(5 / 12 / 20 秒),照通知設定決定跳不跳橫幅(NotificationBanner.tsx)。 */
+  /** config.agent:開啟後依序送出 4 則示範通知(5 / 8 / 12 / 20 秒;5、8 秒同一聊天,示範 Group notifications),照通知設定決定跳不跳橫幅(NotificationBanner.tsx)。 */
   demoBanners?: boolean
 }
 
@@ -3220,6 +3220,12 @@ export default function App({
         banner: { id: 'demo-dm', threadKey: 'chat:shinichi', app: 'chats', actor: { name: PEOPLE.shinichi.name, avatarUrl: PEOPLE.shinichi.avatar }, body: 'The Lugu Co-op samples arrived. Can you confirm the 20 kg order before 3 PM?', reply: true, time: 'now' },
       },
       {
+        // 同一聊天第 2 則:Group notifications 開 → 收合進上一張(· 2 new messages);關 → 另一張
+        at: 8000,
+        event: { app: 'chats', kind: 'messages', actorId: 'shinichi' },
+        banner: { id: 'demo-dm-2', threadKey: 'chat:shinichi', app: 'chats', actor: { name: PEOPLE.shinichi.name, avatarUrl: PEOPLE.shinichi.avatar }, body: 'If 20 kg is too much, 15 kg still gets us the bulk price.', reply: true, time: 'now' },
+      },
+      {
         at: 12000,
         event: { app: 'chats', kind: 'mentions', actorId: 'guanyu', directMention: true },
         banner: { id: 'demo-mention', threadKey: 'chat:product-team', app: 'chats', context: 'Product Team 產品團隊', actor: { name: PEOPLE.guanyu.name, avatarUrl: PEOPLE.guanyu.avatar }, body: '@Me 我 can you confirm the launch date for the Q4 tasting kit?', reply: true, time: 'now' },
@@ -3233,7 +3239,7 @@ export default function App({
     const timers = script.map(({ at, event, banner }) =>
       window.setTimeout(() => {
         const r = routeNotification(event, notifPrefsRef.current, { inMeeting: false, systemDnd: false })
-        if (r.outcome === 'banner') bannerStack.push({ ...banner, reason: r.reason ?? banner.reason })
+        if (r.outcome === 'banner') bannerStack.push({ ...banner, reason: r.reason ?? banner.reason }, notifPrefsRef.current.groupBanners)
       }, at),
     )
     return () => timers.forEach((t) => window.clearTimeout(t))

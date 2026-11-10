@@ -1,7 +1,8 @@
 // Push banner 情境總覽(2026-11-07)。設計審閱用:每個情境一張真卡 + 對到流程圖哪一關 + 行為說明;
 // 「Play」把那張卡送進右上角的真疊放區,看計時、停留暫停、同對話合併、最多 3 張。
 // UI 文案英文;說明文字中文(給設計 / PM 審閱)。
-import { Button, DataTable, Separator } from '@qijenchen/design-system'
+import { useState } from 'react'
+import { Button, DataTable, Separator, Switch } from '@qijenchen/design-system'
 import { Play } from 'lucide-react'
 import { BannerStack, NotificationBanner, useBannerStack, type BannerData } from './NotificationBanner'
 
@@ -36,8 +37,8 @@ const DELIVERED: Scenario[] = [
   },
   {
     title: 'Chats — 同一對話連續訊息(合併)',
-    gate: '同 threadKey',
-    behavior: '不疊出一排同一個人:新訊息取代舊卡,標題後顯示則數,內文換成最新一則,計時重來。',
+    gate: 'Display › Group notifications = On(預設)',
+    behavior: '不疊出一排同一個人:新訊息取代舊卡,標題後顯示則數,內文換成最新一則,計時重來。設定關閉時每則各一張。',
     data: { id: 'grouped', threadKey: 'chat:kenji', app: 'chats', actor: P.kenji, count: 3, body: 'Also, the roaster is free on Thursday if we need a second batch.', reply: true, time: 'now' },
   },
   {
@@ -117,8 +118,10 @@ const SUPPRESSED_COLUMNS = [
 
 export function BannerGallery() {
   const stack = useBannerStack()
+  // 對應設定 Display › Group notifications;在總覽頁可直接切換,按兩次同一張 Play 看差別
+  const [group, setGroup] = useState(true)
   let n = 0
-  const play = (s: Scenario) => stack.push({ ...s.data, id: `${s.data.id}-${Date.now()}-${n++}`, count: undefined })
+  const play = (s: Scenario) => stack.push({ ...s.data, id: `${s.data.id}-${Date.now()}-${n++}`, count: undefined }, group)
 
   return (
     <div className="h-screen overflow-y-auto bg-canvas text-foreground">
@@ -130,6 +133,13 @@ export function BannerGallery() {
             每張卡對到「Teams 通知決策流程圖」的一道關卡。按 Play 會把卡片送進右上角真的疊放區:10 秒收起、滑鼠停留暫停、同一對話合併、最多 3 張。
             操作回饋的 Toast 在右下,別人找你的 banner 在右上,兩者不搶同一個角落。
           </p>
+          <Switch
+            className="pt-2"
+            label="Group notifications"
+            description="對應設定 Display › Group notifications。開:同一來源連按 Play 會收合成一張並累計則數;關:每則各一張。"
+            checked={group}
+            onCheckedChange={setGroup}
+          />
         </header>
 
         <ScenarioSection title="會跳橫幅:各 app 的一般情境" items={DELIVERED} onPlay={play} />

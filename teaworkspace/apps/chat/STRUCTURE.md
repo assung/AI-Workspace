@@ -466,7 +466,7 @@ user：「我想照我寫好的對話劇本來演示」→ 劇本 `K8S_IMAGEPULL
 - 設定列 `SettingRow` = DS `ItemContent`（label + description）左、控制項右，flush rows + 分隔線（item-anatomy.spec.md settings row 6 家共識）。不用 Field horizontal：它的 description 落在控制項欄，不在 label 下方。
 - Notifications 頁三區：
   - **Focus**：Pause notifications（Pause ▾：For 1 hour / For 2 hours / For the rest of today / Until I turn them back on；暫停中變 Resume + 「Paused until …」）、Let priority contacts through、Priority contacts（Edit → 子頁）、Mute during meetings and calls、Follow Do Not Disturb on this computer（預設開，規格第 10 節第 8 點）。
-  - **Display**：Show message preview（橫幅內文）、Play sound。
+  - **Display**：Show message preview（橫幅內文）、Group notifications（預設開；同一來源的橫幅收合成一張並累計則數，關閉 = 每則各一張；2026-11-10 user 新增）、Play sound。
   - **Native apps**：Chats / Tasks / Docs / Drive，各一列 Edit → 子頁；子頁每種通知一個 Select：Banner and badge / Badge only / Off（tWorkspace 沒有活動摘要，被擋下的通知只留未讀徽章，2026-11-07 user 決定）。
 - Priority contacts 子頁：上方 PeoplePicker 加人，下方逐列（ItemAvatar block + 名字 + 職稱 + Remove）。
 - 流程圖關卡 → 控制項對照寫在檔頭註解。
@@ -480,9 +480,9 @@ user：「我想照我寫好的對話劇本來演示」→ 劇本 `K8S_IMAGEPULL
 App 內通知卡（別人找你）。**不用 DS Toast**：toast.spec.md 規定需要使用者處理的內容不放 Toast；本卡要在卡上回覆 / 核准（專案目標 2）。外框值全部沿用 Toast / Notice：寬 360、`rounded-lg` + `--elevation-200`、`px-4 py-3`、`z-[60]`、離視窗邊 24px。
 
 - 結構：來源列（app 圖示 + app · 脈絡 + 時間 + Urgent 標籤 + 關閉）→ 內容列（Family 2：ItemAvatar block / 沒有發送人時 app 圖示圓底 + ItemContent，整列可點 = 打開來源）→「為什麼收到」一行 → 動作列（Reply 展開就地回覆輸入框；最多 2 個 Button）。動作完成 → 卡片換成結果句（Reply sent / Access granted…），3 秒後收起。
-- `BannerStack`：**右上角**（Toast 在右下 = 操作回饋，banner = 別人找你，不搶同一角）。最新在上、最多 3 張、同 `threadKey` 取代並累計則數；10 秒收起（DS Toast 含 action 的預設），滑鼠停留 / 回覆中暫停；Urgent 不自動收起、`role="alert"`。
+- `BannerStack`：**右上角**（Toast 在右下 = 操作回饋，banner = 別人找你，不搶同一角）。最新在上、最多 3 張、同 `threadKey` 取代並累計則數（`push(b, group)`，group = 設定 Group notifications，關閉時不收合）；10 秒收起（DS Toast 含 action 的預設），滑鼠停留 / 回覆中暫停；Urgent 不自動收起、`role="alert"`。
 - `routeNotification(event, prefs, ctx)`：照流程圖第 1 張圖關卡順序 → `banner` / `badge` / `none`，並回傳「為什麼收到」的句子。緊急 → 類別設定 → 聊天靜音（直接 @ 放行）→ 暫停（優先聯絡人放行）→ 會議中靜音（本場會議聊天放行）→ 系統勿擾。
-- App：`config.demoBanners`（demo 預設開）→ 5 / 12 / 20 秒送出 Shinichi 一對一訊息、Guan-Yu 在 Product Team @我、Ya-Ting 申請 Drive 存取；每則先過 `routeNotification`。點聊天卡 → 切到 Chat 分頁該聊天室；Drive 卡 → Drive 分頁。被擋下的通知目前沒有實際加到未讀徽章（示範資料）。
+- App：`config.demoBanners`（demo 預設開）→ 5 / 8 / 12 / 20 秒送出 Shinichi 一對一訊息兩則（示範收合）、Guan-Yu 在 Product Team @我、Ya-Ting 申請 Drive 存取；每則先過 `routeNotification`。點聊天卡 → 切到 Chat 分頁該聊天室；Drive 卡 → Drive 分頁。被擋下的通知目前沒有實際加到未讀徽章（示範資料）。
 - `BannerGallery`：情境總覽頁（說明中文、UI 英文）；demo 網址 `#banners`。Story：`Apps/chat/Settings` › Push banner 情境總覽 / Push banner 實際觸發。
 - demo 入口 hash：`#banners` = 總覽、`#notification-settings` = 打開就是 Settings › Notifications（claude.ai 保留 `#settings`，不能用）。
 

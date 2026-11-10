@@ -71,6 +71,8 @@ export type NotificationPrefs = {
   muteInMeetings: boolean
   followSystemFocus: boolean
   showPreview: boolean
+  /** 同一來源(同一聊天 / 任務 / 檔案)的橫幅收合成一張;關閉 = 每則各一張(2026-11-10 user 新增,預設開) */
+  groupBanners: boolean
   playSound: boolean
   delivery: Record<NativeAppKey, Record<string, DeliveryMode>>
 }
@@ -144,6 +146,7 @@ export function defaultNotificationPrefs(priorityIds: string[] = []): Notificati
     // 規格第 10 節第 8 點:預設就尊重系統勿擾(Teams 的 Windows 連動預設關,這裡刻意不同)
     followSystemFocus: true,
     showPreview: true,
+    groupBanners: true,
     playSound: true,
     delivery,
   }
@@ -507,6 +510,12 @@ function NotificationsPage({
           description="Show the message text in banners. Turn off to show only who sent it."
           checked={prefs.showPreview}
           onCheckedChange={(v) => onChange({ ...prefs, showPreview: v })}
+        />
+        <SwitchRow
+          label="Group notifications"
+          description="Combine banners from the same chat, task, or file into one. Turn off to show each one separately."
+          checked={prefs.groupBanners}
+          onCheckedChange={(v) => onChange({ ...prefs, groupBanners: v })}
         />
         <SwitchRow
           label="Play sound"
