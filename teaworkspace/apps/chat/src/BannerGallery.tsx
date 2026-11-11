@@ -2,9 +2,9 @@
 // 「Play」把那張卡送進右上角的真疊放區,看計時、停留暫停、同對話合併、最多 3 張。
 // UI 文案英文;說明文字中文(給設計 / PM 審閱)。
 import { useState } from 'react'
-import { Button, Checkbox, DataTable, Separator } from '@qijenchen/design-system'
+import { Button, Checkbox, DataTable, RadioGroup, RadioGroupItem, Separator } from '@qijenchen/design-system'
 import { Play } from 'lucide-react'
-import { BannerStack, NotificationBanner, useBannerStack, type BannerData } from './NotificationBanner'
+import { BannerStack, NotificationBanner, useBannerStack, type BannerData, type BannerSize } from './NotificationBanner'
 
 const AVATAR: Record<string, string> = Object.fromEntries(
   Object.entries(import.meta.glob<string>('./assets/avatars/*.jpg', { eager: true, import: 'default' })).map(
@@ -40,6 +40,17 @@ const DELIVERED: Scenario[] = [
     gate: 'Chats › @Mentions › Everyone in the chat @mentions',
     behavior: '@所有人 的廣播。「為什麼收到」寫 Everyone in the chat was @mentioned,跟點名自己的 Personal @mention 分開;在已靜音的聊天不會跳。',
     data: { id: 'everyone', threadKey: 'chat:tea-team', app: 'chats', context: 'Tea Tasting 品茶小組', actor: P.kenji, body: '@everyone Friday’s blind tasting moves to 3 PM in room No.3.', reason: 'Everyone in the chat was @mentioned', reply: true, time: 'now' },
+  },
+  {
+    title: 'Chats — 群組裡的轉傳訊息',
+    gate: 'Chats › Messages › New messages = Show in banner',
+    behavior: '名字是轉傳的人;他附的話放上面,原訊息放在引用框裡,標出原作者(對照 Teams 聊天裡轉傳訊息的外框與 Forwarded 標頭)。Reply 回的是群組,不是原作者。Compact 收成一行「Forwarded a message from …」。',
+    data: {
+      id: 'forward', threadKey: 'chat:product-team', app: 'chats', context: 'Product Team 產品團隊', actor: P.yui,
+      body: 'FYI, this changes our packaging timeline.',
+      forwarded: { from: 'Haibara Ai 灰原哀', body: 'Lab results for batch #3 are in. Moisture is 0.4% over spec, so the lot needs another drying pass.' },
+      reply: true, time: 'now',
+    },
   },
   {
     title: 'Chats — 同一對話連續訊息(合併)',
@@ -102,6 +113,8 @@ export function BannerGallery() {
   const stack = useBannerStack()
   // 對應設定 Display › Group banners from the same chat;在總覽頁可直接切換,按兩次同一張 Play 看差別
   const [group, setGroup] = useState(true)
+  // 對應設定 Display › Size(Comfy / Compact);上方切換 = 整頁情境卡 + 疊放區一起換
+  const [size, setSize] = useState<BannerSize>('comfy')
   let n = 0
   const play = (s: Scenario) => stack.push({ ...s.data, id: `${s.data.id}-${Date.now()}-${n++}`, count: undefined }, group)
 
@@ -122,11 +135,20 @@ export function BannerGallery() {
             checked={group}
             onCheckedChange={(v) => setGroup(v === true)}
           />
+          <div className="flex flex-col gap-2 pt-2">
+            <span id="gallery-size" className="text-body text-foreground">Size(對應設定 Display › Change the size of your message and content previews)</span>
+            <RadioGroup aria-labelledby="gallery-size" value={size} onValueChange={(v) => setSize(v as BannerSize)} className="flex gap-6">
+              <RadioGroupItem value="comfy" label="Comfy" />
+              <RadioGroupItem value="compact" label="Compact" />
+            </RadioGroup>
+          </div>
         </header>
 
-        <ScenarioSection title="會跳橫幅:Chats 的一般情境" items={DELIVERED} onPlay={play} />
+        <SizeComparison />
         <Separator />
-        <ScenarioSection title="會跳橫幅:流程圖關卡造成的變體" items={VARIANTS} onPlay={play} />
+        <ScenarioSection title="會跳橫幅:Chats 的一般情境" items={DELIVERED} onPlay={play} size={size} />
+        <Separator />
+        <ScenarioSection title="會跳橫幅:流程圖關卡造成的變體" items={VARIANTS} onPlay={play} size={size} />
         <Separator />
 
         <section className="flex flex-col gap-4">
@@ -140,12 +162,46 @@ export function BannerGallery() {
           />
         </section>
       </div>
-      <BannerStack items={stack.items} onDismiss={stack.dismiss} showPreview />
+      <BannerStack items={stack.items} onDismiss={stack.dismiss} showPreview size={size} />
     </div>
   )
 }
 
-function ScenarioSection({ title, items, onPlay }: { title: string; items: Scenario[]; onPlay: (s: Scenario) => void }) {
+/** Comfy / Compact 並排:同一則通知兩種尺寸,看資訊取捨 */
+const COMPARE_IDS = ['mention', 'forward', 'grouped', 'urgent']
+function SizeComparison() {
+  const all = [...DELIVERED, ...VARIANTS]
+  const rows = COMPARE_IDS.map((id) => all.find((x) => x.data.id === id)).filter(Boolean) as Scenario[]
+  return (
+    <section className="flex flex-col gap-6">
+      <div className="flex flex-col gap-2">
+        <h2 className="text-h5 font-semibold">Comfy 與 Compact</h2>
+        <p className="max-w-[68ch] text-body text-fg-secondary">
+          Teams 的 Display 設定可選 Comfy 或 Compact(預設 Comfy)。Teams 沒公開兩者的版面差異,以下是我們的定義:
+          Compact 把來源併到名字後面、內文只留一行,收掉「為什麼收到」和按鈕列,只留 Reply 圖示鈕;Urgent 標籤兩種都保留。寬度、陰影、計時規則相同。
+        </p>
+      </div>
+      <div className="grid grid-cols-1 gap-x-10 gap-y-6 lg:grid-cols-2">
+        <h3 className="text-body font-semibold max-lg:hidden">Comfy</h3>
+        <h3 className="text-body font-semibold max-lg:hidden">Compact</h3>
+        {rows.map((r) => (
+          <div key={r.data.id} className="contents">
+            <div className="flex min-w-0 flex-col gap-2">
+              <p className="text-caption text-fg-secondary lg:hidden">Comfy</p>
+              <NotificationBanner data={r.data} size="comfy" onDismiss={() => {}} onOpen={() => {}} />
+            </div>
+            <div className="flex min-w-0 flex-col gap-2">
+              <p className="text-caption text-fg-secondary lg:hidden">Compact</p>
+              <NotificationBanner data={r.data} size="compact" onDismiss={() => {}} onOpen={() => {}} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function ScenarioSection({ title, items, onPlay, size }: { title: string; items: Scenario[]; onPlay: (s: Scenario) => void; size: BannerSize }) {
   return (
     <section className="flex flex-col gap-6">
       <h2 className="text-h5 font-semibold">{title}</h2>
@@ -159,7 +215,7 @@ function ScenarioSection({ title, items, onPlay }: { title: string; items: Scena
               </div>
               <Button variant="secondary" size="sm" startIcon={Play} onClick={() => onPlay(s)}>Play</Button>
             </div>
-            <NotificationBanner data={s.data} showPreview={s.showPreview ?? true} onDismiss={() => {}} onOpen={() => {}} />
+            <NotificationBanner data={s.data} size={size} showPreview={s.showPreview ?? true} onDismiss={() => {}} onOpen={() => {}} />
             <p className="max-w-[60ch] text-body text-fg-secondary">{s.behavior}</p>
           </article>
         ))}

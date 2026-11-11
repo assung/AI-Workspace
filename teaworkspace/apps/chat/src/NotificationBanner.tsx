@@ -16,7 +16,7 @@
 // - 卡上「為什麼收到」一行(規格第 10 節第 1 點)。
 import { useEffect, useRef, useState } from 'react'
 import { Button, Input, ItemAvatar, ItemContent, Tag } from '@qijenchen/design-system'
-import { Check, FileText, HardDrive, ListChecks, MessageCircle, Send, Sparkles, X, type LucideIcon } from 'lucide-react'
+import { Check, FileText, Forward, HardDrive, ListChecks, MessageCircle, Reply, Send, Sparkles, X, type LucideIcon } from 'lucide-react'
 import { NATIVE_APPS, type NativeAppKey } from './WorkspaceSettings'
 
 export type BannerApp = NativeAppKey | 'agent'
@@ -56,7 +56,12 @@ export type BannerData = {
   reply?: boolean
   actions?: BannerAction[]
   time?: string
+  /** 轉傳的訊息(2026-11-11):body = 轉傳者附的話(可空),原訊息放引用框 */
+  forwarded?: { from: string; body: string }
 }
+
+/** 卡片尺寸(2026-11-11):對標 Teams Display「Change the size of your message and content previews. Choose Comfy or Compact.」 */
+export type BannerSize = 'comfy' | 'compact'
 
 /** 單張卡(靜態渲染也能用:情境總覽頁直接排出來) */
 export function NotificationBanner({
@@ -65,8 +70,10 @@ export function NotificationBanner({
   onOpen,
   onInteractingChange,
   showPreview = true,
+  size = 'comfy',
 }: {
   data: BannerData
+  size?: BannerSize
   onDismiss?: () => void
   onOpen?: () => void
   /** 回覆中 / 滑鼠停留 → 暫停自動收起 */
@@ -90,6 +97,80 @@ export function NotificationBanner({
   const name = data.actor?.name ?? data.title ?? meta.label
   const body = showPreview ? data.body : previewOffText(data)
   const sourceLine = [meta.label, data.context].filter(Boolean).join(' · ')
+  const countText = data.count && data.count > 1 ? ` · ${data.count} new messages` : ''
+
+  const replyForm = (
+    <form
+      className={`flex items-center gap-2 ${size === 'compact' ? 'pl-8' : 'pl-11'}`}
+      onSubmit={(e) => {
+        e.preventDefault()
+        if (!draft.trim()) return
+        setReplying(false)
+        setResult('Reply sent')
+      }}
+    >
+      <Input
+        size="sm"
+        autoFocus
+        aria-label={`Reply to ${name}`}
+        placeholder={`Reply to ${name.split(' ')[0]}`}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setReplying(false) } }}
+        className="min-w-0 flex-1"
+      />
+      <Button type="submit" variant="primary" size="sm" iconOnly startIcon={Send} aria-label="Send reply" disabled={!draft.trim()} />
+    </form>
+  )
+
+  const resultRow = (
+    <div className="flex items-center gap-2 text-body" role="status">
+      <Check size={16} className="shrink-0 text-success-text" aria-hidden />
+      <span>{result}</span>
+    </div>
+  )
+
+  // ── Compact:一行身分 + 一行內文;來源併入名字後、「為什麼收到」與按鈕列收掉,只留 Reply 圖示鈕(就地回覆仍可用)
+  if (size === 'compact') {
+    const compactBody = data.forwarded && showPreview
+      ? `Forwarded a message from ${data.forwarded.from}${data.body ? ` · ${data.body}` : ''}`
+      : body
+    return (
+      <div
+        role={data.urgent ? 'alert' : 'status'}
+        aria-label={`${data.urgent ? 'Urgent: ' : ''}${name}${data.context ? ` in ${data.context}` : ''}`}
+        className="w-[360px] max-w-full overflow-hidden rounded-lg bg-surface-raised text-foreground"
+        style={{ boxShadow: 'var(--elevation-200)' }}
+      >
+        <div className="flex flex-col gap-2 px-4 py-2">
+          {result ? resultRow : (
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={onOpen} className="-mx-1 flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-1 text-left hover:bg-neutral-hover">
+                {data.actor ? (
+                  <ItemAvatar mode="inline" src={data.actor.avatarUrl} alt={data.actor.name} />
+                ) : (
+                  <AppIcon size={16} className="shrink-0 text-primary" aria-hidden />
+                )}
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-body">
+                    <span className="font-semibold">{name}</span>
+                    <span className="text-fg-secondary">{data.context ? ` in ${data.context}` : ''}{countText}</span>
+                  </span>
+                  <span className="truncate text-body text-fg-secondary">{compactBody}</span>
+                </span>
+              </button>
+              {data.urgent && <Tag color="red" solid size="sm">Urgent</Tag>}
+              {data.reply && !replying && (
+                <Button variant="text" size="sm" iconOnly startIcon={Reply} aria-label={`Reply to ${name}`} onClick={() => setReplying(true)} />
+              )}
+              {onDismiss && <Button variant="text" size="sm" iconOnly dismiss startIcon={X} aria-label="Dismiss notification" onClick={onDismiss} />}
+            </div>
+          )}
+          {!result && replying && replyForm}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div
@@ -108,12 +189,7 @@ export function NotificationBanner({
           {onDismiss && <Button variant="text" size="sm" iconOnly dismiss startIcon={X} aria-label="Dismiss notification" onClick={onDismiss} />}
         </div>
 
-        {result ? (
-          <div className="flex items-center gap-2 text-body" role="status">
-            <Check size={16} className="shrink-0 text-success-text" aria-hidden />
-            <span>{result}</span>
-          </div>
-        ) : (
+        {result ? resultRow : (
           <>
             {/* 內容列(Family 2):頭像 + label / description;點內容 = 打開來源 */}
             <button
@@ -134,10 +210,26 @@ export function NotificationBanner({
                 label={
                   <span className="font-semibold">
                     {name}
-                    {data.count && data.count > 1 ? <span className="font-normal text-fg-secondary"> · {data.count} new messages</span> : null}
+                    {countText ? <span className="font-normal text-fg-secondary">{countText}</span> : null}
                   </span>
                 }
-                description={<span className="line-clamp-2">{body}</span>}
+                description={
+                  data.forwarded && showPreview ? (
+                    <span className="flex flex-col gap-2">
+                      {data.body && <span className="line-clamp-2">{data.body}</span>}
+                      {/* 轉傳引用框:對照 Teams 聊天裡轉傳訊息的外框 + 「Forwarded」標頭(原作者 + 原文) */}
+                      <span className="flex flex-col gap-1 rounded-md border border-divider px-3 py-2">
+                        <span className="flex items-center gap-1 text-caption text-fg-secondary">
+                          <Forward size={16} aria-hidden />
+                          Forwarded from {data.forwarded.from}
+                        </span>
+                        <span className="line-clamp-2 text-foreground">{data.forwarded.body}</span>
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="line-clamp-2">{body}</span>
+                  )
+                }
               />
             </button>
 
@@ -146,27 +238,7 @@ export function NotificationBanner({
             )}
 
             {replying ? (
-              <form
-                className="flex items-center gap-2 pl-11"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  if (!draft.trim()) return
-                  setReplying(false)
-                  setResult('Reply sent')
-                }}
-              >
-                <Input
-                  size="sm"
-                  autoFocus
-                  aria-label={`Reply to ${name}`}
-                  placeholder={`Reply to ${name.split(' ')[0]}`}
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setReplying(false) } }}
-                  className="min-w-0 flex-1"
-                />
-                <Button type="submit" variant="primary" size="sm" iconOnly startIcon={Send} aria-label="Send reply" disabled={!draft.trim()} />
-              </form>
+              replyForm
             ) : (data.reply || data.actions?.length) ? (
               <div className="flex flex-wrap items-center gap-2 pl-11">
                 {data.reply && (
@@ -198,7 +270,9 @@ export function NotificationBanner({
 /** 預覽關閉時的內文:只說誰做了什麼(Teams「Show message preview」關閉同) */
 function previewOffText(d: BannerData) {
   switch (d.app) {
-    case 'chats': return d.context ? `New message in ${d.context}` : 'Sent you a message'
+    case 'chats':
+      if (d.forwarded) return d.context ? `Forwarded a message in ${d.context}` : 'Forwarded you a message'
+      return d.context ? `New message in ${d.context}` : 'Sent you a message'
     case 'docs': return 'Commented on a doc'
     case 'tasks': return 'Task update'
     case 'drive': return 'Drive update'
@@ -234,11 +308,13 @@ export function BannerStack({
   onDismiss,
   onOpen,
   showPreview,
+  size = 'comfy',
 }: {
   items: BannerData[]
   onDismiss: (id: string) => void
   onOpen?: (b: BannerData) => void
   showPreview: boolean
+  size?: BannerSize
 }) {
   return (
     <section
@@ -246,7 +322,7 @@ export function BannerStack({
       className="pointer-events-none fixed right-6 top-6 z-[60] flex flex-col gap-2"
     >
       {items.map((b) => (
-        <TimedBanner key={b.id + (b.count ?? 1)} data={b} onDismiss={() => onDismiss(b.id)} onOpen={onOpen ? () => { onOpen(b); onDismiss(b.id) } : undefined} showPreview={showPreview} />
+        <TimedBanner key={b.id + (b.count ?? 1)} data={b} size={size} onDismiss={() => onDismiss(b.id)} onOpen={onOpen ? () => { onOpen(b); onDismiss(b.id) } : undefined} showPreview={showPreview} />
       ))}
     </section>
   )
@@ -254,11 +330,13 @@ export function BannerStack({
 
 function TimedBanner({
   data,
+  size,
   onDismiss,
   onOpen,
   showPreview,
 }: {
   data: BannerData
+  size: BannerSize
   onDismiss: () => void
   onOpen?: () => void
   showPreview: boolean
@@ -279,7 +357,7 @@ function TimedBanner({
   }, [paused, onDismiss])
   return (
     <div className="pointer-events-auto" onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
-      <NotificationBanner data={data} onDismiss={onDismiss} onOpen={onOpen} onInteractingChange={setInteracting} showPreview={showPreview} />
+      <NotificationBanner data={data} size={size} onDismiss={onDismiss} onOpen={onOpen} onInteractingChange={setInteracting} showPreview={showPreview} />
     </div>
   )
 }

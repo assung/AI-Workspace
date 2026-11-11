@@ -34,6 +34,8 @@ import {
   ItemContent,
   ItemIcon,
   PeoplePicker,
+  RadioGroup,
+  RadioGroupItem,
   Select,
   Switch,
   toast,
@@ -74,6 +76,8 @@ export type NotificationPrefs = {
   showPreview: boolean
   /** Display › Group banners from the same chat(2026-11-10 user 新增,預設開);關閉 = 每則各一張 */
   groupBanners: boolean
+  /** Display › Size:Comfy / Compact(對標 Teams,預設 Comfy;2026-11-11) */
+  bannerSize: 'comfy' | 'compact'
   delivery: Partial<Record<NativeAppKey, Record<string, DeliveryMode>>>
   /** 功能區塊總開關(key = EventSection.key);關閉 → 該區塊通知全部不送,子項保留原值 */
   sectionEnabled: Record<string, boolean>
@@ -132,6 +136,7 @@ export function defaultNotificationPrefs(priorityIds: string[] = []): Notificati
     followSystemFocus: true,
     showPreview: true,
     groupBanners: true,
+    bannerSize: 'comfy',
     delivery,
     sectionEnabled,
   }
@@ -507,6 +512,7 @@ function NotificationsPage({
             onCheckedChange={(v) => onChange({ ...prefs, groupBanners: v === true })}
           />
         </CheckboxList>
+        <BannerSizeField value={prefs.bannerSize} onChange={(v) => onChange({ ...prefs, bannerSize: v })} />
       </SettingSection>
 
       <SettingSection title="Native apps">
@@ -528,6 +534,20 @@ function NotificationsPage({
           )
         })}
       </SettingSection>
+    </div>
+  )
+}
+
+/** Display › Size(Teams 文案:Change the size of your message and content previews. Choose Comfy or Compact.) */
+function BannerSizeField({ value, onChange }: { value: 'comfy' | 'compact'; onChange: (v: 'comfy' | 'compact') => void }) {
+  const id = useId()
+  return (
+    <div className="flex flex-col gap-2 py-2">
+      <span id={id} className="text-body text-foreground">Change the size of your message and content previews.</span>
+      <RadioGroup aria-labelledby={id} value={value} onValueChange={(v) => onChange(v as 'comfy' | 'compact')} className="flex flex-col gap-2">
+        <RadioGroupItem value="comfy" label="Comfy" description="Shows where it came from, two lines of the message, and actions like Reply." />
+        <RadioGroupItem value="compact" label="Compact" description="One line of the message. Reply is still one click away." />
+      </RadioGroup>
     </div>
   )
 }

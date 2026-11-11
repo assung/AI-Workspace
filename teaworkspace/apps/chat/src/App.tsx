@@ -3570,6 +3570,7 @@ export default function App({
         items={bannerStack.items}
         onDismiss={bannerStack.dismiss}
         showPreview={notifPrefs.showPreview}
+        size={notifPrefs.bannerSize}
         onOpen={(b) => {
           const roomId = b.threadKey?.startsWith('chat:') ? b.threadKey.slice(5) : undefined
           if (roomId && rooms.some((r) => r.id === roomId)) { handleNavTabChange('chat'); setActiveId(roomId) }
