@@ -115,7 +115,7 @@ export function BannerGallery() {
   const [group, setGroup] = useState(true)
   // 對應設定 Display › Size(Comfy / Compact);上方切換 = 整頁情境卡 + 疊放區一起換
   const [size, setSize] = useState<BannerSize>('comfy')
-  // 對應設定 Display › Banners on screen(3–5,預設 3)
+  // 對應設定 Display › Show this many notifications on screen at once(3–5,預設 3)
   const [max, setMax] = useState(3)
   let n = 0
   const play = (s: Scenario) => stack.push({ ...s.data, id: `${s.data.id}-${Date.now()}-${n++}`, count: undefined }, group, max)
@@ -145,11 +145,11 @@ export function BannerGallery() {
             </RadioGroup>
           </div>
           <div className="flex items-center gap-3 pt-2">
-            <span id="gallery-max" className="text-body text-foreground">Banners on screen(對應設定 Display 的同名選項)</span>
+            <span id="gallery-max" className="text-body text-foreground">Show this many notifications on screen at once(對應設定 Display 的同名選項)</span>
             <Select
               className="w-40"
               size="sm"
-              aria-label="Banners on screen"
+              aria-label="Show this many notifications on screen at once"
               options={[{ value: '3', label: '3 (default)' }, { value: '4', label: '4' }, { value: '5', label: '5' }]}
               value={String(max)}
               onChange={(v) => setMax(Number(v))}

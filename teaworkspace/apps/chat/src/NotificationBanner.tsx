@@ -285,7 +285,7 @@ function previewOffText(d: BannerData) {
 // 疊放區(右上角;Toast 在右下 = 操作回饋,banner 在右上 = 別人找你,兩者不搶同一角)
 // ════════════════════════════════════════════════════════════════════════════
 const AUTO_HIDE_MS = 10000
-/** 同時顯示張數:預設 3(toast.spec.md 同規則);設定 Display › Banners on screen 可選 3–5(2026-11-12 user) */
+/** 同時顯示張數:預設 3(toast.spec.md 同規則);設定 Display › Show this many notifications on screen at once 可選 3–5(2026-11-12 user) */
 export const DEFAULT_MAX_VISIBLE = 3
 
 export function useBannerStack() {
