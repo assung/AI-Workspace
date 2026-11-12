@@ -1,8 +1,8 @@
 // Push banner 情境總覽(2026-11-07)。設計審閱用:每個情境一張真卡 + 對到流程圖哪一關 + 行為說明;
-// 「Play」把那張卡送進右上角的真疊放區,看計時、停留暫停、同對話合併、最多 3 張。
+// 「Play」把那張卡送進右上角的真疊放區,看計時、停留暫停、同對話合併、同時張數(預設 3,可設 3–5)。
 // UI 文案英文;說明文字中文(給設計 / PM 審閱)。
 import { useState } from 'react'
-import { Button, Checkbox, DataTable, RadioGroup, RadioGroupItem, Separator } from '@qijenchen/design-system'
+import { Button, Checkbox, DataTable, RadioGroup, RadioGroupItem, Select, Separator } from '@qijenchen/design-system'
 import { Play } from 'lucide-react'
 import { BannerStack, NotificationBanner, useBannerStack, type BannerData, type BannerSize } from './NotificationBanner'
 
@@ -115,8 +115,10 @@ export function BannerGallery() {
   const [group, setGroup] = useState(true)
   // 對應設定 Display › Size(Comfy / Compact);上方切換 = 整頁情境卡 + 疊放區一起換
   const [size, setSize] = useState<BannerSize>('comfy')
+  // 對應設定 Display › Banners on screen(3–5,預設 3)
+  const [max, setMax] = useState(3)
   let n = 0
-  const play = (s: Scenario) => stack.push({ ...s.data, id: `${s.data.id}-${Date.now()}-${n++}`, count: undefined }, group)
+  const play = (s: Scenario) => stack.push({ ...s.data, id: `${s.data.id}-${Date.now()}-${n++}`, count: undefined }, group, max)
 
   return (
     <div className="h-screen overflow-y-auto bg-canvas text-foreground">
@@ -125,7 +127,7 @@ export function BannerGallery() {
           <p className="text-caption font-semibold uppercase tracking-wide text-fg-secondary">tWorkspace · In-app notifications · Chats</p>
           <h1 className="text-h3 font-semibold">Push banner scenarios</h1>
           <p className="max-w-[68ch] text-body text-fg-secondary">
-            每張卡對到「Teams 通知決策流程圖」的一道關卡。按 Play 會把卡片送進右上角真的疊放區:10 秒收起、滑鼠停留暫停、同一對話合併、最多 3 張。
+            每張卡對到「Teams 通知決策流程圖」的一道關卡。按 Play 會把卡片送進右上角真的疊放區:10 秒收起、滑鼠停留暫停、同一對話合併、同時張數上限(預設 3 張,可改 3–5)。
             操作回饋的 Toast 在右下,別人找你的 banner 在右上,兩者不搶同一個角落。
           </p>
           <Checkbox
@@ -141,6 +143,17 @@ export function BannerGallery() {
               <RadioGroupItem value="comfy" label="Comfy" />
               <RadioGroupItem value="compact" label="Compact" />
             </RadioGroup>
+          </div>
+          <div className="flex items-center gap-3 pt-2">
+            <span id="gallery-max" className="text-body text-foreground">Banners on screen(對應設定 Display 的同名選項)</span>
+            <Select
+              className="w-40"
+              size="sm"
+              aria-label="Banners on screen"
+              options={[{ value: '3', label: '3 (default)' }, { value: '4', label: '4' }, { value: '5', label: '5' }]}
+              value={String(max)}
+              onChange={(v) => setMax(Number(v))}
+            />
           </div>
         </header>
 

@@ -78,6 +78,8 @@ export type NotificationPrefs = {
   groupBanners: boolean
   /** Display › Size:Comfy / Compact(對標 Teams,預設 Comfy;2026-11-11) */
   bannerSize: 'comfy' | 'compact'
+  /** Display › Banners on screen:同時最多幾張,3–5,預設 3(2026-11-12 user) */
+  maxBanners: 3 | 4 | 5
   delivery: Partial<Record<NativeAppKey, Record<string, DeliveryMode>>>
   /** 功能區塊總開關(key = EventSection.key);關閉 → 該區塊通知全部不送,子項保留原值 */
   sectionEnabled: Record<string, boolean>
@@ -137,10 +139,17 @@ export function defaultNotificationPrefs(priorityIds: string[] = []): Notificati
     showPreview: true,
     groupBanners: true,
     bannerSize: 'comfy',
+    maxBanners: 3,
     delivery,
     sectionEnabled,
   }
 }
+
+const MAX_BANNER_OPTIONS = [
+  { value: '3', label: '3 (default)' },
+  { value: '4', label: '4' },
+  { value: '5', label: '5' },
+]
 
 const DELIVERY_OPTIONS = [
   { value: 'banner', label: 'Show in banner' },
@@ -513,6 +522,21 @@ function NotificationsPage({
           />
         </CheckboxList>
         <BannerSizeField value={prefs.bannerSize} onChange={(v) => onChange({ ...prefs, bannerSize: v })} />
+        <SettingRow
+          label="Banners on screen"
+          description="The most banners shown at once. Older ones close when a new one arrives."
+          control={({ labelId }) => (
+            <Select
+              className="w-40"
+              size="sm"
+              aria-label="Banners on screen"
+              aria-describedby={labelId}
+              options={MAX_BANNER_OPTIONS}
+              value={String(prefs.maxBanners)}
+              onChange={(v) => onChange({ ...prefs, maxBanners: Number(v) as 3 | 4 | 5 })}
+            />
+          )}
+        />
       </SettingSection>
 
       <SettingSection title="Native apps">

@@ -11,10 +11,11 @@
 // - 一般:10 秒後自動收起(DS Toast 含 action 的預設 10000ms,WCAG 2.2.1);滑鼠停在卡上 / 正在回覆時暫停計時。
 // - 緊急:不自動收起,直到讀取或關閉;Teams 每 2 分鐘再提醒、最多 20 分鐘。
 // - 同一個對話又有新訊息 → 取代原卡、顯示則數(不疊出一排同一個人)。設定 Display › Group banners from the same chat 關閉時每則各一張。
-// - 最多同時 3 張(toast.spec.md 同規則),更舊的收起,只留未讀徽章。
+// - 同時最多 3 張(預設,toast.spec.md 同規則;設定可改 3–5),更舊的收起,只留未讀數。
+//   張數多時(5 張 Comfy 約 1000px)放不下的整張先不顯示(最舊的先藏),不露出半張;視窗變大再出現。
 // - 在任何地方讀過 → 卡片收起(規格第 10 節第 3 點)。
 // - 卡上「為什麼收到」一行(規格第 10 節第 1 點)。
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Button, Input, ItemAvatar, ItemContent, Tag } from '@qijenchen/design-system'
 import { Check, FileText, Forward, HardDrive, ListChecks, MessageCircle, Reply, Send, Sparkles, X, type LucideIcon } from 'lucide-react'
 import { NATIVE_APPS, type NativeAppKey } from './WorkspaceSettings'
@@ -284,18 +285,19 @@ function previewOffText(d: BannerData) {
 // 疊放區(右上角;Toast 在右下 = 操作回饋,banner 在右上 = 別人找你,兩者不搶同一角)
 // ════════════════════════════════════════════════════════════════════════════
 const AUTO_HIDE_MS = 10000
-const MAX_VISIBLE = 3
+/** 同時顯示張數:預設 3(toast.spec.md 同規則);設定 Display › Banners on screen 可選 3–5(2026-11-12 user) */
+export const DEFAULT_MAX_VISIBLE = 3
 
 export function useBannerStack() {
   const [items, setItems] = useState<BannerData[]>([])
   /** group = 設定「Group banners from the same chat」:開 → 同 threadKey 收合成一張並累計則數;關 → 每則各一張 */
-  const push = (b: BannerData, group = true) =>
+  const push = (b: BannerData, group = true, max = DEFAULT_MAX_VISIBLE) =>
     setItems((list) => {
-      if (!group) return [b, ...list].slice(0, MAX_VISIBLE)
+      if (!group) return [b, ...list].slice(0, max)
       const prev = b.threadKey ? list.find((x) => x.threadKey === b.threadKey) : undefined
       const merged = prev ? { ...b, count: (prev.count ?? 1) + 1 } : b
       const rest = list.filter((x) => !(b.threadKey && x.threadKey === b.threadKey))
-      return [merged, ...rest].slice(0, MAX_VISIBLE)
+      return [merged, ...rest].slice(0, max)
     })
   const dismiss = (id: string) => setItems((list) => list.filter((x) => x.id !== id))
   /** 在別處讀過 → 收起同一對話的卡 */
@@ -316,13 +318,39 @@ export function BannerStack({
   showPreview: boolean
   size?: BannerSize
 }) {
+  // 張數多時(例如 5 張 Comfy)視窗放不下:放不下的整張不顯示(最舊的先藏),不露出半張;視窗變大就再出現
+  const ref = useRef<HTMLElement>(null)
+  const [fitCount, setFitCount] = useState(items.length)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const measure = () => {
+      const limit = window.innerHeight - 48 // 上下各 24px(與 top-6 對稱)
+      const kids = Array.from(el.children) as HTMLElement[]
+      let used = 0
+      let n = 0
+      for (const k of kids) {
+        const h = k.scrollHeight + (n > 0 ? 8 : 0) // gap-2
+        if (used + h > limit) break
+        used += h
+        n++
+      }
+      setFitCount(Math.max(1, n))
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [items, size, showPreview])
   return (
     <section
+      ref={ref}
       aria-label="Notifications"
       className="pointer-events-none fixed right-6 top-6 z-[60] flex flex-col gap-2"
     >
-      {items.map((b) => (
-        <TimedBanner key={b.id + (b.count ?? 1)} data={b} size={size} onDismiss={() => onDismiss(b.id)} onOpen={onOpen ? () => { onOpen(b); onDismiss(b.id) } : undefined} showPreview={showPreview} />
+      {items.map((b, i) => (
+        <div key={b.id + (b.count ?? 1)} className={i >= fitCount ? 'invisible absolute' : undefined} aria-hidden={i >= fitCount || undefined}>
+          <TimedBanner data={b} size={size} onDismiss={() => onDismiss(b.id)} onOpen={onOpen ? () => { onOpen(b); onDismiss(b.id) } : undefined} showPreview={showPreview} />
+        </div>
       ))}
     </section>
   )

@@ -3234,7 +3234,7 @@ export default function App({
     const timers = script.map(({ at, event, banner }) =>
       window.setTimeout(() => {
         const r = routeNotification(event, notifPrefsRef.current, { inMeeting: false, systemDnd: false })
-        if (r.outcome === 'banner') bannerStack.push({ ...banner, reason: r.reason ?? banner.reason }, notifPrefsRef.current.groupBanners)
+        if (r.outcome === 'banner') bannerStack.push({ ...banner, reason: r.reason ?? banner.reason }, notifPrefsRef.current.groupBanners, notifPrefsRef.current.maxBanners)
       }, at),
     )
     return () => timers.forEach((t) => window.clearTimeout(t))
