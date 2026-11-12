@@ -157,6 +157,8 @@ export function BannerGallery() {
           </div>
         </header>
 
+        <BannerStates size={size} />
+        <Separator />
         <SizeComparison />
         <Separator />
         <ScenarioSection title="會跳橫幅:Chats 的一般情境" items={DELIVERED} onPlay={play} size={size} />
@@ -177,6 +179,30 @@ export function BannerGallery() {
       </div>
       <BannerStack items={stack.items} onDismiss={stack.dismiss} showPreview size={size} />
     </div>
+  )
+}
+
+/** 卡片的三種狀態(2026-11-12):Initial / Hover / Reply focused。三張是同一則通知;Hover 與 Reply 請實際操作第 2、3 張 */
+const STATE_NOTES = [
+  { title: 'Initial', note: '剛跳出。10 秒後自動收起。' },
+  { title: 'Hover', note: '滑鼠移到卡片上:計時暫停,移開後繼續。內容列出現淺灰底,表示點了會打開這個聊天。' },
+  { title: 'Reply focused', note: '按 Reply 後,按鈕換成輸入框並自動取得焦點(藍色外框)。回覆期間計時暫停;有文字才能送出,Enter 送出,Esc 回到按鈕。' },
+]
+function BannerStates({ size }: { size: BannerSize }) {
+  const base = DELIVERED.find((x) => x.data.id === 'mention') as Scenario
+  return (
+    <section className="flex flex-col gap-6" data-states>
+      <h2 className="text-h5 font-semibold">卡片狀態</h2>
+      <div className="grid grid-cols-1 gap-x-8 gap-y-8 lg:grid-cols-3">
+        {STATE_NOTES.map((st, i) => (
+          <article key={st.title} className="flex min-w-0 flex-col gap-3" data-state={i}>
+            <h3 className="text-body font-semibold">{st.title}</h3>
+            <NotificationBanner data={{ ...base.data, id: `state-${i}` }} size={size} onDismiss={() => {}} onOpen={() => {}} />
+            <p className="text-body text-fg-secondary">{st.note}</p>
+          </article>
+        ))}
+      </div>
+    </section>
   )
 }
 
