@@ -59,6 +59,11 @@ export type BannerData = {
   time?: string
   /** 轉傳的訊息(2026-11-11):body = 轉傳者附的話(可空),原訊息放引用框 */
   forwarded?: { from: string; body: string }
+  /**
+   * Thread 回覆(2026-11-16):跟聊天主畫面的訊息分開成另一張卡(threadKey 也要不同),因為 Reply 的目的地不同。
+   * root = thread 第一則訊息的摘要,讓人認得是哪個 thread。
+   */
+  thread?: { root: string }
 }
 
 /** 卡片尺寸(2026-11-11):對標 Teams Display「Change the size of your message and content previews. Choose Comfy or Compact.」 */
@@ -72,9 +77,12 @@ export function NotificationBanner({
   onInteractingChange,
   showPreview = true,
   size = 'comfy',
+  defaultReplying = false,
 }: {
   data: BannerData
   size?: BannerSize
+  /** 一開始就展開回覆輸入框(總覽頁示意用) */
+  defaultReplying?: boolean
   onDismiss?: () => void
   onOpen?: () => void
   /** 回覆中 / 滑鼠停留 → 暫停自動收起 */
@@ -84,7 +92,10 @@ export function NotificationBanner({
 }) {
   const meta = APP_META[data.app]
   const AppIcon = meta.icon
-  const [replying, setReplying] = useState(false)
+  const [replying, setReplying] = useState(defaultReplying)
+  // 使用者自己按 Reply 才自動 focus;defaultReplying(總覽頁靜態示意)不搶焦點
+  const [userOpenedReply, setUserOpenedReply] = useState(false)
+  const openReply = () => { setUserOpenedReply(true); setReplying(true) }
   const [draft, setDraft] = useState('')
   const [result, setResult] = useState<string | null>(null)
 
@@ -97,8 +108,12 @@ export function NotificationBanner({
 
   const name = data.actor?.name ?? data.title ?? meta.label
   const body = showPreview ? data.body : previewOffText(data)
-  const sourceLine = [meta.label, data.context].filter(Boolean).join(' · ')
-  const countText = data.count && data.count > 1 ? ` · ${data.count} new messages` : ''
+  // 來源列:thread → 「Chats · Thread in 群組」(DM 的 thread → 「Chats · Thread」)
+  const place = data.thread ? (data.context ? `Thread in ${data.context}` : 'Thread') : data.context
+  const sourceLine = [meta.label, place].filter(Boolean).join(' · ')
+  const countText = data.count && data.count > 1 ? ` · ${data.count} new ${data.thread ? 'replies' : 'messages'}` : ''
+  // Reply 送到哪裡,送出前就寫在輸入框上:thread → 回到 thread;群組 → 回到群組;一對一 → 回給對方
+  const replyTarget = data.thread ? 'Reply in thread' : data.context ? `Reply to ${data.context}` : `Reply to ${name.split(' ')[0]}`
 
   const replyForm = (
     <form
@@ -112,9 +127,9 @@ export function NotificationBanner({
     >
       <Input
         size="sm"
-        autoFocus
-        aria-label={`Reply to ${name}`}
-        placeholder={`Reply to ${name.split(' ')[0]}`}
+        autoFocus={userOpenedReply}
+        aria-label={replyTarget}
+        placeholder={replyTarget}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setReplying(false) } }}
@@ -155,14 +170,14 @@ export function NotificationBanner({
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-body">
                     <span className="font-semibold">{name}</span>
-                    <span className="text-fg-secondary">{data.context ? ` in ${data.context}` : ''}{countText}</span>
+                    <span className="text-fg-secondary">{data.thread ? ' in thread' : ''}{data.context ? `${data.thread ? ' · ' : ' in '}${data.context}` : ''}{countText}</span>
                   </span>
                   <span className="truncate text-body text-fg-secondary">{compactBody}</span>
                 </span>
               </button>
               {data.urgent && <Tag color="red" solid size="sm">Urgent</Tag>}
               {data.reply && !replying && (
-                <Button variant="text" size="sm" iconOnly startIcon={Reply} aria-label={`Reply to ${name}`} onClick={() => setReplying(true)} />
+                <Button variant="text" size="sm" iconOnly startIcon={Reply} aria-label={replyTarget} onClick={openReply} />
               )}
               {onDismiss && <Button variant="text" size="sm" iconOnly dismiss startIcon={X} aria-label="Dismiss notification" onClick={onDismiss} />}
             </div>
@@ -234,6 +249,9 @@ export function NotificationBanner({
               />
             </button>
 
+            {data.thread && (
+              <p className="truncate pl-11 text-caption text-fg-secondary">Thread: “{data.thread.root}”</p>
+            )}
             {data.reason && (
               <p className="pl-11 text-caption text-fg-secondary">{data.reason}</p>
             )}
@@ -243,7 +261,7 @@ export function NotificationBanner({
             ) : (data.reply || data.actions?.length) ? (
               <div className="flex flex-wrap items-center gap-2 pl-11">
                 {data.reply && (
-                  <Button variant="secondary" size="sm" onClick={() => setReplying(true)}>Reply</Button>
+                  <Button variant="secondary" size="sm" onClick={openReply}>{data.thread ? 'Reply in thread' : 'Reply'}</Button>
                 )}
                 {data.actions?.map((a) => (
                   <Button

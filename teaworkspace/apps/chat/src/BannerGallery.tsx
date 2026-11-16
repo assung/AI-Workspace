@@ -159,6 +159,8 @@ export function BannerGallery() {
 
         <BannerStates size={size} />
         <Separator />
+        <ThreadVsChat onPlay={play} />
+        <Separator />
         <SizeComparison />
         <Separator />
         <ScenarioSection title="會跳橫幅:Chats 的一般情境" items={DELIVERED} onPlay={play} size={size} />
@@ -200,6 +202,53 @@ function BannerStates({ size }: { size: BannerSize }) {
             <NotificationBanner data={{ ...base.data, id: `state-${i}` }} size={size} onDismiss={() => {}} onOpen={() => {}} />
             <p className="text-body text-fg-secondary">{st.note}</p>
           </article>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+/** Thread 回覆 vs 聊天主畫面的訊息(2026-11-16,討論用):同一個群組、兩張卡,Reply 的目的地不同 */
+const CHAT_MSG: Scenario = {
+  title: '', gate: '', behavior: '',
+  data: { id: 'tv-chat', threadKey: 'chat:product-team', app: 'chats', context: 'Product Team 產品團隊', actor: P.guanyu, body: 'Morning all. The Q4 tasting kit samples arrive on Thursday.', reply: true, time: 'now' },
+}
+const THREAD_MSG: Scenario = {
+  title: '', gate: '', behavior: '',
+  data: { id: 'tv-thread', threadKey: 'chat:product-team/thread:launch-date', app: 'chats', context: 'Product Team 產品團隊', actor: P.yui, body: 'Legal signed off, so Nov 28 works for the launch.', thread: { root: 'Can we lock the Q4 launch date this week?' }, reply: true, time: 'now' },
+}
+function ThreadVsChat({ onPlay }: { onPlay: (s: Scenario) => void }) {
+  const rows: { label: string; size: BannerSize; replying?: boolean }[] = [
+    { label: 'Comfy', size: 'comfy' },
+    { label: 'Comfy,按 Reply 後', size: 'comfy', replying: true },
+    { label: 'Compact', size: 'compact' },
+  ]
+  return (
+    <section className="flex flex-col gap-6" data-thread-vs-chat>
+      <div className="flex flex-col gap-2">
+        <h2 className="text-h5 font-semibold">Thread 回覆與一般訊息</h2>
+        <p className="max-w-[68ch] text-body text-fg-secondary">
+          同一個群組裡,一般訊息和 thread 回覆分成兩張卡,不收合在一起,因為 Reply 會送到不同地方。
+          來源列、按鈕和輸入框提示字都寫明目的地,送出前就知道會回到哪裡。同一個 thread 的多則回覆仍收合成一張。
+        </p>
+        <div className="flex gap-2 pt-1">
+          <Button variant="secondary" size="sm" startIcon={Play} onClick={() => { onPlay(CHAT_MSG); onPlay(THREAD_MSG) }}>Play both</Button>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-x-10 gap-y-6 lg:grid-cols-2">
+        <h3 className="text-body font-semibold">一般訊息(回到群組)</h3>
+        <h3 className="text-body font-semibold max-lg:hidden">Thread 回覆(回到 thread)</h3>
+        {rows.map((r) => (
+          <div key={r.label} className="contents">
+            <div className="flex min-w-0 flex-col gap-2">
+              <p className="text-caption text-fg-secondary">{r.label}</p>
+              <NotificationBanner data={{ ...CHAT_MSG.data, id: `tvc-${r.label}` }} size={r.size} defaultReplying={r.replying} onDismiss={() => {}} onOpen={() => {}} />
+            </div>
+            <div className="flex min-w-0 flex-col gap-2">
+              <p className="text-caption text-fg-secondary"><span className="lg:hidden">Thread 回覆 · </span>{r.label}</p>
+              <NotificationBanner data={{ ...THREAD_MSG.data, id: `tvt-${r.label}` }} size={r.size} defaultReplying={r.replying} onDismiss={() => {}} onOpen={() => {}} />
+            </div>
+          </div>
         ))}
       </div>
     </section>
