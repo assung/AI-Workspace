@@ -217,40 +217,59 @@ const THREAD_MSG: Scenario = {
   title: '', gate: '', behavior: '',
   data: { id: 'tv-thread', threadKey: 'chat:product-team/thread:launch-date', app: 'chats', context: 'Product Team 產品團隊', actor: P.yui, body: 'Legal signed off, so Nov 28 works for the launch.', thread: { root: 'Can we lock the Q4 launch date this week?' }, reply: true, time: 'now' },
 }
+/** 一對一聊天(DM)的同一組對照:來源列沒有群組名,回覆對象是對方本人 */
+const DM_MSG: Scenario = {
+  title: '', gate: '', behavior: '',
+  data: { id: 'tv-dm', threadKey: 'chat:shinichi', app: 'chats', actor: P.shinichi, body: 'The Lugu Co-op samples arrived. Can you confirm the 20 kg order before 3 PM?', reply: true, time: 'now' },
+}
+const DM_THREAD_MSG: Scenario = {
+  title: '', gate: '', behavior: '',
+  data: { id: 'tv-dm-thread', threadKey: 'chat:shinichi/thread:roast-profile', app: 'chats', actor: P.shinichi, body: 'Batch #3 held at 205°C for 40 seconds longer. Want me to send the curve?', thread: { root: 'What changed in the roast profile for batch #3?' }, reply: true, time: 'now' },
+}
 function ThreadVsChat({ onPlay }: { onPlay: (s: Scenario) => void }) {
   const rows: { label: string; size: BannerSize; replying?: boolean }[] = [
     { label: 'Comfy', size: 'comfy' },
     { label: 'Comfy,按 Reply 後', size: 'comfy', replying: true },
     { label: 'Compact', size: 'compact' },
   ]
+  const groups = [
+    { key: 'group', title: 'Group chat', left: CHAT_MSG, right: THREAD_MSG, leftTitle: '一般訊息(回到群組)', rightTitle: 'Thread 回覆(回到 thread)' },
+    { key: 'dm', title: 'DM(一對一)', left: DM_MSG, right: DM_THREAD_MSG, leftTitle: '一般訊息(回給對方)', rightTitle: 'Thread 回覆(回到 thread)' },
+  ]
   return (
-    <section className="flex flex-col gap-6" data-thread-vs-chat>
+    <section className="flex flex-col gap-8" data-thread-vs-chat>
       <div className="flex flex-col gap-2">
         <h2 className="text-h5 font-semibold">Thread 回覆與一般訊息</h2>
         <p className="max-w-[68ch] text-body text-fg-secondary">
-          同一個群組裡,一般訊息和 thread 回覆分成兩張卡,不收合在一起,因為 Reply 會送到不同地方。
+          同一個聊天裡,一般訊息和 thread 回覆分成兩張卡,不收合在一起,因為 Reply 會送到不同地方。
           來源列、按鈕和輸入框提示字都寫明目的地,送出前就知道會回到哪裡。同一個 thread 的多則回覆仍收合成一張。
+          群組和一對一聊天規則相同,差別只在來源列有沒有群組名。
         </p>
-        <div className="flex gap-2 pt-1">
-          <Button variant="secondary" size="sm" startIcon={Play} onClick={() => { onPlay(CHAT_MSG); onPlay(THREAD_MSG) }}>Play both</Button>
-        </div>
       </div>
-      <div className="grid grid-cols-1 gap-x-10 gap-y-6 lg:grid-cols-2">
-        <h3 className="text-body font-semibold">一般訊息(回到群組)</h3>
-        <h3 className="text-body font-semibold max-lg:hidden">Thread 回覆(回到 thread)</h3>
-        {rows.map((r) => (
-          <div key={r.label} className="contents">
-            <div className="flex min-w-0 flex-col gap-2">
-              <p className="text-caption text-fg-secondary">{r.label}</p>
-              <NotificationBanner data={{ ...CHAT_MSG.data, id: `tvc-${r.label}` }} size={r.size} defaultReplying={r.replying} onDismiss={() => {}} onOpen={() => {}} />
-            </div>
-            <div className="flex min-w-0 flex-col gap-2">
-              <p className="text-caption text-fg-secondary"><span className="lg:hidden">Thread 回覆 · </span>{r.label}</p>
-              <NotificationBanner data={{ ...THREAD_MSG.data, id: `tvt-${r.label}` }} size={r.size} defaultReplying={r.replying} onDismiss={() => {}} onOpen={() => {}} />
-            </div>
+      {groups.map((g) => (
+        <div key={g.key} className="flex flex-col gap-4" data-tv-group={g.key}>
+          <div className="flex items-center gap-3">
+            <h3 className="text-body-lg font-semibold">{g.title}</h3>
+            <Button variant="secondary" size="sm" startIcon={Play} onClick={() => { onPlay(g.left); onPlay(g.right) }}>Play both</Button>
           </div>
-        ))}
-      </div>
+          <div className="grid grid-cols-1 gap-x-10 gap-y-6 lg:grid-cols-2">
+            <h4 className="text-body font-semibold">{g.leftTitle}</h4>
+            <h4 className="text-body font-semibold max-lg:hidden">{g.rightTitle}</h4>
+            {rows.map((r) => (
+              <div key={r.label} className="contents">
+                <div className="flex min-w-0 flex-col gap-2">
+                  <p className="text-caption text-fg-secondary">{r.label}</p>
+                  <NotificationBanner data={{ ...g.left.data, id: `tvl-${g.key}-${r.label}` }} size={r.size} defaultReplying={r.replying} onDismiss={() => {}} onOpen={() => {}} />
+                </div>
+                <div className="flex min-w-0 flex-col gap-2">
+                  <p className="text-caption text-fg-secondary"><span className="lg:hidden">Thread 回覆 · </span>{r.label}</p>
+                  <NotificationBanner data={{ ...g.right.data, id: `tvr-${g.key}-${r.label}` }} size={r.size} defaultReplying={r.replying} onDismiss={() => {}} onOpen={() => {}} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </section>
   )
 }
