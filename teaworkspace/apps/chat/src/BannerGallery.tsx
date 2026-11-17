@@ -239,7 +239,7 @@ const ACT: { key: string; title: string; note: string; s: Scenario }[] = [
     s: { title: '', gate: '', behavior: '', data: { id: 'act-one', app: 'chats', appInfo: { name: 'Calendar', icon: CalendarDays, color: 'var(--color-indigo-6)' }, body: 'Weekly tasting sync starts in 5 minutes · Room No.3', actions: [{ label: 'Join' }], time: 'now' } },
   },
   {
-    key: 'two', title: '兩顆按鈕', note: '兩顆平分第三區,間距 12。按下後訊息列換成結果(例如 Approved),3 秒後收起。',
+    key: 'two', title: '兩顆按鈕', note: '兩顆平分第三區,間距 8。按下後訊息列換成結果(例如 Approved),3 秒後收起。',
     s: { title: '', gate: '', behavior: '', data: { id: 'act-two', app: 'chats', appInfo: { name: 'Approvals', icon: ClipboardCheck, color: 'var(--color-turquoise-6)' }, body: 'Lin Ya-Ting submitted expense report #4821 (NT$12,400) for your approval.', actions: [{ label: 'Approve', result: 'Approved expense report #4821' }, { label: 'Reject', result: 'Rejected expense report #4821' }], time: 'now' } },
   },
 ]
@@ -249,7 +249,7 @@ function ActionVariants({ onPlay }: { onPlay: (s: Scenario) => void }) {
       <div className="flex flex-col gap-2">
         <h2 className="text-h5 font-semibold">動作按鈕</h2>
         <p className="max-w-[68ch] text-body text-fg-secondary">
-          有動作按鈕的通知不能回覆,按鈕直接取代輸入框。Comfy 的按鈕放在第三區;Compact 和 Reply 一樣,滑鼠移到卡上才出現在右側。卡片高度與可回覆的卡相同。
+          有動作按鈕的通知不能回覆,按鈕直接取代輸入框。Comfy 和 Compact 都把按鈕放在訊息下方一列;Compact 因此比可回覆的卡高。
         </p>
       </div>
       <div className="grid grid-cols-1 gap-x-8 gap-y-6 xl:grid-cols-[repeat(3,360px)]">
@@ -261,7 +261,7 @@ function ActionVariants({ onPlay }: { onPlay: (s: Scenario) => void }) {
             </div>
             <p className="text-caption text-fg-secondary">Comfy</p>
             <NotificationBanner data={c.s.data} size="comfy" onDismiss={() => {}} onOpen={() => {}} />
-            <p className="text-caption text-fg-secondary">Compact(滑鼠移上去)</p>
+            <p className="text-caption text-fg-secondary">Compact</p>
             <NotificationBanner data={{ ...c.s.data, id: `${c.s.data.id}-compact` }} size="compact" onDismiss={() => {}} onOpen={() => {}} />
             <p className="text-body text-fg-secondary">{c.note}</p>
           </article>

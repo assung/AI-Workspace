@@ -124,7 +124,7 @@ export function NotificationBanner({
       ? `Forwarded a message from ${data.forwarded.from}`
       : kind === 'group' && data.actor ? `${data.actor.name}: ${body}` : body
   )
-  /** 動作按鈕:DS Button tertiary sm,dark mode;一顆或兩顆,水平排、間距 12 */
+  /** 動作按鈕:DS Button tertiary sm,dark mode;一顆撐滿、兩顆平分,間距 8(2026-11-17 user 由 12 改 8) */
   const actionButtons = (fill: boolean) =>
     data.actions?.map((a) => (
       <Button
@@ -141,7 +141,8 @@ export function NotificationBanner({
   const titleText = kind === 'app' ? data.appInfo!.name : kind === 'group' ? data.context! : name
   // 第二區第一排:App 多一個「APP」標籤(DS Tag turquoise sm,dark mode;左右 4px、上下 0 —— Tag 外框 px-1 改 px-0,只留文字本身的 4px)
   const titleRow = (
-    <span className="flex min-w-0 items-center gap-1">
+    // app 名與 APP 標籤間距 8(2026-11-17 user)
+    <span className="flex min-w-0 items-center gap-2">
       <span className="truncate text-[14px] font-bold leading-[1.5] text-white">{titleText}</span>
       {kind === 'app' && (
         // 內框 1px,顏色同文字(currentColor)(2026-11-17 user)
@@ -256,16 +257,12 @@ export function NotificationBanner({
               >
                 {titleRow}
                 {/* 一行訊息;可回覆時這一列固定 28(= 輸入框高),App 不能回覆 → hug */}
-                <span className={`flex items-center ${hasFooter ? 'h-7' : ''}`}>
+                <span className={`flex items-center ${canReply ? 'h-7' : ''}`}>
                   <span className="truncate text-[12px] font-normal leading-[1.3] text-white">{compactBody}</span>
                 </span>
               </button>
             )}
           </div>
-          {/* 有動作按鈕時:hover 出現的是動作按鈕(取代 Reply),兩顆時間距 12 */}
-          {hasActions && (
-            <div className="hidden shrink-0 items-center gap-3 group-hover:flex group-focus-within:flex">{actionButtons(false)}</div>
-          )}
           {canReply && !replying && !result && (
             <Button
               variant="tertiary"
@@ -281,6 +278,9 @@ export function NotificationBanner({
             </Button>
           )}
         </div>
+        {/* 動作按鈕:同 Comfy 往下排一列(一顆撐滿、兩顆平分、間距 8),卡片長高(2026-11-17 user) */}
+        {hasActions && <div className="flex gap-2">{actionButtons(true)}</div>}
+        {!!data.actions?.length && result && <div className="h-7" aria-hidden />}
       </div>
     )
   }
@@ -318,9 +318,9 @@ export function NotificationBanner({
       </button>
 
       {/* 第三區:回覆輸入框 + 送出(一直顯示) */}
-      {/* 第三區:可回覆 → 輸入框;有動作 → 按鈕取代輸入框(一顆滿寬、兩顆平分,間距 12);結果出現後收起 */}
+      {/* 第三區:可回覆 → 輸入框;有動作 → 按鈕取代輸入框(一顆滿寬、兩顆平分,間距 8);結果出現後收起 */}
       {canReply && replyField(false)}
-      {hasActions && <div className="flex gap-3">{actionButtons(true)}</div>}
+      {hasActions && <div className="flex gap-2">{actionButtons(true)}</div>}
       {!!data.actions?.length && result && <div className="h-7" aria-hidden />}
     </div>
   )
