@@ -127,11 +127,13 @@ export function NotificationBanner({
   // 情境(2026-11-17 user):DM = 人像 + 人名;Group chat = 發言者頭像 + 群組名;App = app logo + app 名 + APP 標籤(不能回覆)
   const kind: 'dm' | 'group' | 'app' = data.appInfo ? 'app' : data.context ? 'group' : 'dm'
   // 有動作按鈕時不能回覆:按鈕直接取代輸入框(2026-11-17 user)
-  const hasActions = !!data.actions?.length && !result
+  // 預覽關閉 → 按鈕一起藏(2026-11-17 user 選 A):看不到內容就不能直接做決定(同 Apple HIG 隱藏預覽時要先看到內容才能操作)。卡片 hug,點卡片打開 app
+  const showActions = !!data.actions?.length && showPreview
+  const hasActions = showActions && !result
   // Emoji 回應也不能回覆(2026-11-17 user)→ 沒有輸入框 / Reply,卡片 hug
   const canReply = kind !== 'app' && !data.actions?.length && !data.reaction
   // 第三區存在(輸入框或按鈕)→ 訊息列固定高,卡片高度不跳;都沒有 → hug
-  const hasFooter = canReply || !!data.actions?.length
+  const hasFooter = canReply || showActions
   // Group chat 第二排 =「人名: 訊息」,才看得出是誰說的(2026-11-17 user)
   // Emoji 回應第二排:DM =「Reacted to your message: 原訊息」;Group chat =「人名 reacted to your message: 原訊息」(2026-11-17 user)
   const reactedTo = data.reaction ? `reacted to your message: ${data.reaction.message}` : ''
@@ -330,7 +332,7 @@ export function NotificationBanner({
         </div>
         {/* 動作按鈕:同 Comfy 往下排一列(一顆撐滿、兩顆平分、間距 8),卡片長高(2026-11-17 user) */}
         {hasActions && <div className="flex gap-2">{actionButtons(true)}</div>}
-        {!!data.actions?.length && result && <div className="h-7" aria-hidden />}
+        {showActions && result && <div className="h-7" aria-hidden />}
       </div>
     )
   }
@@ -371,7 +373,7 @@ export function NotificationBanner({
       {/* 第三區:可回覆 → 輸入框;有動作 → 按鈕取代輸入框(一顆滿寬、兩顆平分,間距 8);結果出現後收起 */}
       {canReply && replyField(false)}
       {hasActions && <div className="flex gap-2">{actionButtons(true)}</div>}
-      {!!data.actions?.length && result && <div className="h-7" aria-hidden />}
+      {showActions && result && <div className="h-7" aria-hidden />}
     </div>
   )
 }

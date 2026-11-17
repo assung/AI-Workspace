@@ -412,7 +412,7 @@ function PreviewHiddenVariants() {
   const cases: { key: string; title: string; data: BannerData }[] = [
     { key: 'dm', title: 'DM', data: CTX[0].s.data },
     { key: 'group-you', title: 'Group chat · @You', data: CTX[1].s.data },
-    { key: 'app', title: 'App', data: CTX[2].s.data },
+    { key: 'app', title: 'App · 有按鈕', data: ACT[1].s.data },
     { key: 'react', title: 'Group chat · Emoji 回應', data: { id: 'ph-react', threadKey: 'chat:product-team:reactions', app: 'chats', context: 'Product Team 產品團隊', actor: P.yui, reaction: { emoji: '🎉', message: 'The Q4 tasting kit launches on Nov 28!' }, body: '', time: 'now' } },
   ]
   return (
@@ -420,7 +420,7 @@ function PreviewHiddenVariants() {
       <div className="flex flex-col gap-2">
         <h2 className="text-h5 font-semibold">訊息預覽關閉</h2>
         <p className="max-w-[68ch] text-body text-fg-secondary">
-          Display › Show message and content previews 未勾選時,第一排照常(人名 / 群組名 / app 名,@You、APP 標籤與 emoji 也保留),第二排不論什麼情境一律「Message preview hidden」。
+          Display › Show message and content previews 未勾選時,第一排照常(人名 / 群組名 / app 名,@You、APP 標籤與 emoji 也保留),第二排不論什麼情境一律「Message preview hidden」。App 的動作按鈕也一起藏起來:看不到內容就不能直接核准 / 拒絕,點卡片打開 app 處理。
         </p>
       </div>
       <div className="grid grid-cols-1 gap-x-8 gap-y-6 xl:grid-cols-[repeat(2,360px)]">
