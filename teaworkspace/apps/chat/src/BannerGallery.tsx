@@ -44,7 +44,7 @@ const DELIVERED: Scenario[] = [
   {
     title: 'Chats — 群組裡的轉傳訊息',
     gate: 'Chats › Messages › New messages = Show in banner',
-    behavior: '名字是轉傳的人;他附的話放上面,原訊息放在引用框裡,標出原作者(對照 Teams 聊天裡轉傳訊息的外框與 Forwarded 標頭)。Reply 回的是群組,不是原作者。Compact 收成一行「Forwarded a message from …」。',
+    behavior: '第一排群組名,第二排「人名 forwarded a message: 附話」;沒附話就只寫「人名 forwarded a message」。原訊息不放在卡上,點開聊天才看得到。Reply 回的是群組,不是原作者。',
     data: {
       id: 'forward', threadKey: 'chat:product-team', app: 'chats', context: 'Product Team 產品團隊', actor: P.yui,
       body: 'FYI, this changes our packaging timeline.',
@@ -164,6 +164,7 @@ export function BannerGallery() {
         <ReactionVariants onPlay={play} />
         <Separator />
         <MentionVariants onPlay={play} />
+        <ForwardVariants onPlay={play} />
         <Separator />
         <BannerStates size={size} />
         <Separator />
@@ -341,6 +342,54 @@ function MentionVariants({ onPlay }: { onPlay: (s: Scenario) => void }) {
       <div className="grid grid-cols-1 gap-x-8 gap-y-6 xl:grid-cols-[repeat(3,360px)]">
         {MENTION.map((c) => (
           <article key={c.key} className="flex min-w-0 flex-col gap-3" data-mention={c.key}>
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-body font-semibold">{c.title}</h3>
+              <Button variant="secondary" size="sm" startIcon={Play} onClick={() => onPlay(c.s)}>Play</Button>
+            </div>
+            <p className="text-caption text-fg-secondary">Comfy</p>
+            <NotificationBanner data={c.s.data} size="comfy" onDismiss={() => {}} onOpen={() => {}} />
+            <p className="text-caption text-fg-secondary">Compact</p>
+            <NotificationBanner data={{ ...c.s.data, id: `${c.s.data.id}-compact` }} size="compact" onDismiss={() => {}} onOpen={() => {}} />
+            <p className="text-body text-fg-secondary">{c.note}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+/** 轉傳(2026-11-17 user):第二排只看有沒有附話 —— 只轉傳 / 轉傳 + 附話;DM 句首大寫,Group 前面接人名 */
+const FWD_ORIGINAL = { from: 'Haibara Ai 灰原哀', body: 'Lab results for batch #3 are in. Moisture is 0.4% over spec, so the lot needs another drying pass.' }
+const FORWARD: { key: string; title: string; note: string; s: Scenario }[] = [
+  {
+    key: 'dm-only', title: 'DM · Forward only', note: '只轉傳,沒附話:「Forwarded a message」。',
+    s: { title: '', gate: '', behavior: '', data: { id: 'f-dm', threadKey: 'chat:shinichi', app: 'chats', actor: P.shinichi, body: '', forwarded: FWD_ORIGINAL, reply: true, time: 'now' } },
+  },
+  {
+    key: 'dm-text', title: 'DM · Forward + text', note: '轉傳時另外附了話:「Forwarded a message: 附話」。',
+    s: { title: '', gate: '', behavior: '', data: { id: 'f-dm-text', threadKey: 'chat:shinichi', app: 'chats', actor: P.shinichi, body: 'Can you check with the Lugu Co-op whether they can re-dry this lot before Friday?', forwarded: FWD_ORIGINAL, reply: true, time: 'now' } },
+  },
+  {
+    key: 'group-only', title: 'Group chat · Forward only', note: '第一排群組名,第二排「人名 forwarded a message」。',
+    s: { title: '', gate: '', behavior: '', data: { id: 'f-group', threadKey: 'chat:product-team', app: 'chats', context: 'Product Team 產品團隊', actor: P.yui, body: '', forwarded: FWD_ORIGINAL, reply: true, time: 'now' } },
+  },
+  {
+    key: 'group-text', title: 'Group chat · Forward + text', note: '第二排「人名 forwarded a message: 附話」。',
+    s: { title: '', gate: '', behavior: '', data: { id: 'f-group-text', threadKey: 'chat:product-team', app: 'chats', context: 'Product Team 產品團隊', actor: P.yui, body: 'FYI, this changes our packaging timeline.', forwarded: FWD_ORIGINAL, reply: true, time: 'now' } },
+  },
+]
+function ForwardVariants({ onPlay }: { onPlay: (s: Scenario) => void }) {
+  return (
+    <section className="flex flex-col gap-6" data-forwards>
+      <div className="flex flex-col gap-2">
+        <h2 className="text-h5 font-semibold">轉傳</h2>
+        <p className="max-w-[68ch] text-body text-fg-secondary">
+          第一排同 DM / Group chat。第二排看轉傳時有沒有另外附話:沒有 →「Forwarded a message」;有 →「Forwarded a message: 附話」。Group chat 前面接轉傳的人名(「人名 forwarded a message…」)。可以回覆,回到這個聊天。
+        </p>
+      </div>
+      <div className="grid grid-cols-1 gap-x-8 gap-y-6 xl:grid-cols-[repeat(2,360px)]">
+        {FORWARD.map((c) => (
+          <article key={c.key} className="flex min-w-0 flex-col gap-3" data-forward={c.key}>
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-body font-semibold">{c.title}</h3>
               <Button variant="secondary" size="sm" startIcon={Play} onClick={() => onPlay(c.s)}>Play</Button>

@@ -57,7 +57,12 @@ export type BannerData = {
   reply?: boolean
   actions?: BannerAction[]
   time?: string
-  /** 轉傳的訊息(2026-11-11):body = 轉傳者附的話(可空),原訊息放引用框 */
+  /**
+   * 轉傳的訊息(2026-11-17 user):body = 轉傳者另外附的話(可空)。第二排:
+   * 只轉傳 → DM「Forwarded a message」/ Group「人名 forwarded a message」;
+   * 轉傳 + 附話 → DM「Forwarded a message: 附話」/ Group「人名 forwarded a message: 附話」。
+   * from / body = 原訊息的作者與內容(卡片不顯示,點開聊天才看得到)。
+   */
   forwarded?: { from: string; body: string }
   /**
    * Thread 回覆(2026-11-16):跟聊天主畫面的訊息分開成另一張卡(threadKey 也要不同),因為 Reply 的目的地不同。
@@ -130,11 +135,18 @@ export function NotificationBanner({
   // Group chat 第二排 =「人名: 訊息」,才看得出是誰說的(2026-11-17 user)
   // Emoji 回應第二排:DM =「Reacted to your message: 原訊息」;Group chat =「人名 reacted to your message: 原訊息」(2026-11-17 user)
   const reactedTo = data.reaction ? `reacted to your message: ${showPreview ? data.reaction.message : '…'}` : ''
+  // 轉傳第二排(2026-11-17 user):有附話才接「: 附話」;預覽關閉時不露附話
+  const forwardedText = data.forwarded
+    ? `forwarded a message${showPreview && data.body ? `: ${data.body}` : ''}`
+    : ''
+  // 句首(DM 沒有人名開頭)大寫:reacted → Reacted、forwarded → Forwarded
+  const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1)
+  const actorVerb = (t: string) => (kind === 'group' && data.actor ? `${data.actor.name} ${t}` : cap(t))
   const messageText = result ?? (
     data.reaction
-      ? kind === 'group' && data.actor ? `${data.actor.name} ${reactedTo}` : `R${reactedTo.slice(1)}`
-      : data.forwarded && showPreview
-        ? `Forwarded a message from ${data.forwarded.from}`
+      ? actorVerb(reactedTo)
+      : data.forwarded
+        ? actorVerb(forwardedText)
         : kind === 'group' && data.actor ? `${data.actor.name}: ${body}` : body
   )
   /** 動作按鈕:DS Button tertiary sm,dark mode;一顆撐滿、兩顆平分,間距 8(2026-11-17 user 由 12 改 8) */
@@ -365,7 +377,6 @@ export function NotificationBanner({
 function previewOffText(d: BannerData) {
   switch (d.app) {
     case 'chats':
-      if (d.forwarded) return d.context ? `Forwarded a message in ${d.context}` : 'Forwarded you a message'
       return d.context ? `New message in ${d.context}` : 'Sent you a message'
     case 'docs': return 'Commented on a doc'
     case 'tasks': return 'Task update'
