@@ -75,6 +75,8 @@ export type BannerData = {
    * DM:第一排人名、第二排「Reacted to your message: …」;Group chat:第一排群組名、第二排「人名 reacted to your message: …」。
    */
   reaction?: { emoji: string; message: string }
+  /** 被 @ 提及(2026-11-17 user):'you' = 點名你 →「@You」標籤;'all' = @All →「@All」標籤。訊息內文本身含 @名字 / @All。 */
+  mention?: 'you' | 'all'
 }
 
 /** 卡片尺寸(2026-11-11):對標 Teams Display「Change the size of your message and content previews. Choose Comfy or Compact.」 */
@@ -153,8 +155,19 @@ export function NotificationBanner({
   const titleText = kind === 'app' ? data.appInfo!.name : kind === 'group' ? data.context! : name
   // 第二區第一排:App 多一個「APP」標籤(DS Tag turquoise sm,dark mode;左右 4px、上下 0 —— Tag 外框 px-1 改 px-0,只留文字本身的 4px)
   const titleRow = (
-    // app 名與 APP 標籤間距 8(2026-11-17 user)
+    // 標籤與名字間距 8(2026-11-17 user):@You / @All 在名字左邊,APP 在名字右邊
     <span className="flex min-w-0 items-center gap-2">
+      {data.mention && (
+        // 大小同 APP 標籤(sm、左右 4、上下 0、1px 內框同文字色);顏色依 user 指定寫死:底 #FFECB2、字 #C36100
+        <Tag
+          color="yellow"
+          size="sm"
+          className="shrink-0 px-0 py-0 shadow-[inset_0_0_0_1px_currentColor]"
+          style={{ background: '#FFECB2', color: '#C36100' }}
+        >
+          {data.mention === 'all' ? '@All' : '@You'}
+        </Tag>
+      )}
       <span className="truncate text-[14px] font-bold leading-[1.5] text-white">{titleText}</span>
       {kind === 'app' && (
         // 內框 1px,顏色同文字(currentColor)(2026-11-17 user)

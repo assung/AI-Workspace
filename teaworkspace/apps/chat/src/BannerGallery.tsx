@@ -33,13 +33,13 @@ const DELIVERED: Scenario[] = [
     title: 'Chats — Personal @mention',
     gate: 'Chats › @Mentions › Personal @mentions',
     behavior: '來源列帶群組名;「為什麼收到」寫 You were @mentioned。',
-    data: { id: 'mention', threadKey: 'chat:product-team', app: 'chats', context: 'Product Team 產品團隊', actor: P.guanyu, body: '@Me 我 can you confirm the launch date for the Q4 tasting kit?', reason: 'You were @mentioned', reply: true, time: 'now' },
+    data: { id: 'mention', threadKey: 'chat:product-team', app: 'chats', context: 'Product Team 產品團隊', actor: P.guanyu, body: '@Me 我 can you confirm the launch date for the Q4 tasting kit?', mention: 'you', reply: true, time: 'now' },
   },
   {
     title: 'Chats — Everyone in the chat @mention',
     gate: 'Chats › @Mentions › Everyone in the chat @mentions',
     behavior: '@所有人 的廣播。「為什麼收到」寫 Everyone in the chat was @mentioned,跟點名自己的 Personal @mention 分開;在已靜音的聊天不會跳。',
-    data: { id: 'everyone', threadKey: 'chat:tea-team', app: 'chats', context: 'Tea Tasting 品茶小組', actor: P.kenji, body: '@everyone Friday’s blind tasting moves to 3 PM in room No.3.', reason: 'Everyone in the chat was @mentioned', reply: true, time: 'now' },
+    data: { id: 'everyone', threadKey: 'chat:tea-team', app: 'chats', context: 'Tea Tasting 品茶小組', actor: P.kenji, body: '@All Friday’s blind tasting moves to 3 PM in room No.3.', mention: 'all', reply: true, time: 'now' },
   },
   {
     title: 'Chats — 群組裡的轉傳訊息',
@@ -77,7 +77,7 @@ const VARIANTS: Scenario[] = [
     title: '靜音的聊天,被 Personal @mention',
     gate: '第 3 關:聊天被靜音 → 有直接 @你',
     behavior: '靜音只擋一般訊息和 Everyone @mentions;點名你的 Personal @mention 仍跳,並說明這是靜音聊天。',
-    data: { id: 'muted', threadKey: 'chat:engineering', app: 'chats', context: 'Engineering', actor: P.kenji, body: '@Me 我 the PR for the tasting form is ready for your review.', reason: 'You were @mentioned · this chat is muted', reply: true, time: 'now' },
+    data: { id: 'muted', threadKey: 'chat:engineering', app: 'chats', context: 'Engineering', actor: P.kenji, body: '@Me 我 the PR for the tasting form is ready for your review.', mention: 'you', reply: true, time: 'now' },
   },
   {
     title: '通話 / 會議中,只放行這場會議的聊天',
@@ -97,7 +97,7 @@ const VARIANTS: Scenario[] = [
 const SUPPRESSED: { gate: string; outcome: string; example: string }[] = [
   { gate: '@Mentions 總開關關閉', outcome: '兩種 @ 都不跳卡', example: 'Chats › @Mentions 的 Switch 關掉,下方兩個 Select 變 disabled' },
   { gate: '這種通知 = Off', outcome: '不跳卡(聊天本身的未讀數照常)', example: 'Chats › Messages › Reactions(預設 Off)' },
-  { gate: '聊天被靜音,不是 Personal @mention', outcome: '不通知', example: '已靜音的 Engineering 有人 @everyone' },
+  { gate: '聊天被靜音,不是 Personal @mention', outcome: '不通知', example: '已靜音的 Engineering 有人 @All' },
   { gate: '暫停中,寄件人不在優先名單', outcome: '不跳卡', example: '暫停 1 小時期間,Shinichi 傳訊息' },
   { gate: '通話 / 會議中且未勾選「Show notifications while "In a Call" status」', outcome: '不跳卡', example: '開會時 Product Team 的一般訊息' },
   { gate: '系統勿擾 / 專注模式開著', outcome: '不跳卡', example: 'macOS 專注模式期間任何非緊急通知' },
@@ -163,6 +163,8 @@ export function BannerGallery() {
         <Separator />
         <ReactionVariants onPlay={play} />
         <Separator />
+        <MentionVariants onPlay={play} />
+        <Separator />
         <BannerStates size={size} />
         <Separator />
         <ThreadVsChat onPlay={play} />
@@ -198,7 +200,7 @@ const CTX: { key: string; title: string; note: string; s: Scenario }[] = [
   },
   {
     key: 'group', title: 'Group chat', note: '左邊是群組裡發言者的頭像,第一排是群組名稱。',
-    s: { title: '', gate: '', behavior: '', data: { id: 'ctx-group', threadKey: 'chat:product-team', app: 'chats', context: 'Product Team 產品團隊', actor: P.guanyu, body: '@Me 我 can you confirm the launch date for the Q4 tasting kit?', reply: true, time: 'now' } },
+    s: { title: '', gate: '', behavior: '', data: { id: 'ctx-group', threadKey: 'chat:product-team', app: 'chats', context: 'Product Team 產品團隊', actor: P.guanyu, body: '@Me 我 can you confirm the launch date for the Q4 tasting kit?', mention: 'you', reply: true, time: 'now' } },
   },
   {
     key: 'app', title: 'App', note: '左邊是 app logo(圓形),第一排是 app 名稱 + APP 標籤。沒有回覆功能,卡片高度隨內容(hug)。',
@@ -296,6 +298,49 @@ function ReactionVariants({ onPlay }: { onPlay: (s: Scenario) => void }) {
       <div className="grid grid-cols-1 gap-x-8 gap-y-6 xl:grid-cols-[repeat(3,360px)]">
         {REACT.map((c) => (
           <article key={c.key} className="flex min-w-0 flex-col gap-3" data-react={c.key}>
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-body font-semibold">{c.title}</h3>
+              <Button variant="secondary" size="sm" startIcon={Play} onClick={() => onPlay(c.s)}>Play</Button>
+            </div>
+            <p className="text-caption text-fg-secondary">Comfy</p>
+            <NotificationBanner data={c.s.data} size="comfy" onDismiss={() => {}} onOpen={() => {}} />
+            <p className="text-caption text-fg-secondary">Compact</p>
+            <NotificationBanner data={{ ...c.s.data, id: `${c.s.data.id}-compact` }} size="compact" onDismiss={() => {}} onOpen={() => {}} />
+            <p className="text-body text-fg-secondary">{c.note}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+/** @ 提及(2026-11-17 user):第一排名字左邊加「@You」/「@All」標籤(大小同 APP 標籤,底 #FFECB2、字 #C36100,間距 8) */
+const MENTION: { key: string; title: string; note: string; s: Scenario }[] = [
+  {
+    key: 'dm-you', title: 'DM · @You', note: '一對一聊天裡被點名。',
+    s: { title: '', gate: '', behavior: '', data: { id: 'm-dm', threadKey: 'chat:shinichi', app: 'chats', actor: P.shinichi, body: '@Me 我 the Lugu Co-op needs your sign-off on the 20 kg order by 3 PM.', mention: 'you', reply: true, time: 'now' } },
+  },
+  {
+    key: 'group-you', title: 'Group chat · @You', note: '群組裡被點名。第一排是群組名,第二排「人名: 訊息」。',
+    s: { title: '', gate: '', behavior: '', data: { id: 'm-group', threadKey: 'chat:product-team', app: 'chats', context: 'Product Team 產品團隊', actor: P.guanyu, body: '@Me 我 can you confirm the launch date for the Q4 tasting kit?', mention: 'you', reply: true, time: 'now' } },
+  },
+  {
+    key: 'group-all', title: 'Group chat · @All', note: '有人 @All 群組裡所有人。',
+    s: { title: '', gate: '', behavior: '', data: { id: 'm-all', threadKey: 'chat:tea-team', app: 'chats', context: 'Tea Tasting 品茶小組', actor: P.kenji, body: '@All Friday’s blind tasting moves to 3 PM in room No.3.', mention: 'all', reply: true, time: 'now' } },
+  },
+]
+function MentionVariants({ onPlay }: { onPlay: (s: Scenario) => void }) {
+  return (
+    <section className="flex flex-col gap-6" data-mentions>
+      <div className="flex flex-col gap-2">
+        <h2 className="text-h5 font-semibold">@ 提及</h2>
+        <p className="max-w-[68ch] text-body text-fg-secondary">
+          被 @ 時,第一排名字左邊多一個標籤:點名你是「@You」,@所有人是「@All」。標籤大小同 APP 標籤,顏色固定(底 #FFECB2、字 #C36100),與名字間距 8。
+        </p>
+      </div>
+      <div className="grid grid-cols-1 gap-x-8 gap-y-6 xl:grid-cols-[repeat(3,360px)]">
+        {MENTION.map((c) => (
+          <article key={c.key} className="flex min-w-0 flex-col gap-3" data-mention={c.key}>
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-body font-semibold">{c.title}</h3>
               <Button variant="secondary" size="sm" startIcon={Play} onClick={() => onPlay(c.s)}>Play</Button>
