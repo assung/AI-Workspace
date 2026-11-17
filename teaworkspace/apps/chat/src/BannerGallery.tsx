@@ -3,7 +3,7 @@
 // UI 文案英文;說明文字中文(給設計 / PM 審閱)。
 import { useState } from 'react'
 import { Button, Checkbox, DataTable, RadioGroup, RadioGroupItem, Select, Separator } from '@qijenchen/design-system'
-import { ClipboardCheck, Play } from 'lucide-react'
+import { CalendarDays, ClipboardCheck, Play } from 'lucide-react'
 import { BannerStack, NotificationBanner, useBannerStack, type BannerData, type BannerSize } from './NotificationBanner'
 
 const AVATAR: Record<string, string> = Object.fromEntries(
@@ -159,6 +159,8 @@ export function BannerGallery() {
 
         <ContextVariants onPlay={play} />
         <Separator />
+        <ActionVariants onPlay={play} />
+        <Separator />
         <BannerStates size={size} />
         <Separator />
         <ThreadVsChat onPlay={play} />
@@ -221,6 +223,45 @@ function ContextVariants({ onPlay }: { onPlay: (s: Scenario) => void }) {
             <p className="text-caption text-fg-secondary">Comfy</p>
             <NotificationBanner data={c.s.data} size="comfy" onDismiss={() => {}} onOpen={() => {}} />
             <p className="text-caption text-fg-secondary">Compact</p>
+            <NotificationBanner data={{ ...c.s.data, id: `${c.s.data.id}-compact` }} size="compact" onDismiss={() => {}} onOpen={() => {}} />
+            <p className="text-body text-fg-secondary">{c.note}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+/** 動作按鈕(2026-11-17 user):有按鈕就沒有回覆,按鈕取代輸入框;DS Button tertiary sm dark;一顆或兩顆,兩顆水平排、間距 12 */
+const ACT: { key: string; title: string; note: string; s: Scenario }[] = [
+  {
+    key: 'one', title: '一顆按鈕', note: '按鈕撐滿第三區。按下 Join 會打開會議(示範中為打開來源)。',
+    s: { title: '', gate: '', behavior: '', data: { id: 'act-one', app: 'chats', appInfo: { name: 'Calendar', icon: CalendarDays, color: 'var(--color-indigo-6)' }, body: 'Weekly tasting sync starts in 5 minutes · Room No.3', actions: [{ label: 'Join' }], time: 'now' } },
+  },
+  {
+    key: 'two', title: '兩顆按鈕', note: '兩顆平分第三區,間距 12。按下後訊息列換成結果(例如 Approved),3 秒後收起。',
+    s: { title: '', gate: '', behavior: '', data: { id: 'act-two', app: 'chats', appInfo: { name: 'Approvals', icon: ClipboardCheck, color: 'var(--color-turquoise-6)' }, body: 'Lin Ya-Ting submitted expense report #4821 (NT$12,400) for your approval.', actions: [{ label: 'Approve', result: 'Approved expense report #4821' }, { label: 'Reject', result: 'Rejected expense report #4821' }], time: 'now' } },
+  },
+]
+function ActionVariants({ onPlay }: { onPlay: (s: Scenario) => void }) {
+  return (
+    <section className="flex flex-col gap-6" data-actions>
+      <div className="flex flex-col gap-2">
+        <h2 className="text-h5 font-semibold">動作按鈕</h2>
+        <p className="max-w-[68ch] text-body text-fg-secondary">
+          有動作按鈕的通知不能回覆,按鈕直接取代輸入框。Comfy 的按鈕放在第三區;Compact 和 Reply 一樣,滑鼠移到卡上才出現在右側。卡片高度與可回覆的卡相同。
+        </p>
+      </div>
+      <div className="grid grid-cols-1 gap-x-8 gap-y-6 xl:grid-cols-[repeat(3,360px)]">
+        {ACT.map((c) => (
+          <article key={c.key} className="flex min-w-0 flex-col gap-3" data-act={c.key}>
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-body font-semibold">{c.title}</h3>
+              <Button variant="secondary" size="sm" startIcon={Play} onClick={() => onPlay(c.s)}>Play</Button>
+            </div>
+            <p className="text-caption text-fg-secondary">Comfy</p>
+            <NotificationBanner data={c.s.data} size="comfy" onDismiss={() => {}} onOpen={() => {}} />
+            <p className="text-caption text-fg-secondary">Compact(滑鼠移上去)</p>
             <NotificationBanner data={{ ...c.s.data, id: `${c.s.data.id}-compact` }} size="compact" onDismiss={() => {}} onOpen={() => {}} />
             <p className="text-body text-fg-secondary">{c.note}</p>
           </article>

@@ -487,6 +487,9 @@ App 內通知卡（別人找你）。**不用 DS Toast**：toast.spec.md 規定�
   - **Comfy**：訊息 12/130 白、最多兩行、固定兩行高；第三區輸入框一直顯示。卡高 136。
   - **Compact**：訊息一行，這一列固定高 28（= 輸入框高）；hover 或鍵盤 focus 進卡片時第二區最右側出現 Reply（DS Button tertiary sm，套 DS dark mode：`data-theme="dark"` 局部主題；寬 56 = DS sm 最小寬；規格原寫 54，2026-11-17 user 決定維持 56）；按 Reply → 第二列換成輸入框 + 送出鈕並自動 focus，Esc 回到訊息。卡高三種狀態都是 97。
   - **情境**（2026-11-17 user）：DM = 對方頭像 + 對方名字；Group chat = 發言者頭像 + 群組名稱；App（`appInfo: { name, icon, color }`）= app logo（40 圓形，同內框）+ app 名稱 + 「APP」標籤（DS Tag turquoise sm、`data-theme="dark"`、外框 px-0 → 文字左右 4px、上下 0）。App 不能回覆：Comfy 沒有輸入框、Compact 沒有 Reply，訊息列不固定高 → 卡片 hug（Comfy 100 / Compact 88；DM、Group 為 136 / 97）。示範 app 為虛構的「Approvals」，不用真實品牌 logo。
+  - **Group chat 訊息**＝「發言者名字: 訊息」（2026-11-17 user），Comfy / Compact 都一樣。
+  - **APP 標籤內框** 1px，顏色同文字（`inset 0 0 0 1px currentColor`）。
+  - **動作按鈕**（`actions`，2026-11-17 user）：有按鈕就不能回覆，按鈕取代輸入框；DS Button tertiary sm + `data-theme="dark"`。Comfy：第三區，一顆撐滿、兩顆平分，間距 12。Compact：滑鼠移到卡上（或鍵盤 focus）時在右側出現（取代 Reply），兩顆間距 12。按下有 `result` 的按鈕 → 訊息列換成結果、按鈕收起（保留 28 高不跳）、3 秒後卡片收起。卡高與可回覆的卡相同（136 / 97）。
   - 這版不顯示：群組 / thread 來源、Urgent 標籤、「為什麼收到」、時間、則數、轉傳引用框（待設計）。螢幕閱讀器名稱仍帶回覆目的地。
 - **Comfy / Compact**（`size` prop，2026-11-11，舊版面）：Comfy = 上述完整結構。Compact = 一列身分（ItemAvatar inline + 名字 + 「in 群組」+ 則數）+ 一行內文，收掉來源列、「為什麼收到」、按鈕列，只留 Reply 圖示鈕（點了照樣展開就地回覆）；Urgent 標籤、寬度、陰影、計時相同。Teams 只公開設定文案，沒公開兩種尺寸的版面，Compact 版面是我們定義的。
 - **轉傳訊息**（`forwarded: { from, body }`，2026-11-11）：名字 = 轉傳的人；他附的話在上，原訊息放在引用框（border-divider rounded-md + 「Forwarded from 原作者」標頭）。Compact = 「Forwarded a message from …」。預覽關閉 = 「Forwarded a message in 群組」。

@@ -110,20 +110,45 @@ export function NotificationBanner({
   }, [result, onDismiss])
 
   const name = data.actor?.name ?? data.title ?? meta.label
+  const body = showPreview ? data.body : previewOffText(data)
   // 情境(2026-11-17 user):DM = 人像 + 人名;Group chat = 發言者頭像 + 群組名;App = app logo + app 名 + APP 標籤(不能回覆)
   const kind: 'dm' | 'group' | 'app' = data.appInfo ? 'app' : data.context ? 'group' : 'dm'
-  const canReply = kind !== 'app'
+  // 有動作按鈕時不能回覆:按鈕直接取代輸入框(2026-11-17 user)
+  const hasActions = !!data.actions?.length && !result
+  const canReply = kind !== 'app' && !data.actions?.length
+  // 第三區存在(輸入框或按鈕)→ 訊息列固定高,卡片高度不跳;都沒有 → hug
+  const hasFooter = canReply || !!data.actions?.length
+  // Group chat 第二排 =「人名: 訊息」,才看得出是誰說的(2026-11-17 user)
+  const messageText = result ?? (
+    data.forwarded && showPreview
+      ? `Forwarded a message from ${data.forwarded.from}`
+      : kind === 'group' && data.actor ? `${data.actor.name}: ${body}` : body
+  )
+  /** 動作按鈕:DS Button tertiary sm,dark mode;一顆或兩顆,水平排、間距 12 */
+  const actionButtons = (fill: boolean) =>
+    data.actions?.map((a) => (
+      <Button
+        key={a.label}
+        variant="tertiary"
+        size="sm"
+        data-theme="dark"
+        className={fill ? 'min-w-0 flex-1 justify-center' : 'shrink-0 justify-center'}
+        onClick={() => (a.result ? setResult(a.result) : onOpen?.())}
+      >
+        {a.label}
+      </Button>
+    ))
   const titleText = kind === 'app' ? data.appInfo!.name : kind === 'group' ? data.context! : name
   // 第二區第一排:App 多一個「APP」標籤(DS Tag turquoise sm,dark mode;左右 4px、上下 0 —— Tag 外框 px-1 改 px-0,只留文字本身的 4px)
   const titleRow = (
     <span className="flex min-w-0 items-center gap-1">
       <span className="truncate text-[14px] font-bold leading-[1.5] text-white">{titleText}</span>
       {kind === 'app' && (
-        <Tag color="turquoise" size="sm" data-theme="dark" className="shrink-0 px-0 py-0">APP</Tag>
+        // 內框 1px,顏色同文字(currentColor)(2026-11-17 user)
+        <Tag color="turquoise" size="sm" data-theme="dark" className="shrink-0 px-0 py-0 shadow-[inset_0_0_0_1px_currentColor]">APP</Tag>
       )}
     </span>
   )
-  const body = showPreview ? data.body : previewOffText(data)
   // 來源列:thread → 「Chats · Thread in 群組」(DM 的 thread → 「Chats · Thread」)
   const place = data.thread ? (data.context ? `Thread in ${data.context}` : 'Thread') : data.context
   const sourceLine = [meta.label, place].filter(Boolean).join(' · ')
@@ -206,7 +231,7 @@ export function NotificationBanner({
   //   2. 滑鼠移到卡上(或鍵盤 focus 進卡片)時,第二區最右側出現 Reply(DS Button tertiary sm,寬 54px)
   //   3. 按 Reply → 第二列換成回覆輸入框 + 送出鈕(樣式同 Comfy 第三區)
   if (size === 'compact') {
-    const compactBody = result ?? (data.forwarded && showPreview ? `Forwarded a message from ${data.forwarded.from}` : body)
+    const compactBody = messageText
     return (
       <div
         role={data.urgent ? 'alert' : 'status'}
@@ -231,12 +256,16 @@ export function NotificationBanner({
               >
                 {titleRow}
                 {/* 一行訊息;可回覆時這一列固定 28(= 輸入框高),App 不能回覆 → hug */}
-                <span className={`flex items-center ${canReply ? 'h-7' : ''}`}>
+                <span className={`flex items-center ${hasFooter ? 'h-7' : ''}`}>
                   <span className="truncate text-[12px] font-normal leading-[1.3] text-white">{compactBody}</span>
                 </span>
               </button>
             )}
           </div>
+          {/* 有動作按鈕時:hover 出現的是動作按鈕(取代 Reply),兩顆時間距 12 */}
+          {hasActions && (
+            <div className="hidden shrink-0 items-center gap-3 group-hover:flex group-focus-within:flex">{actionButtons(false)}</div>
+          )}
           {canReply && !replying && !result && (
             <Button
               variant="tertiary"
@@ -282,14 +311,17 @@ export function NotificationBanner({
         <span className="flex min-w-0 flex-1 flex-col">
           {titleRow}
           {/* 最多兩行;可回覆時固定兩行高,App 不能回覆 → hug */}
-          <span className={`line-clamp-2 text-[12px] font-normal leading-[1.3] text-white ${canReply ? 'h-[2.6em]' : ''}`}>
-            {result ?? (data.forwarded && showPreview ? `Forwarded a message from ${data.forwarded.from}` : body)}
+          <span className={`line-clamp-2 text-[12px] font-normal leading-[1.3] text-white ${hasFooter ? 'h-[2.6em]' : ''}`}>
+            {messageText}
           </span>
         </span>
       </button>
 
       {/* 第三區:回覆輸入框 + 送出(一直顯示) */}
+      {/* 第三區:可回覆 → 輸入框;有動作 → 按鈕取代輸入框(一顆滿寬、兩顆平分,間距 12);結果出現後收起 */}
       {canReply && replyField(false)}
+      {hasActions && <div className="flex gap-3">{actionButtons(true)}</div>}
+      {!!data.actions?.length && result && <div className="h-7" aria-hidden />}
     </div>
   )
 }
