@@ -218,7 +218,7 @@ export function NotificationBanner({
               size="sm"
               // 深色底上用 DS dark mode 樣式(2026-11-17 user):data-theme="dark" 是 DS 支援的局部主題範圍(semantic.css [data-theme]),不另寫顏色
               data-theme="dark"
-              // 規格寬 54px;DS Button sm 有 min-w-14(56px),目前沿用 DS 最小寬,待 user 決定是否覆寫
+              // 寬 56px = DS Button sm 最小寬 min-w-14(規格原寫 54,2026-11-17 user 決定維持 DS 的 56)
               className="hidden shrink-0 justify-center group-hover:inline-flex group-focus-within:inline-flex"
               aria-label={replyTarget}
               onClick={openReply}

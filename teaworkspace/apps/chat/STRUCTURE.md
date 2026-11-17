@@ -485,7 +485,7 @@ App 內通知卡（別人找你）。**不用 DS Toast**：toast.spec.md 規定�
 - **品牌視覺（2026-11-17 user 規格，取代下方 Comfy / Compact 舊版面描述）**：深色卡 #33337B、寬 360、padding 12、圓角 8、陰影 0 8 16 #000 16%；數值照 user 指定，尚未 token 化。
   - 共用：第一區 = 六角形 logo 16 + 「Workspace」12/130 bold 白 65% + 右側關閉 16（同色）；頭像 40 圓形 + 內框 1px #E8E8E8；名字 14/150 bold 白一行；頭像與文字間距 12；區塊間距 8。回覆輸入框高 28、底白 8%、框線 1px 白 25%、focus 框線 primary、placeholder「Send a reply」14/150 白 65%；右側送出鈕 lucide send-horizontal 16 白（點擊範圍 28×28）。
   - **Comfy**：訊息 12/130 白、最多兩行、固定兩行高；第三區輸入框一直顯示。卡高 136。
-  - **Compact**：訊息一行，這一列固定高 28（= 輸入框高）；hover 或鍵盤 focus 進卡片時第二區最右側出現 Reply（DS Button tertiary sm，套 DS dark mode：`data-theme="dark"` 局部主題；規格寬 54，但 DS sm 最小寬 56，目前沿用 56）；按 Reply → 第二列換成輸入框 + 送出鈕並自動 focus，Esc 回到訊息。卡高三種狀態都是 97。
+  - **Compact**：訊息一行，這一列固定高 28（= 輸入框高）；hover 或鍵盤 focus 進卡片時第二區最右側出現 Reply（DS Button tertiary sm，套 DS dark mode：`data-theme="dark"` 局部主題；寬 56 = DS sm 最小寬；規格原寫 54，2026-11-17 user 決定維持 56）；按 Reply → 第二列換成輸入框 + 送出鈕並自動 focus，Esc 回到訊息。卡高三種狀態都是 97。
   - 這版不顯示：群組 / thread 來源、Urgent 標籤、「為什麼收到」、時間、則數、轉傳引用框（待設計）。螢幕閱讀器名稱仍帶回覆目的地。
 - **Comfy / Compact**（`size` prop，2026-11-11，舊版面）：Comfy = 上述完整結構。Compact = 一列身分（ItemAvatar inline + 名字 + 「in 群組」+ 則數）+ 一行內文，收掉來源列、「為什麼收到」、按鈕列，只留 Reply 圖示鈕（點了照樣展開就地回覆）；Urgent 標籤、寬度、陰影、計時相同。Teams 只公開設定文案，沒公開兩種尺寸的版面，Compact 版面是我們定義的。
 - **轉傳訊息**（`forwarded: { from, body }`，2026-11-11）：名字 = 轉傳的人；他附的話在上，原訊息放在引用框（border-divider rounded-md + 「Forwarded from 原作者」標頭）。Compact = 「Forwarded a message from …」。預覽關閉 = 「Forwarded a message in 群組」。
