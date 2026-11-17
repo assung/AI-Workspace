@@ -186,9 +186,9 @@ export function BannerGallery() {
 
 /** 卡片的三種狀態(2026-11-12):Initial / Hover / Reply focused。三張是同一則通知;Hover 與 Reply 請實際操作第 2、3 張 */
 const STATE_NOTES = [
-  { title: 'Initial', note: '剛跳出。10 秒後自動收起。' },
-  { title: 'Hover', note: '滑鼠移到卡片上:計時暫停,移開後繼續。內容列出現淺灰底,表示點了會打開這個聊天。' },
-  { title: 'Reply focused', note: '按 Reply 後,按鈕換成輸入框並自動取得焦點(藍色外框)。回覆期間計時暫停;有文字才能送出,Enter 送出,Esc 回到按鈕。' },
+  { title: 'Initial', note: '剛跳出。10 秒後自動收起。回覆輸入框一開始就在。' },
+  { title: 'Hover', note: '外觀不變(同 Teams)。滑鼠停在卡上時計時暫停,移開後繼續;點頭像或文字區會打開這個聊天。' },
+  { title: 'Reply focused', note: '點輸入框即可打字,框線變亮;回覆期間計時暫停。Enter 或紙飛機送出,Esc 離開輸入框。' },
 ]
 function BannerStates({ size }: { size: BannerSize }) {
   const base = DELIVERED.find((x) => x.data.id === 'mention') as Scenario

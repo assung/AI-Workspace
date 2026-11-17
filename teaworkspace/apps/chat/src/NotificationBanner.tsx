@@ -16,8 +16,8 @@
 // - 在任何地方讀過 → 卡片收起(規格第 10 節第 3 點)。
 // - 卡上「為什麼收到」一行(規格第 10 節第 1 點)。
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Button, Input, ItemAvatar, ItemContent, Tag } from '@qijenchen/design-system'
-import { Check, FileText, Forward, HardDrive, ListChecks, MessageCircle, Reply, Send, Sparkles, X, type LucideIcon } from 'lucide-react'
+import { Avatar, Button, Input, ItemAvatar, Tag } from '@qijenchen/design-system'
+import { Check, FileText, HardDrive, Hexagon, ListChecks, MessageCircle, Reply, Send, Sparkles, X, type LucideIcon } from 'lucide-react'
 import { NATIVE_APPS, type NativeAppKey } from './WorkspaceSettings'
 
 export type BannerApp = NativeAppKey | 'agent'
@@ -188,100 +188,84 @@ export function NotificationBanner({
     )
   }
 
+  // ── Comfy(2026-11-17 user 視覺規格):品牌深色卡。數值照 user 指定,尚未 token 化(見 STRUCTURE.md §Push banner)。
+  //   第一區:六角形 logo 16 + 品牌名 12/130 bold,白 65%;右側關閉 16,同色。
+  //   第二區:頭像 40 圓形;名字 14/150 bold 白、一行;訊息 12/130 regular 白、最多兩行且固定兩行高;兩排間距 0;頭像與文字間距 12。
+  //   第三區:回覆輸入框高 28、底白 8%、框線 1px 白 25%、placeholder「Send a reply」14/150 白 65%;右側紙飛機送出鈕(白)。
+  //   第二、三區間距 8;卡片 padding 12、底色 #33337B。
+  const sendReply = () => {
+    if (!draft.trim()) return
+    setDraft('')
+    setResult('Reply sent')
+  }
   return (
     <div
       role={data.urgent ? 'alert' : 'status'}
       aria-label={`${data.urgent ? 'Urgent: ' : ''}${name}${data.context ? ` in ${data.context}` : ''}`}
-      className="w-[360px] max-w-full overflow-hidden rounded-lg bg-surface-raised text-foreground"
-      style={{ boxShadow: 'var(--elevation-200)' }}
+      className="flex w-[360px] max-w-full flex-col gap-2 overflow-hidden rounded-lg p-3 text-white"
+      style={{ background: '#33337B', boxShadow: 'var(--elevation-200)' }}
     >
-      <div className="flex flex-col gap-2 px-4 py-3">
-        {/* 來源列:app + 脈絡 + 時間 + 關閉 */}
-        <div className="flex items-center gap-2 text-caption text-fg-secondary">
-          <AppIcon size={16} className="shrink-0" aria-hidden />
-          <span className="min-w-0 flex-1 truncate">{sourceLine}</span>
-          {data.urgent && <Tag color="red" solid size="sm">Urgent</Tag>}
-          {data.time && <span className="shrink-0">{data.time}</span>}
-          {onDismiss && <Button variant="text" size="sm" iconOnly dismiss startIcon={X} aria-label="Dismiss notification" onClick={onDismiss} />}
-        </div>
-
-        {result ? resultRow : (
-          <>
-            {/* 內容列(Family 2):頭像 + label / description;點內容 = 打開來源 */}
-            <button
-              type="button"
-              onClick={onOpen}
-              className="-mx-2 flex items-start gap-3 rounded-md px-2 py-1 text-left hover:bg-neutral-hover"
-            >
-              {data.actor ? (
-                <ItemAvatar mode="block" src={data.actor.avatarUrl} alt={data.actor.name} />
-              ) : (
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-subtle text-primary" aria-hidden>
-                  <AppIcon size={16} />
-                </span>
-              )}
-              <ItemContent
-                className="min-w-0 flex-1"
-                labelTruncate={false}
-                label={
-                  <span className="font-semibold">
-                    {name}
-                    {countText ? <span className="font-normal text-fg-secondary">{countText}</span> : null}
-                  </span>
-                }
-                description={
-                  data.forwarded && showPreview ? (
-                    <span className="flex flex-col gap-2">
-                      {data.body && <span className="line-clamp-2">{data.body}</span>}
-                      {/* 轉傳引用框:對照 Teams 聊天裡轉傳訊息的外框 + 「Forwarded」標頭(原作者 + 原文) */}
-                      <span className="flex flex-col gap-1 rounded-md border border-divider px-3 py-2">
-                        <span className="flex items-center gap-1 text-caption text-fg-secondary">
-                          <Forward size={16} aria-hidden />
-                          Forwarded from {data.forwarded.from}
-                        </span>
-                        <span className="line-clamp-2 text-foreground">{data.forwarded.body}</span>
-                      </span>
-                    </span>
-                  ) : (
-                    <span className="line-clamp-2">{body}</span>
-                  )
-                }
-              />
-            </button>
-
-            {data.thread && (
-              <p className="truncate pl-11 text-caption text-fg-secondary">Thread: “{data.thread.root}”</p>
-            )}
-            {data.reason && (
-              <p className="pl-11 text-caption text-fg-secondary">{data.reason}</p>
-            )}
-
-            {replying ? (
-              replyForm
-            ) : (data.reply || data.actions?.length) ? (
-              <div className="flex flex-wrap items-center gap-2 pl-11">
-                {data.reply && (
-                  <Button variant="secondary" size="sm" onClick={openReply}>{data.thread ? 'Reply in thread' : 'Reply'}</Button>
-                )}
-                {data.actions?.map((a) => (
-                  <Button
-                    key={a.label}
-                    variant={a.primary ? 'primary' : 'secondary'}
-                    size="sm"
-                    onClick={() => (a.result ? setResult(a.result) : onOpen?.())}
-                  >
-                    {a.label}
-                  </Button>
-                ))}
-              </div>
-            ) : null}
-
-            {data.urgent && (
-              <p className="pl-11 text-caption text-fg-secondary">Reminds you every 2 minutes until you read it.</p>
-            )}
-          </>
+      {/* 第一區:品牌列 */}
+      <div className="flex items-center gap-1 text-white/65">
+        <Hexagon size={16} className="shrink-0" aria-hidden />
+        <span className="min-w-0 flex-1 truncate text-[12px] font-bold leading-[1.3]">Workspace</span>
+        {onDismiss && (
+          <button
+            type="button"
+            aria-label="Dismiss notification"
+            onClick={onDismiss}
+            className="-m-1 flex shrink-0 items-center justify-center rounded p-1 text-white/65 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+          >
+            <X size={16} aria-hidden />
+          </button>
         )}
       </div>
+
+      {/* 第二區:頭像 + 名字 / 訊息(固定兩行高,卡片高度不跟內容變) */}
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex items-center gap-3 rounded text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+      >
+        {data.actor ? (
+          <Avatar src={data.actor.avatarUrl} alt={data.actor.name} size={40} />
+        ) : (
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/[0.08]" aria-hidden>
+            <AppIcon size={16} />
+          </span>
+        )}
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-[14px] font-bold leading-[1.5] text-white">{name}</span>
+          <span className="line-clamp-2 h-[2.6em] text-[12px] font-normal leading-[1.3] text-white">
+            {result ?? (data.forwarded && showPreview ? `Forwarded a message from ${data.forwarded.from}` : body)}
+          </span>
+        </span>
+      </button>
+
+      {/* 第三區:回覆輸入框 + 送出 */}
+      <form
+        className="flex items-center gap-2"
+        onSubmit={(e) => { e.preventDefault(); sendReply() }}
+      >
+        <input
+          type="text"
+          aria-label={replyTarget}
+          placeholder="Send a reply"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onFocus={() => setReplying(true)}
+          onBlur={() => setReplying(false)}
+          onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); (e.target as HTMLInputElement).blur() } }}
+          className="h-7 min-w-0 flex-1 rounded-md border border-white/25 bg-white/[0.08] px-2 text-[14px] leading-[1.5] text-white outline-none placeholder:text-white/65 focus:border-white/65"
+        />
+        <button
+          type="submit"
+          aria-label="Send reply"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-white hover:bg-white/[0.08] focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+        >
+          <Send size={16} aria-hidden />
+        </button>
+      </form>
     </div>
   )
 }
