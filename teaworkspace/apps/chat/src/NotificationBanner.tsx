@@ -17,7 +17,7 @@
 // - 卡上「為什麼收到」一行(規格第 10 節第 1 點)。
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Avatar, Button, Input, ItemAvatar, Tag } from '@qijenchen/design-system'
-import { Check, FileText, HardDrive, Hexagon, ListChecks, MessageCircle, Reply, Send, Sparkles, X, type LucideIcon } from 'lucide-react'
+import { Check, FileText, HardDrive, Hexagon, ListChecks, MessageCircle, Reply, Send, SendHorizontal, Sparkles, X, type LucideIcon } from 'lucide-react'
 import { NATIVE_APPS, type NativeAppKey } from './WorkspaceSettings'
 
 export type BannerApp = NativeAppKey | 'agent'
@@ -191,8 +191,8 @@ export function NotificationBanner({
   // ── Comfy(2026-11-17 user 視覺規格):品牌深色卡。數值照 user 指定,尚未 token 化(見 STRUCTURE.md §Push banner)。
   //   第一區:六角形 logo 16 + 品牌名 12/130 bold,白 65%;右側關閉 16,同色。
   //   第二區:頭像 40 圓形;名字 14/150 bold 白、一行;訊息 12/130 regular 白、最多兩行且固定兩行高;兩排間距 0;頭像與文字間距 12。
-  //   第三區:回覆輸入框高 28、底白 8%、框線 1px 白 25%、placeholder「Send a reply」14/150 白 65%;右側紙飛機送出鈕(白)。
-  //   第二、三區間距 8;卡片 padding 12、底色 #33337B。
+  //   第三區:回覆輸入框高 28、底白 8%、框線 1px 白 25%、placeholder「Send a reply」14/150 白 65%;右側送出鈕 lucide send-horizontal(白)。
+  //   第二、三區間距 8;卡片 padding 12、圓角 8、底色 #33337B;頭像內框 1px #E8E8E8;輸入框 focus 框線 = primary(DS Textarea 同用 border-primary)。
   const sendReply = () => {
     if (!draft.trim()) return
     setDraft('')
@@ -202,7 +202,7 @@ export function NotificationBanner({
     <div
       role={data.urgent ? 'alert' : 'status'}
       aria-label={`${data.urgent ? 'Urgent: ' : ''}${name}${data.context ? ` in ${data.context}` : ''}`}
-      className="flex w-[360px] max-w-full flex-col gap-2 overflow-hidden rounded-lg p-3 text-white"
+      className="flex w-[360px] max-w-full flex-col gap-2 overflow-hidden rounded-[8px] p-3 text-white"
       style={{ background: '#33337B', boxShadow: 'var(--elevation-200)' }}
     >
       {/* 第一區:品牌列 */}
@@ -228,7 +228,11 @@ export function NotificationBanner({
         className="flex items-center gap-3 rounded text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
       >
         {data.actor ? (
-          <Avatar src={data.actor.avatarUrl} alt={data.actor.name} size={40} />
+          // 頭像內框 1px #E8E8E8(2026-11-17 user):疊一層 inset ring,不佔版面、不改變 40px 尺寸
+          <span className="relative h-10 w-10 shrink-0">
+            <Avatar src={data.actor.avatarUrl} alt={data.actor.name} size={40} />
+            <span className="pointer-events-none absolute inset-0 rounded-full shadow-[inset_0_0_0_1px_#E8E8E8]" aria-hidden />
+          </span>
         ) : (
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/[0.08]" aria-hidden>
             <AppIcon size={16} />
@@ -256,14 +260,14 @@ export function NotificationBanner({
           onFocus={() => setReplying(true)}
           onBlur={() => setReplying(false)}
           onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); (e.target as HTMLInputElement).blur() } }}
-          className="h-7 min-w-0 flex-1 rounded-md border border-white/25 bg-white/[0.08] px-2 text-[14px] leading-[1.5] text-white outline-none placeholder:text-white/65 focus:border-white/65"
+          className="h-7 min-w-0 flex-1 rounded-md border border-white/25 bg-white/[0.08] px-2 text-[14px] leading-[1.5] text-white outline-none placeholder:text-white/65 focus:border-primary"
         />
         <button
           type="submit"
           aria-label="Send reply"
           className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-white hover:bg-white/[0.08] focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
         >
-          <Send size={16} aria-hidden />
+          <SendHorizontal size={16} aria-hidden />
         </button>
       </form>
     </div>
