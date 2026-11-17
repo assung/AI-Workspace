@@ -16,8 +16,8 @@
 // - 在任何地方讀過 → 卡片收起(規格第 10 節第 3 點)。
 // - 卡上「為什麼收到」一行(規格第 10 節第 1 點)。
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Avatar, Button, Input, ItemAvatar, Tag } from '@qijenchen/design-system'
-import { Check, FileText, HardDrive, Hexagon, ListChecks, MessageCircle, Reply, Send, SendHorizontal, Sparkles, X, type LucideIcon } from 'lucide-react'
+import { Avatar, Button } from '@qijenchen/design-system'
+import { FileText, HardDrive, Hexagon, ListChecks, MessageCircle, SendHorizontal, Sparkles, X, type LucideIcon } from 'lucide-react'
 import { NATIVE_APPS, type NativeAppKey } from './WorkspaceSettings'
 
 export type BannerApp = NativeAppKey | 'agent'
@@ -93,9 +93,7 @@ export function NotificationBanner({
   const meta = APP_META[data.app]
   const AppIcon = meta.icon
   const [replying, setReplying] = useState(defaultReplying)
-  // 使用者自己按 Reply 才自動 focus;defaultReplying(總覽頁靜態示意)不搶焦點
-  const [userOpenedReply, setUserOpenedReply] = useState(false)
-  const openReply = () => { setUserOpenedReply(true); setReplying(true) }
+  const openReply = () => setReplying(true)
   const [draft, setDraft] = useState('')
   const [result, setResult] = useState<string | null>(null)
 
@@ -115,74 +113,117 @@ export function NotificationBanner({
   // Reply 送到哪裡,送出前就寫在輸入框上:thread → 回到 thread;群組 → 回到群組;一對一 → 回給對方
   const replyTarget = data.thread ? 'Reply in thread' : data.context ? `Reply to ${data.context}` : `Reply to ${name.split(' ')[0]}`
 
-  const replyForm = (
-    <form
-      className={`flex items-center gap-2 ${size === 'compact' ? 'pl-8' : 'pl-11'}`}
-      onSubmit={(e) => {
-        e.preventDefault()
-        if (!draft.trim()) return
-        setReplying(false)
-        setResult('Reply sent')
-      }}
-    >
-      <Input
-        size="sm"
-        autoFocus={userOpenedReply}
+  // ── Comfy / Compact 共用的區塊 ──
+  const brandRow = (
+    <div className="flex items-center gap-1 text-white/65">
+      <Hexagon size={16} className="shrink-0" aria-hidden />
+      <span className="min-w-0 flex-1 truncate text-[12px] font-bold leading-[1.3]">Workspace</span>
+      {onDismiss && (
+        <button
+          type="button"
+          aria-label="Dismiss notification"
+          onClick={onDismiss}
+          className="-m-1 flex shrink-0 items-center justify-center rounded p-1 text-white/65 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+        >
+          <X size={16} aria-hidden />
+        </button>
+      )}
+    </div>
+  )
+  const avatarEl = data.actor ? (
+    // 頭像內框 1px #E8E8E8(2026-11-17 user):疊一層 inset ring,不佔版面、不改變 40px 尺寸
+    <span className="relative h-10 w-10 shrink-0">
+      <Avatar src={data.actor.avatarUrl} alt={data.actor.name} size={40} />
+      <span className="pointer-events-none absolute inset-0 rounded-full shadow-[inset_0_0_0_1px_#E8E8E8]" aria-hidden />
+    </span>
+  ) : (
+    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/[0.08]" aria-hidden>
+      <AppIcon size={16} />
+    </span>
+  )
+  const sendReply = () => {
+    if (!draft.trim()) return
+    setDraft('')
+    setReplying(false)
+    setResult('Reply sent')
+  }
+  /** 回覆輸入框 + 送出鈕;compact = 使用者按了 Reply 才出現 → 自動 focus,Esc 回到訊息 */
+  const replyField = (compact: boolean) => (
+    <form className="flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); sendReply() }}>
+      <input
+        type="text"
+        autoFocus={compact}
         aria-label={replyTarget}
-        placeholder={replyTarget}
+        placeholder="Send a reply"
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setReplying(false) } }}
-        className="min-w-0 flex-1"
+        onFocus={() => { if (!compact) setReplying(true) }}
+        onBlur={() => { if (!compact) setReplying(false) }}
+        onKeyDown={(e) => {
+          if (e.key !== 'Escape') return
+          e.stopPropagation()
+          if (compact) setReplying(false)
+          else (e.target as HTMLInputElement).blur()
+        }}
+        className="h-7 min-w-0 flex-1 rounded-md border border-white/25 bg-white/[0.08] px-2 text-[14px] leading-[1.5] text-white outline-none placeholder:text-white/65 focus:border-primary"
       />
-      <Button type="submit" variant="primary" size="sm" iconOnly startIcon={Send} aria-label="Send reply" disabled={!draft.trim()} />
+      <button
+        type="submit"
+        aria-label="Send reply"
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-white hover:bg-white/[0.08] focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+      >
+        <SendHorizontal size={16} aria-hidden />
+      </button>
     </form>
   )
 
-  const resultRow = (
-    <div className="flex items-center gap-2 text-body" role="status">
-      <Check size={16} className="shrink-0 text-success-text" aria-hidden />
-      <span>{result}</span>
-    </div>
-  )
-
-  // ── Compact:一行身分 + 一行內文;來源併入名字後、「為什麼收到」與按鈕列收掉,只留 Reply 圖示鈕(就地回覆仍可用)
+  // ── Compact(2026-11-17 user 視覺規格):外框、第一區、頭像、名字同 Comfy,差異只有三點 ──
+  //   1. 第二列訊息最多一行,但這一列固定高 28px(= 回覆輸入框高),切到回覆時卡片高度不跳
+  //   2. 滑鼠移到卡上(或鍵盤 focus 進卡片)時,第二區最右側出現 Reply(DS Button tertiary sm,寬 54px)
+  //   3. 按 Reply → 第二列換成回覆輸入框 + 送出鈕(樣式同 Comfy 第三區)
   if (size === 'compact') {
-    const compactBody = data.forwarded && showPreview
-      ? `Forwarded a message from ${data.forwarded.from}${data.body ? ` · ${data.body}` : ''}`
-      : body
+    const compactBody = result ?? (data.forwarded && showPreview ? `Forwarded a message from ${data.forwarded.from}` : body)
     return (
       <div
         role={data.urgent ? 'alert' : 'status'}
         aria-label={`${data.urgent ? 'Urgent: ' : ''}${name}${data.context ? ` in ${data.context}` : ''}`}
-        className="w-[360px] max-w-full overflow-hidden rounded-lg bg-surface-raised text-foreground"
-        style={{ boxShadow: 'var(--elevation-200)' }}
+        className="group flex w-[360px] max-w-full flex-col gap-2 overflow-hidden rounded-[8px] p-3 text-white"
+        style={{ background: '#33337B', boxShadow: '0 8px 16px rgba(0, 0, 0, 0.16)' }}
       >
-        <div className="flex flex-col gap-2 px-4 py-2">
-          {result ? resultRow : (
-            <div className="flex items-center gap-2">
-              <button type="button" onClick={onOpen} className="-mx-1 flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-1 text-left hover:bg-neutral-hover">
-                {data.actor ? (
-                  <ItemAvatar mode="inline" src={data.actor.avatarUrl} alt={data.actor.name} />
-                ) : (
-                  <AppIcon size={16} className="shrink-0 text-primary" aria-hidden />
-                )}
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-body">
-                    <span className="font-semibold">{name}</span>
-                    <span className="text-fg-secondary">{data.thread ? ' in thread' : ''}{data.context ? `${data.thread ? ' · ' : ' in '}${data.context}` : ''}{countText}</span>
-                  </span>
-                  <span className="truncate text-body text-fg-secondary">{compactBody}</span>
+        {brandRow}
+        <div className="flex items-center gap-3">
+          {avatarEl}
+          <div className="flex min-w-0 flex-1 flex-col">
+            {replying ? (
+              <>
+                <span className="truncate text-[14px] font-bold leading-[1.5] text-white">{name}</span>
+                {replyField(true)}
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={onOpen}
+                className="flex min-w-0 flex-col rounded text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+              >
+                <span className="truncate text-[14px] font-bold leading-[1.5] text-white">{name}</span>
+                <span className="flex h-7 items-center">
+                  <span className="truncate text-[12px] font-normal leading-[1.3] text-white">{compactBody}</span>
                 </span>
               </button>
-              {data.urgent && <Tag color="red" solid size="sm">Urgent</Tag>}
-              {data.reply && !replying && (
-                <Button variant="text" size="sm" iconOnly startIcon={Reply} aria-label={replyTarget} onClick={openReply} />
-              )}
-              {onDismiss && <Button variant="text" size="sm" iconOnly dismiss startIcon={X} aria-label="Dismiss notification" onClick={onDismiss} />}
-            </div>
+            )}
+          </div>
+          {!replying && !result && (
+            <Button
+              variant="tertiary"
+              size="sm"
+              // 規格寬 54px;DS Button sm 有 min-w-14(56px),目前沿用 DS 最小寬,待 user 決定是否覆寫
+              className="hidden shrink-0 justify-center group-hover:inline-flex group-focus-within:inline-flex"
+              aria-label={replyTarget}
+              onClick={openReply}
+            >
+              Reply
+            </Button>
           )}
-          {!result && replying && replyForm}
         </div>
       </div>
     )
@@ -193,11 +234,6 @@ export function NotificationBanner({
   //   第二區:頭像 40 圓形;名字 14/150 bold 白、一行;訊息 12/130 regular 白、最多兩行且固定兩行高;兩排間距 0;頭像與文字間距 12。
   //   第三區:回覆輸入框高 28、底白 8%、框線 1px 白 25%、placeholder「Send a reply」14/150 白 65%;右側送出鈕 lucide send-horizontal(白)。
   //   第二、三區間距 8;卡片 padding 12、圓角 8、底色 #33337B、陰影 0 8 16 #000 16%;頭像內框 1px #E8E8E8;輸入框 focus 框線 = primary(DS Textarea 同用 border-primary)。
-  const sendReply = () => {
-    if (!draft.trim()) return
-    setDraft('')
-    setResult('Reply sent')
-  }
   return (
     <div
       role={data.urgent ? 'alert' : 'status'}
@@ -207,20 +243,7 @@ export function NotificationBanner({
       style={{ background: '#33337B', boxShadow: '0 8px 16px rgba(0, 0, 0, 0.16)' }}
     >
       {/* 第一區:品牌列 */}
-      <div className="flex items-center gap-1 text-white/65">
-        <Hexagon size={16} className="shrink-0" aria-hidden />
-        <span className="min-w-0 flex-1 truncate text-[12px] font-bold leading-[1.3]">Workspace</span>
-        {onDismiss && (
-          <button
-            type="button"
-            aria-label="Dismiss notification"
-            onClick={onDismiss}
-            className="-m-1 flex shrink-0 items-center justify-center rounded p-1 text-white/65 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
-          >
-            <X size={16} aria-hidden />
-          </button>
-        )}
-      </div>
+      {brandRow}
 
       {/* 第二區:頭像 + 名字 / 訊息(固定兩行高,卡片高度不跟內容變) */}
       <button
@@ -228,17 +251,7 @@ export function NotificationBanner({
         onClick={onOpen}
         className="flex items-center gap-3 rounded text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
       >
-        {data.actor ? (
-          // 頭像內框 1px #E8E8E8(2026-11-17 user):疊一層 inset ring,不佔版面、不改變 40px 尺寸
-          <span className="relative h-10 w-10 shrink-0">
-            <Avatar src={data.actor.avatarUrl} alt={data.actor.name} size={40} />
-            <span className="pointer-events-none absolute inset-0 rounded-full shadow-[inset_0_0_0_1px_#E8E8E8]" aria-hidden />
-          </span>
-        ) : (
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/[0.08]" aria-hidden>
-            <AppIcon size={16} />
-          </span>
-        )}
+        {avatarEl}
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-[14px] font-bold leading-[1.5] text-white">{name}</span>
           <span className="line-clamp-2 h-[2.6em] text-[12px] font-normal leading-[1.3] text-white">
@@ -247,30 +260,8 @@ export function NotificationBanner({
         </span>
       </button>
 
-      {/* 第三區:回覆輸入框 + 送出 */}
-      <form
-        className="flex items-center gap-2"
-        onSubmit={(e) => { e.preventDefault(); sendReply() }}
-      >
-        <input
-          type="text"
-          aria-label={replyTarget}
-          placeholder="Send a reply"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onFocus={() => setReplying(true)}
-          onBlur={() => setReplying(false)}
-          onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); (e.target as HTMLInputElement).blur() } }}
-          className="h-7 min-w-0 flex-1 rounded-md border border-white/25 bg-white/[0.08] px-2 text-[14px] leading-[1.5] text-white outline-none placeholder:text-white/65 focus:border-primary"
-        />
-        <button
-          type="submit"
-          aria-label="Send reply"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-white hover:bg-white/[0.08] focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
-        >
-          <SendHorizontal size={16} aria-hidden />
-        </button>
-      </form>
+      {/* 第三區:回覆輸入框 + 送出(一直顯示) */}
+      {replyField(false)}
     </div>
   )
 }

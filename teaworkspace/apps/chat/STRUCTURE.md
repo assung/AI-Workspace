@@ -482,7 +482,12 @@ user：「我想照我寫好的對話劇本來演示」→ 劇本 `K8S_IMAGEPULL
 App 內通知卡（別人找你）。**不用 DS Toast**：toast.spec.md 規定需要使用者處理的內容不放 Toast；本卡要在卡上回覆 / 核准（專案目標 2）。外框值全部沿用 Toast / Notice：寬 360、`rounded-lg` + `--elevation-200`、`px-4 py-3`、`z-[60]`、離視窗邊 24px。
 
 - 結構：來源列（app 圖示 + app · 脈絡 + 時間 + Urgent 標籤 + 關閉）→ 內容列（Family 2：ItemAvatar block / 沒有發送人時 app 圖示圓底 + ItemContent，整列可點 = 打開來源）→「為什麼收到」一行 → 動作列（Reply 展開就地回覆輸入框；最多 2 個 Button）。動作完成 → 卡片換成結果句（Reply sent / Access granted…），3 秒後收起。
-- **Comfy / Compact**（`size` prop，2026-11-11）：Comfy = 上述完整結構。Compact = 一列身分（ItemAvatar inline + 名字 + 「in 群組」+ 則數）+ 一行內文，收掉來源列、「為什麼收到」、按鈕列，只留 Reply 圖示鈕（點了照樣展開就地回覆）；Urgent 標籤、寬度、陰影、計時相同。Teams 只公開設定文案，沒公開兩種尺寸的版面，Compact 版面是我們定義的。
+- **品牌視覺（2026-11-17 user 規格，取代下方 Comfy / Compact 舊版面描述）**：深色卡 #33337B、寬 360、padding 12、圓角 8、陰影 0 8 16 #000 16%；數值照 user 指定，尚未 token 化。
+  - 共用：第一區 = 六角形 logo 16 + 「Workspace」12/130 bold 白 65% + 右側關閉 16（同色）；頭像 40 圓形 + 內框 1px #E8E8E8；名字 14/150 bold 白一行；頭像與文字間距 12；區塊間距 8。回覆輸入框高 28、底白 8%、框線 1px 白 25%、focus 框線 primary、placeholder「Send a reply」14/150 白 65%；右側送出鈕 lucide send-horizontal 16 白（點擊範圍 28×28）。
+  - **Comfy**：訊息 12/130 白、最多兩行、固定兩行高；第三區輸入框一直顯示。卡高 136。
+  - **Compact**：訊息一行，這一列固定高 28（= 輸入框高）；hover 或鍵盤 focus 進卡片時第二區最右側出現 Reply（DS Button tertiary sm；規格寬 54，但 DS sm 最小寬 56，目前沿用 56）；按 Reply → 第二列換成輸入框 + 送出鈕並自動 focus，Esc 回到訊息。卡高三種狀態都是 97。
+  - 這版不顯示：群組 / thread 來源、Urgent 標籤、「為什麼收到」、時間、則數、轉傳引用框（待設計）。螢幕閱讀器名稱仍帶回覆目的地。
+- **Comfy / Compact**（`size` prop，2026-11-11，舊版面）：Comfy = 上述完整結構。Compact = 一列身分（ItemAvatar inline + 名字 + 「in 群組」+ 則數）+ 一行內文，收掉來源列、「為什麼收到」、按鈕列，只留 Reply 圖示鈕（點了照樣展開就地回覆）；Urgent 標籤、寬度、陰影、計時相同。Teams 只公開設定文案，沒公開兩種尺寸的版面，Compact 版面是我們定義的。
 - **轉傳訊息**（`forwarded: { from, body }`，2026-11-11）：名字 = 轉傳的人；他附的話在上，原訊息放在引用框（border-divider rounded-md + 「Forwarded from 原作者」標頭）。Compact = 「Forwarded a message from …」。預覽關閉 = 「Forwarded a message in 群組」。
 - `BannerStack`：**右上角**（Toast 在右下 = 操作回饋，banner = 別人找你，不搶同一角）。最新在上、同時最多 N 張（Display › Show this many notifications on screen at once：3 / 4 / 5，預設 3；視窗放不下時最舊的整張先不顯示，不露出半張）、同 `threadKey` 取代並累計則數（`push(b, group, max)`，group = 設定 Group banners from the same chat，關閉時不收合）；10 秒收起（DS Toast 含 action 的預設），滑鼠停留 / 回覆中暫停；Urgent 不自動收起、`role="alert"`。
 - `routeNotification(event, prefs, ctx)`：照流程圖第 1 張圖關卡順序 → `banner` / `badge` / `none`，並回傳「為什麼收到」的句子。緊急 → 功能區塊總開關 → 該種通知 Show in banner / Off → 聊天靜音（只放行 Personal @mention，Everyone @mentions 不放行）→ 暫停（優先聯絡人放行）→ 通話 / 會議中（未勾 Show notifications while "In a Call" status 時只放行本場會議聊天）→ 系統勿擾。
