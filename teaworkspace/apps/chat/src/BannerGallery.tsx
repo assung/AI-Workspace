@@ -26,7 +26,7 @@ const DELIVERED: Scenario[] = [
   {
     title: 'Chats — 一對一新訊息',
     gate: 'Chats › Messages › New messages = Show in banner',
-    behavior: '10 秒後收起;滑鼠停留或回覆中暫停。Reply 直接在卡上回,送出後顯示「Reply sent」3 秒收起。點內容 = 打開該聊天。',
+    behavior: '10 秒後收起;滑鼠停留或回覆中暫停。Reply 直接在卡上回,送出後卡片直接收起。點內容 = 打開該聊天。',
     data: { id: 'dm', threadKey: 'chat:shinichi', app: 'chats', actor: P.shinichi, body: 'The Lugu Co-op samples arrived. Can you confirm the 20 kg order before 3 PM?', reply: true, time: 'now' },
   },
   {

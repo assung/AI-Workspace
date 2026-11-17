@@ -481,7 +481,7 @@ user：「我想照我寫好的對話劇本來演示」→ 劇本 `K8S_IMAGEPULL
 
 App 內通知卡（別人找你）。**不用 DS Toast**：toast.spec.md 規定需要使用者處理的內容不放 Toast；本卡要在卡上回覆 / 核准（專案目標 2）。外框值全部沿用 Toast / Notice：寬 360、`rounded-lg` + `--elevation-200`、`px-4 py-3`、`z-[60]`、離視窗邊 24px。
 
-- 結構：來源列（app 圖示 + app · 脈絡 + 時間 + Urgent 標籤 + 關閉）→ 內容列（Family 2：ItemAvatar block / 沒有發送人時 app 圖示圓底 + ItemContent，整列可點 = 打開來源）→「為什麼收到」一行 → 動作列（Reply 展開就地回覆輸入框；最多 2 個 Button）。動作完成 → 卡片換成結果句（Reply sent / Access granted…），3 秒後收起。
+- 結構：來源列（app 圖示 + app · 脈絡 + 時間 + Urgent 標籤 + 關閉）→ 內容列（Family 2：ItemAvatar block / 沒有發送人時 app 圖示圓底 + ItemContent，整列可點 = 打開來源）→「為什麼收到」一行 → 動作列（Reply 展開就地回覆輸入框；最多 2 個 Button）。動作按鈕完成 → 卡片換成結果句（Approved…），3 秒後收起；**回覆送出 → 卡片直接收起，不顯示「Reply sent」**（2026-11-17 user）。
 - **品牌視覺（2026-11-17 user 規格，取代下方 Comfy / Compact 舊版面描述）**：深色卡 #33337B、寬 360、padding 12、圓角 8、陰影 0 8 16 #000 16%；數值照 user 指定，尚未 token 化。
   - 共用：第一區 = 六角形 logo 16 + 「Workspace」12/130 bold 白 65% + 右側關閉 16（同色）；頭像 40 圓形 + 內框 1px #E8E8E8；名字 14/150 bold 白一行；頭像與文字間距 12；區塊間距 8。回覆輸入框高 28、底白 8%、框線 1px 白 25%、focus 框線 primary、placeholder「Send a reply」14/150 白 65%；右側送出鈕 lucide send-horizontal 16 白（點擊範圍 28×28）。
   - **Comfy**：訊息 12/130 白、最多兩行、固定兩行高；第三區輸入框一直顯示。卡高 136。

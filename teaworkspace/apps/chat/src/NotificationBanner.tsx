@@ -247,9 +247,10 @@ export function NotificationBanner({
   )
   const sendReply = () => {
     if (!draft.trim()) return
+    // 送出後卡片直接收起,不顯示「Reply sent」(2026-11-17 user)
     setDraft('')
     setReplying(false)
-    setResult('Reply sent')
+    onDismiss?.()
   }
   /** 回覆輸入框 + 送出鈕;compact = 使用者按了 Reply 才出現 → 自動 focus,Esc 回到訊息 */
   const replyField = (compact: boolean) => (
