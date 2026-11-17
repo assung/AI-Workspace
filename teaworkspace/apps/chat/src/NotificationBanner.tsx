@@ -16,7 +16,7 @@
 // - 在任何地方讀過 → 卡片收起(規格第 10 節第 3 點)。
 // - 卡上「為什麼收到」一行(規格第 10 節第 1 點)。
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Avatar, Button } from '@qijenchen/design-system'
+import { Avatar, Button, Tag } from '@qijenchen/design-system'
 import { FileText, HardDrive, Hexagon, ListChecks, MessageCircle, SendHorizontal, Sparkles, X, type LucideIcon } from 'lucide-react'
 import { NATIVE_APPS, type NativeAppKey } from './WorkspaceSettings'
 
@@ -64,6 +64,11 @@ export type BannerData = {
    * root = thread 第一則訊息的摘要,讓人認得是哪個 thread。
    */
   thread?: { root: string }
+  /**
+   * App 通知(2026-11-17):來源是 app 而不是人。卡片第二區 = app logo(圓形)+ app 名 +「APP」標籤;沒有回覆功能,卡片高度 hug。
+   * logo = 圖示 + 底色(示範用的虛構 app,不用真實品牌 logo)。
+   */
+  appInfo?: { name: string; icon: LucideIcon; color: string }
 }
 
 /** 卡片尺寸(2026-11-11):對標 Teams Display「Change the size of your message and content previews. Choose Comfy or Compact.」 */
@@ -105,6 +110,19 @@ export function NotificationBanner({
   }, [result, onDismiss])
 
   const name = data.actor?.name ?? data.title ?? meta.label
+  // 情境(2026-11-17 user):DM = 人像 + 人名;Group chat = 發言者頭像 + 群組名;App = app logo + app 名 + APP 標籤(不能回覆)
+  const kind: 'dm' | 'group' | 'app' = data.appInfo ? 'app' : data.context ? 'group' : 'dm'
+  const canReply = kind !== 'app'
+  const titleText = kind === 'app' ? data.appInfo!.name : kind === 'group' ? data.context! : name
+  // 第二區第一排:App 多一個「APP」標籤(DS Tag turquoise sm,dark mode;左右 4px、上下 0 —— Tag 外框 px-1 改 px-0,只留文字本身的 4px)
+  const titleRow = (
+    <span className="flex min-w-0 items-center gap-1">
+      <span className="truncate text-[14px] font-bold leading-[1.5] text-white">{titleText}</span>
+      {kind === 'app' && (
+        <Tag color="turquoise" size="sm" data-theme="dark" className="shrink-0 px-0 py-0">APP</Tag>
+      )}
+    </span>
+  )
   const body = showPreview ? data.body : previewOffText(data)
   // 來源列:thread → 「Chats · Thread in 群組」(DM 的 thread → 「Chats · Thread」)
   const place = data.thread ? (data.context ? `Thread in ${data.context}` : 'Thread') : data.context
@@ -130,7 +148,13 @@ export function NotificationBanner({
       )}
     </div>
   )
-  const avatarEl = data.actor ? (
+  const avatarEl = data.appInfo ? (
+    // App logo:同樣 40 圓形 + 內框 1px #E8E8E8
+    <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white" style={{ background: data.appInfo.color }} aria-hidden>
+      <data.appInfo.icon size={20} />
+      <span className="pointer-events-none absolute inset-0 rounded-full shadow-[inset_0_0_0_1px_#E8E8E8]" />
+    </span>
+  ) : data.actor ? (
     // 頭像內框 1px #E8E8E8(2026-11-17 user):疊一層 inset ring,不佔版面、不改變 40px 尺寸
     <span className="relative h-10 w-10 shrink-0">
       <Avatar src={data.actor.avatarUrl} alt={data.actor.name} size={40} />
@@ -196,7 +220,7 @@ export function NotificationBanner({
           <div className="flex min-w-0 flex-1 flex-col">
             {replying ? (
               <>
-                <span className="truncate text-[14px] font-bold leading-[1.5] text-white">{name}</span>
+                {titleRow}
                 {replyField(true)}
               </>
             ) : (
@@ -205,14 +229,15 @@ export function NotificationBanner({
                 onClick={onOpen}
                 className="flex min-w-0 flex-col rounded text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
               >
-                <span className="truncate text-[14px] font-bold leading-[1.5] text-white">{name}</span>
-                <span className="flex h-7 items-center">
+                {titleRow}
+                {/* 一行訊息;可回覆時這一列固定 28(= 輸入框高),App 不能回覆 → hug */}
+                <span className={`flex items-center ${canReply ? 'h-7' : ''}`}>
                   <span className="truncate text-[12px] font-normal leading-[1.3] text-white">{compactBody}</span>
                 </span>
               </button>
             )}
           </div>
-          {!replying && !result && (
+          {canReply && !replying && !result && (
             <Button
               variant="tertiary"
               size="sm"
@@ -255,15 +280,16 @@ export function NotificationBanner({
       >
         {avatarEl}
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-[14px] font-bold leading-[1.5] text-white">{name}</span>
-          <span className="line-clamp-2 h-[2.6em] text-[12px] font-normal leading-[1.3] text-white">
+          {titleRow}
+          {/* 最多兩行;可回覆時固定兩行高,App 不能回覆 → hug */}
+          <span className={`line-clamp-2 text-[12px] font-normal leading-[1.3] text-white ${canReply ? 'h-[2.6em]' : ''}`}>
             {result ?? (data.forwarded && showPreview ? `Forwarded a message from ${data.forwarded.from}` : body)}
           </span>
         </span>
       </button>
 
       {/* 第三區:回覆輸入框 + 送出(一直顯示) */}
-      {replyField(false)}
+      {canReply && replyField(false)}
     </div>
   )
 }

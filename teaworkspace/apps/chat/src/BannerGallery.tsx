@@ -3,7 +3,7 @@
 // UI 文案英文;說明文字中文(給設計 / PM 審閱)。
 import { useState } from 'react'
 import { Button, Checkbox, DataTable, RadioGroup, RadioGroupItem, Select, Separator } from '@qijenchen/design-system'
-import { Play } from 'lucide-react'
+import { ClipboardCheck, Play } from 'lucide-react'
 import { BannerStack, NotificationBanner, useBannerStack, type BannerData, type BannerSize } from './NotificationBanner'
 
 const AVATAR: Record<string, string> = Object.fromEntries(
@@ -122,7 +122,7 @@ export function BannerGallery() {
 
   return (
     <div className="h-screen overflow-y-auto bg-canvas text-foreground">
-      <div className="mx-auto flex max-w-[1080px] flex-col gap-10 px-6 py-10">
+      <div className="mx-auto flex max-w-[1192px] flex-col gap-10 px-6 py-10">
         <header className="flex flex-col gap-2">
           <p className="text-caption font-semibold uppercase tracking-wide text-fg-secondary">tWorkspace · In-app notifications · Chats</p>
           <h1 className="text-h3 font-semibold">Push banner scenarios</h1>
@@ -157,6 +157,8 @@ export function BannerGallery() {
           </div>
         </header>
 
+        <ContextVariants onPlay={play} />
+        <Separator />
         <BannerStates size={size} />
         <Separator />
         <ThreadVsChat onPlay={play} />
@@ -184,6 +186,50 @@ export function BannerGallery() {
   )
 }
 
+/** 三種情境(2026-11-17 user):DM / Group chat / App。App 沒有回覆,卡片 hug */
+const CTX: { key: string; title: string; note: string; s: Scenario }[] = [
+  {
+    key: 'dm', title: 'DM', note: '左邊是對方的頭像,第一排是對方名字。',
+    s: { title: '', gate: '', behavior: '', data: { id: 'ctx-dm', threadKey: 'chat:shinichi', app: 'chats', actor: P.shinichi, body: 'The Lugu Co-op samples arrived. Can you confirm the 20 kg order before 3 PM?', reply: true, time: 'now' } },
+  },
+  {
+    key: 'group', title: 'Group chat', note: '左邊是群組裡發言者的頭像,第一排是群組名稱。',
+    s: { title: '', gate: '', behavior: '', data: { id: 'ctx-group', threadKey: 'chat:product-team', app: 'chats', context: 'Product Team 產品團隊', actor: P.guanyu, body: '@Me 我 can you confirm the launch date for the Q4 tasting kit?', reply: true, time: 'now' } },
+  },
+  {
+    key: 'app', title: 'App', note: '左邊是 app logo(圓形),第一排是 app 名稱 + APP 標籤。沒有回覆功能,卡片高度隨內容(hug)。',
+    s: { title: '', gate: '', behavior: '', data: { id: 'ctx-app', app: 'chats', appInfo: { name: 'Approvals', icon: ClipboardCheck, color: 'var(--color-turquoise-6)' }, body: 'Lin Ya-Ting submitted expense report #4821 (NT$12,400) for your approval.', time: 'now' } },
+  },
+]
+function ContextVariants({ onPlay }: { onPlay: (s: Scenario) => void }) {
+  return (
+    <section className="flex flex-col gap-6" data-contexts>
+      <div className="flex flex-col gap-2">
+        <h2 className="text-h5 font-semibold">情境樣式:DM / Group chat / App</h2>
+        <p className="max-w-[68ch] text-body text-fg-secondary">
+          同一套外框,第二區依來源換內容。DM 和 Group chat 可以回覆;App 通知不能回覆,所以沒有輸入框(Comfy)也沒有 Reply 按鈕(Compact),卡片比較矮。
+        </p>
+      </div>
+      {/* 卡片以實際寬 360 並排:360 × 3 + 32 × 2 = 1144 = 頁面內容寬 */}
+      <div className="grid grid-cols-1 gap-x-8 gap-y-6 xl:grid-cols-[repeat(3,360px)]">
+        {CTX.map((c) => (
+          <article key={c.key} className="flex min-w-0 flex-col gap-3" data-ctx={c.key}>
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-body font-semibold">{c.title}</h3>
+              <Button variant="secondary" size="sm" startIcon={Play} onClick={() => onPlay(c.s)}>Play</Button>
+            </div>
+            <p className="text-caption text-fg-secondary">Comfy</p>
+            <NotificationBanner data={c.s.data} size="comfy" onDismiss={() => {}} onOpen={() => {}} />
+            <p className="text-caption text-fg-secondary">Compact</p>
+            <NotificationBanner data={{ ...c.s.data, id: `${c.s.data.id}-compact` }} size="compact" onDismiss={() => {}} onOpen={() => {}} />
+            <p className="text-body text-fg-secondary">{c.note}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 /** 卡片的三種狀態(2026-11-12):Initial / Hover / Reply focused。三張是同一則通知;Hover 與 Reply 請實際操作第 2、3 張 */
 const STATE_NOTES = [
   { title: 'Initial', note: '剛跳出。10 秒後自動收起。回覆輸入框一開始就在。' },
@@ -195,7 +241,7 @@ function BannerStates({ size }: { size: BannerSize }) {
   return (
     <section className="flex flex-col gap-6" data-states>
       <h2 className="text-h5 font-semibold">卡片狀態</h2>
-      <div className="grid grid-cols-1 gap-x-8 gap-y-8 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-x-8 gap-y-8 xl:grid-cols-[repeat(3,360px)]">
         {STATE_NOTES.map((st, i) => (
           <article key={st.title} className="flex min-w-0 flex-col gap-3" data-state={i}>
             <h3 className="text-body font-semibold">{st.title}</h3>
