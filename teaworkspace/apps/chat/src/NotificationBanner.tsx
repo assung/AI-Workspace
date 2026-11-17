@@ -431,6 +431,19 @@ export function useBannerStack() {
 }
 
 /** 疊放區位置(2026-11-17 user):右下角,距右 16、距底 120 */
+
+/** 視窗右緣、疊放區高度那一帶,底下可捲動容器的直向捲軸寬(overlay 捲軸 = 0) */
+function rightEdgeScrollbarWidth(stack: HTMLElement) {
+  const y = Math.max(0, window.innerHeight - STACK_BOTTOM - 1)
+  for (const node of document.elementsFromPoint(window.innerWidth - 1, y)) {
+    if (!(node instanceof HTMLElement) || stack.contains(node)) continue
+    const cs = getComputedStyle(node)
+    const w = node.offsetWidth - node.clientWidth - parseFloat(cs.borderLeftWidth) - parseFloat(cs.borderRightWidth)
+    if (w > 0 && /(auto|scroll)/.test(cs.overflowY) && node.scrollHeight > node.clientHeight) return w
+  }
+  // 整頁(html)捲動時 fixed 的 right 本來就不含捲軸
+  return 0
+}
 const STACK_BOTTOM = 120
 
 export function BannerStack({
@@ -452,10 +465,13 @@ export function BannerStack({
   // 視窗放不下時:從最舊(最下面)開始不顯示整張,不露出半張;視窗變大就再出現
   const ref = useRef<HTMLElement>(null)
   const [fitCount, setFitCount] = useState(items.length)
+  // 距右 16 不含捲軸(2026-11-17 user):頁面若由內層容器捲動,捲軸畫在視窗裡,fixed 的 right 會把它算進去 → 量出右緣下方那個容器的捲軸寬補上
+  const [scrollbarW, setScrollbarW] = useState(0)
   useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
     const measure = () => {
+      setScrollbarW(rightEdgeScrollbarWidth(el))
       const limit = window.innerHeight - STACK_BOTTOM - 16 // 上方至少留 16
       const kids = Array.from(el.children) as HTMLElement[]
       let used = 0
@@ -477,7 +493,8 @@ export function BannerStack({
       ref={ref}
       aria-label="Notifications"
       // 由下(舊)往上(新)疊:items 是新→舊,底部對齊 → 最新在最上面、最舊在最下面,停留中的卡不會被新卡推動
-      className="pointer-events-none fixed bottom-[120px] right-4 z-[60] flex flex-col gap-2"
+      className="pointer-events-none fixed bottom-[120px] z-[60] flex flex-col gap-2"
+      style={{ right: 16 + scrollbarW }}
     >
       {items.map((b, i) => (
         <div key={b.instanceKey ?? b.id} className={i >= fitCount ? 'invisible absolute' : undefined} aria-hidden={i >= fitCount || undefined}>
