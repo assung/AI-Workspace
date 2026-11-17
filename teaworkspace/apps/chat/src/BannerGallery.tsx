@@ -161,6 +161,8 @@ export function BannerGallery() {
         <Separator />
         <ActionVariants onPlay={play} />
         <Separator />
+        <ReactionVariants onPlay={play} />
+        <Separator />
         <BannerStates size={size} />
         <Separator />
         <ThreadVsChat onPlay={play} />
@@ -255,6 +257,45 @@ function ActionVariants({ onPlay }: { onPlay: (s: Scenario) => void }) {
       <div className="grid grid-cols-1 gap-x-8 gap-y-6 xl:grid-cols-[repeat(3,360px)]">
         {ACT.map((c) => (
           <article key={c.key} className="flex min-w-0 flex-col gap-3" data-act={c.key}>
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-body font-semibold">{c.title}</h3>
+              <Button variant="secondary" size="sm" startIcon={Play} onClick={() => onPlay(c.s)}>Play</Button>
+            </div>
+            <p className="text-caption text-fg-secondary">Comfy</p>
+            <NotificationBanner data={c.s.data} size="comfy" onDismiss={() => {}} onOpen={() => {}} />
+            <p className="text-caption text-fg-secondary">Compact</p>
+            <NotificationBanner data={{ ...c.s.data, id: `${c.s.data.id}-compact` }} size="compact" onDismiss={() => {}} onOpen={() => {}} />
+            <p className="text-body text-fg-secondary">{c.note}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+/** Emoji 回應(2026-11-17 user):頭像右下角 16px emoji 徽章;第一排人名、第二排「Reacted to your message: …」 */
+const REACT: { key: string; title: string; note: string; s: Scenario }[] = [
+  {
+    key: 'dm', title: 'DM', note: '對方對你的訊息按了 emoji。',
+    s: { title: '', gate: '', behavior: '', data: { id: 'react-dm', threadKey: 'chat:shinichi:reactions', app: 'chats', actor: P.shinichi, reaction: { emoji: '👍', message: 'Confirmed, ordering 20 kg from the Lugu Co-op today.' }, body: '', reply: true, time: 'now' } },
+  },
+  {
+    key: 'group', title: 'Group chat', note: '群組成員對你的訊息按了 emoji。第一排是人名不是群組名,因為重點是誰回應了你。',
+    s: { title: '', gate: '', behavior: '', data: { id: 'react-group', threadKey: 'chat:product-team:reactions', app: 'chats', context: 'Product Team 產品團隊', actor: P.yui, reaction: { emoji: '🎉', message: 'The Q4 tasting kit launches on Nov 28!' }, body: '', reply: true, time: 'now' } },
+  },
+]
+function ReactionVariants({ onPlay }: { onPlay: (s: Scenario) => void }) {
+  return (
+    <section className="flex flex-col gap-6" data-reactions>
+      <div className="flex flex-col gap-2">
+        <h2 className="text-h5 font-semibold">Emoji 回應</h2>
+        <p className="max-w-[68ch] text-body text-fg-secondary">
+          有人對你的訊息按了 emoji。頭像右下角疊一個 16px 的圓,裡面放 12px 的 emoji;圓的外框 1.5px 用卡片底色,看起來像從頭像挖出一圈。
+        </p>
+      </div>
+      <div className="grid grid-cols-1 gap-x-8 gap-y-6 xl:grid-cols-[repeat(3,360px)]">
+        {REACT.map((c) => (
+          <article key={c.key} className="flex min-w-0 flex-col gap-3" data-react={c.key}>
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-body font-semibold">{c.title}</h3>
               <Button variant="secondary" size="sm" startIcon={Play} onClick={() => onPlay(c.s)}>Play</Button>

@@ -69,6 +69,11 @@ export type BannerData = {
    * logo = 圖示 + 底色(示範用的虛構 app,不用真實品牌 logo)。
    */
   appInfo?: { name: string; icon: LucideIcon; color: string }
+  /**
+   * Emoji 回應(2026-11-17 user):DM / Group chat 裡有人對你的訊息按了 emoji。
+   * 頭像右下角疊一個 16px 圓(emoji 12px 置中,外框 1.5px = 卡片底色);第一排 = 人名,第二排 =「Reacted to your message: 原訊息…」。
+   */
+  reaction?: { emoji: string; message: string }
 }
 
 /** 卡片尺寸(2026-11-11):對標 Teams Display「Change the size of your message and content previews. Choose Comfy or Compact.」 */
@@ -119,10 +124,13 @@ export function NotificationBanner({
   // 第三區存在(輸入框或按鈕)→ 訊息列固定高,卡片高度不跳;都沒有 → hug
   const hasFooter = canReply || !!data.actions?.length
   // Group chat 第二排 =「人名: 訊息」,才看得出是誰說的(2026-11-17 user)
+  // Emoji 回應:第二排 =「Reacted to your message: 原訊息」(不加人名前綴,第一排已是人名)
   const messageText = result ?? (
-    data.forwarded && showPreview
-      ? `Forwarded a message from ${data.forwarded.from}`
-      : kind === 'group' && data.actor ? `${data.actor.name}: ${body}` : body
+    data.reaction
+      ? `Reacted to your message: ${showPreview ? data.reaction.message : '…'}`
+      : data.forwarded && showPreview
+        ? `Forwarded a message from ${data.forwarded.from}`
+        : kind === 'group' && data.actor ? `${data.actor.name}: ${body}` : body
   )
   /** 動作按鈕:DS Button tertiary sm,dark mode;一顆撐滿、兩顆平分,間距 8(2026-11-17 user 由 12 改 8) */
   const actionButtons = (fill: boolean) =>
@@ -138,7 +146,8 @@ export function NotificationBanner({
         {a.label}
       </Button>
     ))
-  const titleText = kind === 'app' ? data.appInfo!.name : kind === 'group' ? data.context! : name
+  // Emoji 回應:第一排一律是人名(群組也是),因為重點是「誰」回應了你
+  const titleText = kind === 'app' ? data.appInfo!.name : data.reaction ? name : kind === 'group' ? data.context! : name
   // 第二區第一排:App 多一個「APP」標籤(DS Tag turquoise sm,dark mode;左右 4px、上下 0 —— Tag 外框 px-1 改 px-0,只留文字本身的 4px)
   const titleRow = (
     // app 名與 APP 標籤間距 8(2026-11-17 user)
@@ -185,6 +194,16 @@ export function NotificationBanner({
     <span className="relative h-10 w-10 shrink-0">
       <Avatar src={data.actor.avatarUrl} alt={data.actor.name} size={40} />
       <span className="pointer-events-none absolute inset-0 rounded-full shadow-[inset_0_0_0_1px_#E8E8E8]" aria-hidden />
+      {data.reaction && (
+        // Emoji 徽章:40×40 範圍內右下角,16px 圓、emoji 12px 置中;外框 1.5px 用卡片底色,像從頭像裡挖出一圈
+        <span
+          className="absolute bottom-0 right-0 flex h-4 w-4 items-center justify-center rounded-full bg-white text-[12px] leading-none"
+          style={{ boxShadow: '0 0 0 1.5px #33337B' }}
+          aria-hidden
+        >
+          {data.reaction.emoji}
+        </span>
+      )}
     </span>
   ) : (
     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/[0.08]" aria-hidden>
