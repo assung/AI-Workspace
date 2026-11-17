@@ -41,7 +41,7 @@ export const PriorityContacts: Story = {
   render: () => <App config={{ agent: true, initialSettingsRoute: 'notifications/priority' }} />,
 }
 
-/** Push banner 情境總覽:每張卡對到流程圖的一道關卡;Play 送進右上角疊放區看計時與合併(BannerGallery.tsx)。 */
+/** Push banner 情境總覽:每張卡對到流程圖的一道關卡;Play 送進右下角疊放區看計時與合併(BannerGallery.tsx)。 */
 export const BannerScenarios: Story = {
   name: 'Push banner 情境總覽',
   render: () => <BannerGallery />,

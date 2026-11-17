@@ -1,5 +1,5 @@
 // Push banner 情境總覽(2026-11-07)。設計審閱用:每個情境一張真卡 + 對到流程圖哪一關 + 行為說明;
-// 「Play」把那張卡送進右上角的真疊放區,看計時、停留暫停、同對話合併、同時張數(預設 3,可設 3–5)。
+// 「Play」把那張卡送進右下角的真疊放區,看計時、停留暫停、同對話合併、同時張數(預設 3,可設 3–5)。
 // UI 文案英文;說明文字中文(給設計 / PM 審閱)。
 import { useState } from 'react'
 import { Button, Checkbox, DataTable, RadioGroup, RadioGroupItem, Select, Separator } from '@qijenchen/design-system'
@@ -127,8 +127,7 @@ export function BannerGallery() {
           <p className="text-caption font-semibold uppercase tracking-wide text-fg-secondary">tWorkspace · In-app notifications · Chats</p>
           <h1 className="text-h3 font-semibold">Push banner scenarios</h1>
           <p className="max-w-[68ch] text-body text-fg-secondary">
-            每張卡對到「Teams 通知決策流程圖」的一道關卡。按 Play 會把卡片送進右上角真的疊放區:10 秒收起、滑鼠停留暫停、同一對話合併、同時張數上限(預設 3 張,可改 3–5)。
-            操作回饋的 Toast 在右下,別人找你的 banner 在右上,兩者不搶同一個角落。
+            每張卡對到「Teams 通知決策流程圖」的一道關卡。按 Play 會把卡片送進右下角真的疊放區(距右 16、距底 120,由下〔舊〕往上〔新〕疊):10 秒收起、滑鼠停留暫停、同一對話合併、同時張數上限(預設 3 張,可改 3–5)。停留中的卡:同一聊天的新訊息只即時更新第二排、不換位置;就算變成最舊也不會被擠掉。
           </p>
           <Checkbox
             className="pt-2"
@@ -189,7 +188,7 @@ export function BannerGallery() {
           />
         </section>
       </div>
-      <BannerStack items={stack.items} onDismiss={stack.dismiss} showPreview size={size} />
+      <BannerStack items={stack.items} onDismiss={stack.dismiss} onPinnedChange={stack.setPinned} showPreview size={size} />
     </div>
   )
 }

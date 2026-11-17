@@ -3208,7 +3208,7 @@ export default function App({
     const t = window.setTimeout(() => setNotifPrefs((p) => (isPaused(p) ? p : { ...p, pauseUntil: null })), Math.max(0, ms) + 50)
     return () => window.clearTimeout(t)
   }, [notifPrefs.pauseUntil])
-  // Push banner(右上角疊放區)。示範劇本:每則事件先過 routeNotification(流程圖關卡),結果 = banner 才跳卡。
+  // Push banner(右下角疊放區,距右 16、距底 120)。示範劇本:每則事件先過 routeNotification(流程圖關卡),結果 = banner 才跳卡。
   const bannerStack = useBannerStack()
   const notifPrefsRef = useRef(notifPrefs)
   notifPrefsRef.current = notifPrefs
@@ -3590,10 +3590,11 @@ export default function App({
       />
       {/* AI agent 背景回覆的通知;落點照 DS 預設(右下、以整個視窗為準,toast.spec.md「落點」) */}
       <Toaster containerAriaLabel="Notifications" />
-      {/* Push banner(右上;別人找你。Toast 右下 = 操作回饋)。點卡片內容 = 打開來源:聊天 → 切到 Chat 分頁該聊天室 */}
+      {/* Push banner(右下,距右 16、距底 120;由下〔舊〕往上〔新〕疊)。點卡片內容 = 打開來源:聊天 → 切到 Chat 分頁該聊天室 */}
       <BannerStack
         items={bannerStack.items}
         onDismiss={bannerStack.dismiss}
+        onPinnedChange={bannerStack.setPinned}
         showPreview={notifPrefs.showPreview}
         size={notifPrefs.bannerSize}
         onOpen={(b) => {

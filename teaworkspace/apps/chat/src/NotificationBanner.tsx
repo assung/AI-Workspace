@@ -15,7 +15,7 @@
 //   張數多時(5 張 Comfy 約 1000px)放不下的整張先不顯示(最舊的先藏),不露出半張;視窗變大再出現。
 // - 在任何地方讀過 → 卡片收起(規格第 10 節第 3 點)。
 // - 卡上「為什麼收到」一行(規格第 10 節第 1 點)。
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Avatar, Button, Tag } from '@qijenchen/design-system'
 import { FileText, HardDrive, Hexagon, ListChecks, MessageCircle, SendHorizontal, Sparkles, X, type LucideIcon } from 'lucide-react'
 import { NATIVE_APPS, type NativeAppKey } from './WorkspaceSettings'
@@ -82,6 +82,8 @@ export type BannerData = {
   reaction?: { emoji: string; message: string }
   /** 被 @ 提及(2026-11-17 user):'you' = 點名你 →「@You」標籤;'all' = @All →「@All」標籤。訊息內文本身含 @名字 / @All。 */
   mention?: 'you' | 'all'
+  /** 疊放區內部用:同一張卡的 React key(原地更新時不變,保留回覆草稿) */
+  instanceKey?: string
 }
 
 /** 卡片尺寸(2026-11-11):對標 Teams Display「Change the size of your message and content previews. Choose Comfy or Compact.」 */
@@ -382,7 +384,7 @@ export function NotificationBanner({
 const PREVIEW_HIDDEN = 'Message preview hidden'
 
 // ════════════════════════════════════════════════════════════════════════════
-// 疊放區(右上角;Toast 在右下 = 操作回饋,banner 在右上 = 別人找你,兩者不搶同一角)
+// 疊放區(2026-11-17 user:右下角,距右 16、距底 120;由下〔舊〕往上〔新〕疊)
 // ════════════════════════════════════════════════════════════════════════════
 const AUTO_HIDE_MS = 10000
 /** 同時顯示張數:預設 3(toast.spec.md 同規則);設定 Display › Show this many notifications on screen at once 可選 3–5(2026-11-12 user) */
@@ -390,42 +392,71 @@ export const DEFAULT_MAX_VISIBLE = 3
 
 export function useBannerStack() {
   const [items, setItems] = useState<BannerData[]>([])
+  // 滑鼠停留 / 回覆中的卡(2026-11-17 user):新訊息進來不擠掉、同來源只即時更新內文,不換位置
+  const pinned = useRef(new Set<string>())
+  const seq = useRef(0)
+  const setPinned = useCallback((id: string, v: boolean) => {
+    if (v) pinned.current.add(id)
+    else pinned.current.delete(id)
+  }, [])
+  /** 超過張數上限 → 從最舊的開始收起,但跳過停留中的卡(停留中的卡卡在原位,直到送出 / 關閉 / 移開才繼續計時) */
+  const trim = (list: BannerData[], max: number) => {
+    const out = [...list]
+    for (let i = out.length - 1; i >= 0 && out.length > max; i--) {
+      if (!pinned.current.has(out[i].id)) out.splice(i, 1)
+    }
+    return out
+  }
   /** group = 設定「Group banners from the same chat」:開 → 同 threadKey 收合成一張並累計則數;關 → 每則各一張 */
   const push = (b: BannerData, group = true, max = DEFAULT_MAX_VISIBLE) =>
     setItems((list) => {
-      if (!group) return [b, ...list].slice(0, max)
-      const prev = b.threadKey ? list.find((x) => x.threadKey === b.threadKey) : undefined
-      const merged = prev ? { ...b, count: (prev.count ?? 1) + 1 } : b
-      const rest = list.filter((x) => !(b.threadKey && x.threadKey === b.threadKey))
-      return [merged, ...rest].slice(0, max)
+      const fresh = { ...b, instanceKey: `${b.id}#${++seq.current}` }
+      const prev = group && b.threadKey ? list.find((x) => x.threadKey === b.threadKey) : undefined
+      if (!prev) return trim([fresh, ...list], max)
+      const count = (prev.count ?? 1) + 1
+      // 停留中:同一張卡原地更新第二排(id / instanceKey 不變 → 回覆草稿、計時都保留;回覆仍送到同一個聊天)
+      if (pinned.current.has(prev.id)) {
+        return list.map((x) => (x === prev ? { ...b, id: prev.id, instanceKey: prev.instanceKey, count } : x))
+      }
+      // 沒停留:收合成一張移到最上面(最新),重新計時
+      return trim([{ ...fresh, count }, ...list.filter((x) => x !== prev)], max)
     })
-  const dismiss = (id: string) => setItems((list) => list.filter((x) => x.id !== id))
+  const dismiss = (id: string) => {
+    pinned.current.delete(id)
+    setItems((list) => list.filter((x) => x.id !== id))
+  }
   /** 在別處讀過 → 收起同一對話的卡 */
   const dismissThread = (threadKey: string) => setItems((list) => list.filter((x) => x.threadKey !== threadKey))
-  return { items, push, dismiss, dismissThread }
+  return { items, push, dismiss, dismissThread, setPinned }
 }
+
+/** 疊放區位置(2026-11-17 user):右下角,距右 16、距底 120 */
+const STACK_BOTTOM = 120
 
 export function BannerStack({
   items,
   onDismiss,
   onOpen,
+  onPinnedChange,
   showPreview,
   size = 'comfy',
 }: {
   items: BannerData[]
   onDismiss: (id: string) => void
   onOpen?: (b: BannerData) => void
+  /** 卡片停留 / 回覆中狀態 → useBannerStack().setPinned */
+  onPinnedChange?: (id: string, pinned: boolean) => void
   showPreview: boolean
   size?: BannerSize
 }) {
-  // 張數多時(例如 5 張 Comfy)視窗放不下:放不下的整張不顯示(最舊的先藏),不露出半張;視窗變大就再出現
+  // 視窗放不下時:從最舊(最下面)開始不顯示整張,不露出半張;視窗變大就再出現
   const ref = useRef<HTMLElement>(null)
   const [fitCount, setFitCount] = useState(items.length)
   useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
     const measure = () => {
-      const limit = window.innerHeight - 48 // 上下各 24px(與 top-6 對稱)
+      const limit = window.innerHeight - STACK_BOTTOM - 16 // 上方至少留 16
       const kids = Array.from(el.children) as HTMLElement[]
       let used = 0
       let n = 0
@@ -445,11 +476,19 @@ export function BannerStack({
     <section
       ref={ref}
       aria-label="Notifications"
-      className="pointer-events-none fixed right-6 top-6 z-[60] flex flex-col gap-2"
+      // 由下(舊)往上(新)疊:items 是新→舊,底部對齊 → 最新在最上面、最舊在最下面,停留中的卡不會被新卡推動
+      className="pointer-events-none fixed bottom-[120px] right-4 z-[60] flex flex-col gap-2"
     >
       {items.map((b, i) => (
-        <div key={b.id + (b.count ?? 1)} className={i >= fitCount ? 'invisible absolute' : undefined} aria-hidden={i >= fitCount || undefined}>
-          <TimedBanner data={b} size={size} onDismiss={() => onDismiss(b.id)} onOpen={onOpen ? () => { onOpen(b); onDismiss(b.id) } : undefined} showPreview={showPreview} />
+        <div key={b.instanceKey ?? b.id} className={i >= fitCount ? 'invisible absolute' : undefined} aria-hidden={i >= fitCount || undefined}>
+          <TimedBanner
+            data={b}
+            size={size}
+            onDismiss={() => onDismiss(b.id)}
+            onOpen={onOpen ? () => { onOpen(b); onDismiss(b.id) } : undefined}
+            onPinnedChange={onPinnedChange}
+            showPreview={showPreview}
+          />
         </div>
       ))}
     </section>
@@ -461,12 +500,14 @@ function TimedBanner({
   size,
   onDismiss,
   onOpen,
+  onPinnedChange,
   showPreview,
 }: {
   data: BannerData
   size: BannerSize
   onDismiss: () => void
   onOpen?: () => void
+  onPinnedChange?: (id: string, pinned: boolean) => void
   showPreview: boolean
 }) {
   const [hovered, setHovered] = useState(false)
@@ -474,6 +515,8 @@ function TimedBanner({
   const remaining = useRef(AUTO_HIDE_MS)
   const startedAt = useRef(0)
   const paused = hovered || interacting || !!data.urgent
+  // 停留 / 回覆中 → 告訴疊放區別擠掉這張、同來源只原地更新(2026-11-17 user)
+  useEffect(() => { onPinnedChange?.(data.id, hovered || interacting) }, [hovered, interacting, data.id, onPinnedChange])
   useEffect(() => {
     if (paused) return
     startedAt.current = Date.now()
