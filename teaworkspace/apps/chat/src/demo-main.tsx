@@ -13,7 +13,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <TooltipProvider delayDuration={500} skipDelayDuration={300}>
       {/* #notification-settings = 打開就是 Settings › Notifications(2026-11-07 通知設定 demo;同 IT Service Desk #oncall 以 hash 切換的先例) */}
-      {/* #banners = Push banner 情境總覽;其餘 = prototype(開啟後 5 / 12 / 20 秒送出示範通知,照設定決定跳不跳) */}
+      {/* #banners = Push banner 情境總覽;其餘 = prototype(開啟後 5–32 秒依序送出示範通知,照設定決定跳不跳) */}
       {location.hash === '#banners' ? (
         <BannerGallery />
       ) : (

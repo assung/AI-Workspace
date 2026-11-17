@@ -86,6 +86,7 @@ import {
   Forward,
   Trash2,
   ChevronRight as SubArrow,
+  ClipboardCheck,
 } from 'lucide-react'
 import { FormatToolbar, RichTextArea, textToHtml, hasRichMarkup, type RichEditorHandle } from './RichTextEditor'
 import { TAgentDock, TAgentRailIcon, TAGENT_LABEL, useTAgentEngine, type TAgentOpenDoc, type TAgentRoomRef } from './TAgent'
@@ -3116,7 +3117,7 @@ export type ChatVariantConfig = {
   initialAgentRoute?: TAgentRoute
   /** config.agent:一打開就開著 Settings 的哪一頁(story 用;未給 = 不開)。 */
   initialSettingsRoute?: SettingsRoute
-  /** config.agent:開啟後依序送出 3 則示範通知(5 / 8 / 12 秒;5、8 秒同一聊天,示範 Group banners;目前只有 Chats 有通知),照通知設定決定跳不跳橫幅(NotificationBanner.tsx)。 */
+  /** config.agent:開啟後依序送出示範通知(5 / 8 秒同一聊天 DM、12 秒 Group @You、17 秒 App + 按鈕、22 秒群組轉傳、27 秒 @All、32 秒 Emoji 回應〔Reactions 預設 Off,要先開〕),照通知設定決定跳不跳橫幅(NotificationBanner.tsx)。 */
   demoBanners?: boolean
 }
 
@@ -3229,6 +3230,30 @@ export default function App({
         at: 12000,
         event: { app: 'chats', kind: 'mentionsPersonal', actorId: 'guanyu' },
         banner: { id: 'demo-mention', threadKey: 'chat:product-team', app: 'chats', context: 'Product Team 產品團隊', actor: { name: PEOPLE.guanyu.name, avatarUrl: PEOPLE.guanyu.avatar }, body: '@Me can you confirm the launch date for the Q4 tasting kit?', mention: 'you', reply: true, time: 'now' },
+      },
+      {
+        // App + 動作按鈕(2026-11-17):不能回覆,Approve / Reject 取代輸入框;預覽關閉時按鈕一起藏
+        at: 17000,
+        event: { app: 'chats', kind: 'messages' },
+        banner: { id: 'demo-app', threadKey: 'app:approvals:4821', app: 'chats', appInfo: { name: 'Approvals', icon: ClipboardCheck, color: 'var(--color-turquoise-6)' }, body: 'Lin Ya-Ting submitted expense report #4821 (NT$12,400) for your approval.', actions: [{ label: 'Approve', result: 'Approved expense report #4821' }, { label: 'Reject', result: 'Rejected expense report #4821' }], time: 'now' },
+      },
+      {
+        // 群組轉傳 + 附話(2026-11-17):「人名 forwarded a message: 附話」
+        at: 22000,
+        event: { app: 'chats', kind: 'messages', actorId: 'yui' },
+        banner: { id: 'demo-forward', threadKey: 'chat:qa', app: 'chats', context: 'QA Squad', actor: { name: PEOPLE.yui.name, avatarUrl: PEOPLE.yui.avatar }, body: 'FYI, this changes our packaging timeline.', forwarded: { from: PEOPLE.ai.name, body: 'Lab results for batch #3 are in. Moisture is 0.4% over spec, so the lot needs another drying pass.' }, reply: true, time: 'now' },
+      },
+      {
+        // @All(2026-11-17):走 Everyone in the chat @mentions
+        at: 27000,
+        event: { app: 'chats', kind: 'mentionsEveryone', actorId: 'kenji' },
+        banner: { id: 'demo-all', threadKey: 'chat:tea-team', app: 'chats', context: 'Tea Tasting 品茶小組', actor: { name: PEOPLE.kenji.name, avatarUrl: PEOPLE.kenji.avatar }, body: '@All Friday’s blind tasting moves to 3 PM in room No.3.', mention: 'all', reply: true, time: 'now' },
+      },
+      {
+        // Emoji 回應(2026-11-17):Reactions 預設 Off → 要先到 Settings › Chats 改成 Show in banner 才會跳
+        at: 32000,
+        event: { app: 'chats', kind: 'reactions', actorId: 'shinichi' },
+        banner: { id: 'demo-reaction', threadKey: 'chat:shinichi:reactions', app: 'chats', actor: { name: PEOPLE.shinichi.name, avatarUrl: PEOPLE.shinichi.avatar }, reaction: { emoji: '👍', message: 'Confirmed, ordering 20 kg from the Lugu Co-op today.' }, body: '', time: 'now' },
       },
     ]
     const timers = script.map(({ at, event, banner }) =>

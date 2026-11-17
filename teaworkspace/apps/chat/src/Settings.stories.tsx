@@ -47,7 +47,7 @@ export const BannerScenarios: Story = {
   render: () => <BannerGallery />,
 }
 
-/** Prototype 內的示範通知:開啟後 5 / 12 / 20 秒依序送出,照目前的通知設定決定跳不跳(先從頭像選單暫停,只剩優先聯絡人)。 */
+/** Prototype 內的示範通知:開啟後 5–32 秒依序送出 DM / Group @You / App 按鈕 / 轉傳 / @All / Emoji 回應,照目前的通知設定決定跳不跳(先從頭像選單暫停,只剩優先聯絡人)。 */
 export const LiveBanners: Story = {
   name: 'Push banner 實際觸發',
   render: () => <App config={{ agent: true, demoBanners: true }} />,
