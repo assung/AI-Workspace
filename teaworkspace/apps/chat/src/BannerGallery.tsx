@@ -88,7 +88,7 @@ const VARIANTS: Scenario[] = [
   {
     title: '訊息預覽關閉',
     gate: 'Display › Show message and content previews in notifications = 未勾選',
-    behavior: '只說誰、在哪裡;內文不顯示(投影、分享螢幕時不洩漏)。',
+    behavior: '第一排照常(人名 / 群組名 / app 名與標籤),第二排不論什麼情境一律「Message preview hidden」(投影、分享螢幕時不洩漏)。',
     showPreview: false,
     data: { id: 'nopreview', threadKey: 'chat:product-team-2', app: 'chats', context: 'Product Team 產品團隊', actor: P.guanyu, body: 'Budget numbers for Q4 are attached.', reply: true, time: 'now' },
   },
@@ -165,6 +165,7 @@ export function BannerGallery() {
         <Separator />
         <MentionVariants onPlay={play} />
         <ForwardVariants onPlay={play} />
+        <PreviewHiddenVariants />
         <Separator />
         <BannerStates size={size} />
         <Separator />
@@ -399,6 +400,37 @@ function ForwardVariants({ onPlay }: { onPlay: (s: Scenario) => void }) {
             <p className="text-caption text-fg-secondary">Compact</p>
             <NotificationBanner data={{ ...c.s.data, id: `${c.s.data.id}-compact` }} size="compact" onDismiss={() => {}} onOpen={() => {}} />
             <p className="text-body text-fg-secondary">{c.note}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+/** 預覽關閉(2026-11-17 user):第一排照常,第二排不論情境一律「Message preview hidden」 */
+function PreviewHiddenVariants() {
+  const cases: { key: string; title: string; data: BannerData }[] = [
+    { key: 'dm', title: 'DM', data: CTX[0].s.data },
+    { key: 'group-you', title: 'Group chat · @You', data: CTX[1].s.data },
+    { key: 'app', title: 'App', data: CTX[2].s.data },
+    { key: 'react', title: 'Group chat · Emoji 回應', data: { id: 'ph-react', threadKey: 'chat:product-team:reactions', app: 'chats', context: 'Product Team 產品團隊', actor: P.yui, reaction: { emoji: '🎉', message: 'The Q4 tasting kit launches on Nov 28!' }, body: '', time: 'now' } },
+  ]
+  return (
+    <section className="flex flex-col gap-6" data-preview-hidden>
+      <div className="flex flex-col gap-2">
+        <h2 className="text-h5 font-semibold">訊息預覽關閉</h2>
+        <p className="max-w-[68ch] text-body text-fg-secondary">
+          Display › Show message and content previews 未勾選時,第一排照常(人名 / 群組名 / app 名,@You、APP 標籤與 emoji 也保留),第二排不論什麼情境一律「Message preview hidden」。
+        </p>
+      </div>
+      <div className="grid grid-cols-1 gap-x-8 gap-y-6 xl:grid-cols-[repeat(2,360px)]">
+        {cases.map((c) => (
+          <article key={c.key} className="flex min-w-0 flex-col gap-3" data-ph={c.key}>
+            <h3 className="text-body font-semibold">{c.title}</h3>
+            <p className="text-caption text-fg-secondary">Comfy</p>
+            <NotificationBanner data={{ ...c.data, id: `ph-${c.key}` }} size="comfy" showPreview={false} onDismiss={() => {}} onOpen={() => {}} />
+            <p className="text-caption text-fg-secondary">Compact</p>
+            <NotificationBanner data={{ ...c.data, id: `ph-${c.key}-compact` }} size="compact" showPreview={false} onDismiss={() => {}} onOpen={() => {}} />
           </article>
         ))}
       </div>

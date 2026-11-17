@@ -105,7 +105,7 @@ export function NotificationBanner({
   onOpen?: () => void
   /** 回覆中 / 滑鼠停留 → 暫停自動收起 */
   onInteractingChange?: (v: boolean) => void
-  /** 設定「Show message preview」關閉 → 只顯示誰傳來 */
+  /** 設定「Show message and content previews」關閉 → 第二排一律「Message preview hidden」(2026-11-17 user) */
   showPreview?: boolean
 }) {
   const meta = APP_META[data.app]
@@ -123,7 +123,7 @@ export function NotificationBanner({
   }, [result, onDismiss])
 
   const name = data.actor?.name ?? data.title ?? meta.label
-  const body = showPreview ? data.body : previewOffText(data)
+  const body = data.body
   // 情境(2026-11-17 user):DM = 人像 + 人名;Group chat = 發言者頭像 + 群組名;App = app logo + app 名 + APP 標籤(不能回覆)
   const kind: 'dm' | 'group' | 'app' = data.appInfo ? 'app' : data.context ? 'group' : 'dm'
   // 有動作按鈕時不能回覆:按鈕直接取代輸入框(2026-11-17 user)
@@ -134,16 +134,19 @@ export function NotificationBanner({
   const hasFooter = canReply || !!data.actions?.length
   // Group chat 第二排 =「人名: 訊息」,才看得出是誰說的(2026-11-17 user)
   // Emoji 回應第二排:DM =「Reacted to your message: 原訊息」;Group chat =「人名 reacted to your message: 原訊息」(2026-11-17 user)
-  const reactedTo = data.reaction ? `reacted to your message: ${showPreview ? data.reaction.message : '…'}` : ''
-  // 轉傳第二排(2026-11-17 user):有附話才接「: 附話」;預覽關閉時不露附話
+  const reactedTo = data.reaction ? `reacted to your message: ${data.reaction.message}` : ''
+  // 轉傳第二排(2026-11-17 user):有附話才接「: 附話」
   const forwardedText = data.forwarded
-    ? `forwarded a message${showPreview && data.body ? `: ${data.body}` : ''}`
+    ? `forwarded a message${data.body ? `: ${data.body}` : ''}`
     : ''
   // 句首(DM 沒有人名開頭)大寫:reacted → Reacted、forwarded → Forwarded
   const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1)
   const actorVerb = (t: string) => (kind === 'group' && data.actor ? `${data.actor.name} ${t}` : cap(t))
+  // 預覽關閉:不論情境(DM / Group / App / 轉傳 / 回應 / 提及),第二排一律同一句(2026-11-17 user)
   const messageText = result ?? (
-    data.reaction
+    !showPreview
+      ? PREVIEW_HIDDEN
+      : data.reaction
       ? actorVerb(reactedTo)
       : data.forwarded
         ? actorVerb(forwardedText)
@@ -373,17 +376,8 @@ export function NotificationBanner({
   )
 }
 
-/** 預覽關閉時的內文:只說誰做了什麼(Teams「Show message preview」關閉同) */
-function previewOffText(d: BannerData) {
-  switch (d.app) {
-    case 'chats':
-      return d.context ? `New message in ${d.context}` : 'Sent you a message'
-    case 'docs': return 'Commented on a doc'
-    case 'tasks': return 'Task update'
-    case 'drive': return 'Drive update'
-    default: return 'New update'
-  }
-}
+/** 預覽關閉時第二排的固定文字(2026-11-17 user) */
+const PREVIEW_HIDDEN = 'Message preview hidden'
 
 // ════════════════════════════════════════════════════════════════════════════
 // 疊放區(右上角;Toast 在右下 = 操作回饋,banner 在右上 = 別人找你,兩者不搶同一角)
