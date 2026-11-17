@@ -33,7 +33,7 @@ const DELIVERED: Scenario[] = [
     title: 'Chats — Personal @mention',
     gate: 'Chats › @Mentions › Personal @mentions',
     behavior: '來源列帶群組名;「為什麼收到」寫 You were @mentioned。',
-    data: { id: 'mention', threadKey: 'chat:product-team', app: 'chats', context: 'Product Team 產品團隊', actor: P.guanyu, body: '@Me 我 can you confirm the launch date for the Q4 tasting kit?', mention: 'you', reply: true, time: 'now' },
+    data: { id: 'mention', threadKey: 'chat:product-team', app: 'chats', context: 'Product Team 產品團隊', actor: P.guanyu, body: '@Me can you confirm the launch date for the Q4 tasting kit?', mention: 'you', reply: true, time: 'now' },
   },
   {
     title: 'Chats — Everyone in the chat @mention',
@@ -77,7 +77,7 @@ const VARIANTS: Scenario[] = [
     title: '靜音的聊天,被 Personal @mention',
     gate: '第 3 關:聊天被靜音 → 有直接 @你',
     behavior: '靜音只擋一般訊息和 Everyone @mentions;點名你的 Personal @mention 仍跳,並說明這是靜音聊天。',
-    data: { id: 'muted', threadKey: 'chat:engineering', app: 'chats', context: 'Engineering', actor: P.kenji, body: '@Me 我 the PR for the tasting form is ready for your review.', mention: 'you', reply: true, time: 'now' },
+    data: { id: 'muted', threadKey: 'chat:engineering', app: 'chats', context: 'Engineering', actor: P.kenji, body: '@Me the PR for the tasting form is ready for your review.', mention: 'you', reply: true, time: 'now' },
   },
   {
     title: '通話 / 會議中,只放行這場會議的聊天',
@@ -200,7 +200,7 @@ const CTX: { key: string; title: string; note: string; s: Scenario }[] = [
   },
   {
     key: 'group', title: 'Group chat', note: '左邊是群組裡發言者的頭像,第一排是群組名稱。',
-    s: { title: '', gate: '', behavior: '', data: { id: 'ctx-group', threadKey: 'chat:product-team', app: 'chats', context: 'Product Team 產品團隊', actor: P.guanyu, body: '@Me 我 can you confirm the launch date for the Q4 tasting kit?', mention: 'you', reply: true, time: 'now' } },
+    s: { title: '', gate: '', behavior: '', data: { id: 'ctx-group', threadKey: 'chat:product-team', app: 'chats', context: 'Product Team 產品團隊', actor: P.guanyu, body: '@Me can you confirm the launch date for the Q4 tasting kit?', mention: 'you', reply: true, time: 'now' } },
   },
   {
     key: 'app', title: 'App', note: '左邊是 app logo(圓形),第一排是 app 名稱 + APP 標籤。沒有回覆功能,卡片高度隨內容(hug)。',
@@ -318,11 +318,11 @@ function ReactionVariants({ onPlay }: { onPlay: (s: Scenario) => void }) {
 const MENTION: { key: string; title: string; note: string; s: Scenario }[] = [
   {
     key: 'dm-you', title: 'DM · @You', note: '一對一聊天裡被點名。',
-    s: { title: '', gate: '', behavior: '', data: { id: 'm-dm', threadKey: 'chat:shinichi', app: 'chats', actor: P.shinichi, body: '@Me 我 the Lugu Co-op needs your sign-off on the 20 kg order by 3 PM.', mention: 'you', reply: true, time: 'now' } },
+    s: { title: '', gate: '', behavior: '', data: { id: 'm-dm', threadKey: 'chat:shinichi', app: 'chats', actor: P.shinichi, body: '@Me the Lugu Co-op needs your sign-off on the 20 kg order by 3 PM.', mention: 'you', reply: true, time: 'now' } },
   },
   {
     key: 'group-you', title: 'Group chat · @You', note: '群組裡被點名。第一排是群組名,第二排「人名: 訊息」。',
-    s: { title: '', gate: '', behavior: '', data: { id: 'm-group', threadKey: 'chat:product-team', app: 'chats', context: 'Product Team 產品團隊', actor: P.guanyu, body: '@Me 我 can you confirm the launch date for the Q4 tasting kit?', mention: 'you', reply: true, time: 'now' } },
+    s: { title: '', gate: '', behavior: '', data: { id: 'm-group', threadKey: 'chat:product-team', app: 'chats', context: 'Product Team 產品團隊', actor: P.guanyu, body: '@Me can you confirm the launch date for the Q4 tasting kit?', mention: 'you', reply: true, time: 'now' } },
   },
   {
     key: 'group-all', title: 'Group chat · @All', note: '有人 @All 群組裡所有人。',

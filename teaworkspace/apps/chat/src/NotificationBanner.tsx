@@ -158,11 +158,11 @@ export function NotificationBanner({
     // 標籤與名字間距 8(2026-11-17 user):@You / @All 在名字左邊,APP 在名字右邊
     <span className="flex min-w-0 items-center gap-2">
       {data.mention && (
-        // 大小同 APP 標籤(sm、左右 4、上下 0、1px 內框同文字色);顏色依 user 指定寫死:底 #FFECB2、字 #C36100
+        // 大小同 APP 標籤(sm、左右 4、上下 0;無外框,2026-11-17 user);顏色依 user 指定寫死:底 #FFECB2、字 #C36100
         <Tag
           color="yellow"
           size="sm"
-          className="shrink-0 px-0 py-0 shadow-[inset_0_0_0_1px_currentColor]"
+          className="shrink-0 px-0 py-0"
           style={{ background: '#FFECB2', color: '#C36100' }}
         >
           {data.mention === 'all' ? '@All' : '@You'}

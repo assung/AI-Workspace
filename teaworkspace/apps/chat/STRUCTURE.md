@@ -491,7 +491,7 @@ App 內通知卡（別人找你）。**不用 DS Toast**：toast.spec.md 規定�
   - **APP 標籤內框** 1px，顏色同文字（`inset 0 0 0 1px currentColor`）。
   - **動作按鈕**（`actions`，2026-11-17 user）：有按鈕就不能回覆，按鈕取代輸入框；DS Button tertiary sm + `data-theme="dark"`。Comfy 與 Compact 都放在訊息下方一列：一顆撐滿、兩顆平分，間距 8（Compact 因此長高，訊息列不固定 28）。按下有 `result` 的按鈕 → 訊息列換成結果、按鈕收起（保留 28 高不跳）、3 秒後卡片收起。卡高：Comfy 136（同可回覆的卡）、Compact 隨內容。
   - **Emoji 回應**（`reaction: { emoji, message }`，2026-11-17 user）：DM / Group chat 有人對你的訊息按 emoji。頭像 40×40 範圍內右下角疊 16px 圓（白底、emoji 12px 置中、外框 1.5px #33337B = 卡片底色）。DM：第一排人名、第二排「Reacted to your message: 原訊息」；Group chat：第一排群組名、第二排「人名 reacted to your message: 原訊息」。不能回覆 → 卡片 hug（Comfy 100 / Compact 88）。
-  - **@提及**（`mention: 'you' | 'all'`，2026-11-17 user）：第一排名字左邊加標籤，間距 8；點名你 =「@You」、@所有人 =「@All」。大小同 APP 標籤（DS Tag sm、px-0 → 文字左右 4、上下 0、內框 1px 同文字色），顏色寫死：底 #FFECB2、字 #C36100（不隨主題變）。第二排照原情境（DM = 訊息；Group = 「人名: 訊息」，訊息本身含「@我的名字 / @All」）；可以回覆，卡高同一般 DM / Group。
+  - **@提及**（`mention: 'you' | 'all'`，2026-11-17 user）：第一排名字左邊加標籤，間距 8；點名你 =「@You」、@所有人 =「@All」。大小同 APP 標籤（DS Tag sm、px-0 → 文字左右 4、上下 0；不加外框），顏色寫死：底 #FFECB2、字 #C36100（push banner 整體不隨深淺色主題變）。第二排照原情境（DM = 訊息；Group = 「人名: 訊息」，訊息本身含「@名字 / @All」，示範用「@Me」）；可以回覆，卡高同一般 DM / Group。
   - 這版不顯示：群組 / thread 來源、Urgent 標籤、「為什麼收到」、時間、則數、轉傳引用框（待設計）。螢幕閱讀器名稱仍帶回覆目的地。
 - **Comfy / Compact**（`size` prop，2026-11-11，舊版面）：Comfy = 上述完整結構。Compact = 一列身分（ItemAvatar inline + 名字 + 「in 群組」+ 則數）+ 一行內文，收掉來源列、「為什麼收到」、按鈕列，只留 Reply 圖示鈕（點了照樣展開就地回覆）；Urgent 標籤、寬度、陰影、計時相同。Teams 只公開設定文案，沒公開兩種尺寸的版面，Compact 版面是我們定義的。
 - **轉傳訊息**（`forwarded: { from, body }`，2026-11-11）：名字 = 轉傳的人；他附的話在上，原訊息放在引用框（border-divider rounded-md + 「Forwarded from 原作者」標頭）。Compact = 「Forwarded a message from …」。預覽關閉 = 「Forwarded a message in 群組」。

@@ -3228,7 +3228,7 @@ export default function App({
       {
         at: 12000,
         event: { app: 'chats', kind: 'mentionsPersonal', actorId: 'guanyu' },
-        banner: { id: 'demo-mention', threadKey: 'chat:product-team', app: 'chats', context: 'Product Team 產品團隊', actor: { name: PEOPLE.guanyu.name, avatarUrl: PEOPLE.guanyu.avatar }, body: '@Me 我 can you confirm the launch date for the Q4 tasting kit?', mention: 'you', reply: true, time: 'now' },
+        banner: { id: 'demo-mention', threadKey: 'chat:product-team', app: 'chats', context: 'Product Team 產品團隊', actor: { name: PEOPLE.guanyu.name, avatarUrl: PEOPLE.guanyu.avatar }, body: '@Me can you confirm the launch date for the Q4 tasting kit?', mention: 'you', reply: true, time: 'now' },
       },
     ]
     const timers = script.map(({ at, event, banner }) =>
