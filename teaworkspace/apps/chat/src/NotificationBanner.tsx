@@ -192,7 +192,7 @@ export function NotificationBanner({
   //   第一區:六角形 logo 16 + 品牌名 12/130 bold,白 65%;右側關閉 16,同色。
   //   第二區:頭像 40 圓形;名字 14/150 bold 白、一行;訊息 12/130 regular 白、最多兩行且固定兩行高;兩排間距 0;頭像與文字間距 12。
   //   第三區:回覆輸入框高 28、底白 8%、框線 1px 白 25%、placeholder「Send a reply」14/150 白 65%;右側送出鈕 lucide send-horizontal(白)。
-  //   第二、三區間距 8;卡片 padding 12、圓角 8、底色 #33337B;頭像內框 1px #E8E8E8;輸入框 focus 框線 = primary(DS Textarea 同用 border-primary)。
+  //   第二、三區間距 8;卡片 padding 12、圓角 8、底色 #33337B、陰影 0 8 16 #000 16%;頭像內框 1px #E8E8E8;輸入框 focus 框線 = primary(DS Textarea 同用 border-primary)。
   const sendReply = () => {
     if (!draft.trim()) return
     setDraft('')
@@ -203,7 +203,8 @@ export function NotificationBanner({
       role={data.urgent ? 'alert' : 'status'}
       aria-label={`${data.urgent ? 'Urgent: ' : ''}${name}${data.context ? ` in ${data.context}` : ''}`}
       className="flex w-[360px] max-w-full flex-col gap-2 overflow-hidden rounded-[8px] p-3 text-white"
-      style={{ background: '#33337B', boxShadow: 'var(--elevation-200)' }}
+      // drop shadow X0 Y8 Blur16 #000 16%(2026-11-17 user)
+      style={{ background: '#33337B', boxShadow: '0 8px 16px rgba(0, 0, 0, 0.16)' }}
     >
       {/* 第一區:品牌列 */}
       <div className="flex items-center gap-1 text-white/65">
