@@ -276,11 +276,11 @@ function ActionVariants({ onPlay }: { onPlay: (s: Scenario) => void }) {
 /** Emoji 回應(2026-11-17 user):頭像右下角 16px emoji 徽章;第一排人名、第二排「Reacted to your message: …」 */
 const REACT: { key: string; title: string; note: string; s: Scenario }[] = [
   {
-    key: 'dm', title: 'DM', note: '對方對你的訊息按了 emoji。',
+    key: 'dm', title: 'DM', note: '對方對你的訊息按了 emoji。第一排是人名。',
     s: { title: '', gate: '', behavior: '', data: { id: 'react-dm', threadKey: 'chat:shinichi:reactions', app: 'chats', actor: P.shinichi, reaction: { emoji: '👍', message: 'Confirmed, ordering 20 kg from the Lugu Co-op today.' }, body: '', reply: true, time: 'now' } },
   },
   {
-    key: 'group', title: 'Group chat', note: '群組成員對你的訊息按了 emoji。第一排是人名不是群組名,因為重點是誰回應了你。',
+    key: 'group', title: 'Group chat', note: '群組成員對你的訊息按了 emoji。第一排是群組名,第二排開頭是回應的人。',
     s: { title: '', gate: '', behavior: '', data: { id: 'react-group', threadKey: 'chat:product-team:reactions', app: 'chats', context: 'Product Team 產品團隊', actor: P.yui, reaction: { emoji: '🎉', message: 'The Q4 tasting kit launches on Nov 28!' }, body: '', reply: true, time: 'now' } },
   },
 ]
@@ -290,7 +290,7 @@ function ReactionVariants({ onPlay }: { onPlay: (s: Scenario) => void }) {
       <div className="flex flex-col gap-2">
         <h2 className="text-h5 font-semibold">Emoji 回應</h2>
         <p className="max-w-[68ch] text-body text-fg-secondary">
-          有人對你的訊息按了 emoji。頭像右下角疊一個 16px 的圓,裡面放 12px 的 emoji;圓的外框 1.5px 用卡片底色,看起來像從頭像挖出一圈。
+          有人對你的訊息按了 emoji。頭像右下角疊一個 16px 的白底圓,裡面放 12px 的 emoji;圓的外框 1.5px 用卡片底色,看起來像從頭像挖出一圈。Emoji 回應不能回覆,所以卡片比較矮。
         </p>
       </div>
       <div className="grid grid-cols-1 gap-x-8 gap-y-6 xl:grid-cols-[repeat(3,360px)]">

@@ -71,7 +71,8 @@ export type BannerData = {
   appInfo?: { name: string; icon: LucideIcon; color: string }
   /**
    * Emoji 回應(2026-11-17 user):DM / Group chat 裡有人對你的訊息按了 emoji。
-   * 頭像右下角疊一個 16px 圓(emoji 12px 置中,外框 1.5px = 卡片底色);第一排 = 人名,第二排 =「Reacted to your message: 原訊息…」。
+   * 頭像右下角疊一個 16px 白底圓(emoji 12px 置中,外框 1.5px = 卡片底色,畫在圓外);不能回覆 → 卡片 hug。
+   * DM:第一排人名、第二排「Reacted to your message: …」;Group chat:第一排群組名、第二排「人名 reacted to your message: …」。
    */
   reaction?: { emoji: string; message: string }
 }
@@ -120,14 +121,16 @@ export function NotificationBanner({
   const kind: 'dm' | 'group' | 'app' = data.appInfo ? 'app' : data.context ? 'group' : 'dm'
   // 有動作按鈕時不能回覆:按鈕直接取代輸入框(2026-11-17 user)
   const hasActions = !!data.actions?.length && !result
-  const canReply = kind !== 'app' && !data.actions?.length
+  // Emoji 回應也不能回覆(2026-11-17 user)→ 沒有輸入框 / Reply,卡片 hug
+  const canReply = kind !== 'app' && !data.actions?.length && !data.reaction
   // 第三區存在(輸入框或按鈕)→ 訊息列固定高,卡片高度不跳;都沒有 → hug
   const hasFooter = canReply || !!data.actions?.length
   // Group chat 第二排 =「人名: 訊息」,才看得出是誰說的(2026-11-17 user)
-  // Emoji 回應:第二排 =「Reacted to your message: 原訊息」(不加人名前綴,第一排已是人名)
+  // Emoji 回應第二排:DM =「Reacted to your message: 原訊息」;Group chat =「人名 reacted to your message: 原訊息」(2026-11-17 user)
+  const reactedTo = data.reaction ? `reacted to your message: ${showPreview ? data.reaction.message : '…'}` : ''
   const messageText = result ?? (
     data.reaction
-      ? `Reacted to your message: ${showPreview ? data.reaction.message : '…'}`
+      ? kind === 'group' && data.actor ? `${data.actor.name} ${reactedTo}` : `R${reactedTo.slice(1)}`
       : data.forwarded && showPreview
         ? `Forwarded a message from ${data.forwarded.from}`
         : kind === 'group' && data.actor ? `${data.actor.name}: ${body}` : body
@@ -146,8 +149,8 @@ export function NotificationBanner({
         {a.label}
       </Button>
     ))
-  // Emoji 回應:第一排一律是人名(群組也是),因為重點是「誰」回應了你
-  const titleText = kind === 'app' ? data.appInfo!.name : data.reaction ? name : kind === 'group' ? data.context! : name
+  // 第一排:App = app 名;Group chat = 群組名(Emoji 回應也是,人名改放第二排);DM = 人名
+  const titleText = kind === 'app' ? data.appInfo!.name : kind === 'group' ? data.context! : name
   // 第二區第一排:App 多一個「APP」標籤(DS Tag turquoise sm,dark mode;左右 4px、上下 0 —— Tag 外框 px-1 改 px-0,只留文字本身的 4px)
   const titleRow = (
     // app 名與 APP 標籤間距 8(2026-11-17 user)
