@@ -181,7 +181,7 @@ export function NotificationBanner({
         <Tag
           color="yellow"
           size="sm"
-          className="shrink-0 px-0 py-0"
+          className={`shrink-0 px-0 py-0 ${MENTION_TAG_NUDGE}`}
           style={{ background: '#FFECB2', color: '#C36100' }}
         >
           {data.mention === 'all' ? '@All' : '@You'}
@@ -190,7 +190,7 @@ export function NotificationBanner({
       <span className="truncate text-[14px] font-bold leading-[1.5] text-white">{titleText}</span>
       {kind === 'app' && (
         // 內框 1px,顏色同文字(currentColor)(2026-11-17 user)
-        <Tag color="turquoise" size="sm" data-theme="dark" className="shrink-0 px-0 py-0 shadow-[inset_0_0_0_1px_currentColor]">APP</Tag>
+        <Tag color="turquoise" size="sm" data-theme="dark" className={`shrink-0 px-0 py-0 shadow-[inset_0_0_0_1px_currentColor] ${APP_TAG_NUDGE}`}>APP</Tag>
       )}
     </span>
   )
@@ -427,6 +427,15 @@ export function useBannerStack() {
   const dismissThread = (threadKey: string) => setItems((list) => list.filter((x) => x.threadKey !== threadKey))
   return { items, push, dismiss, dismissThread, setPinned }
 }
+
+/**
+ * 標籤文字光學置中(2026-11-18 user:「APP 看起來偏上」)。不改 DS Tag 的 20px 高與 130% 行高,只把字往下推。
+ * 原因:標籤裡沒有下伸部的字(APP / You),行框底部預留的下伸空間是空的 → 字形實測偏上;P、@ 的重量又在上半部,看起來更高。
+ * - APP:實測頂 5.3 / 底 5.7。下移 0.5px 只在 2x 以上螢幕套用 —— 1x 會進位成 1px 反而偏下 0.8px,1x 維持原位(1 像素內最接近置中)。
+ * - @You / @All:@ 字形頂端比大寫高,實測 1x 頂 3.8 / 底 5.2、2x 頂 3.8 / 底 4.7 → 一律下移 0.5px(1x 進位成 1px 後為 4.8 / 4.2)。
+ */
+const APP_TAG_NUDGE = '[@media(min-resolution:2dppx)]:[&>span]:translate-y-[0.5px]'
+const MENTION_TAG_NUDGE = '[&>span]:translate-y-[0.5px]'
 
 /** 疊放區位置(2026-11-17 user):右下角,距右 16、距底 120 */
 

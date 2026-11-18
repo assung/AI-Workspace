@@ -491,6 +491,7 @@ App 內通知卡（別人找你）。**不用 DS Toast**：toast.spec.md 規定�
   - **APP 標籤內框** 1px，顏色同文字（`inset 0 0 0 1px currentColor`）。
   - **動作按鈕**（`actions`，2026-11-17 user）：有按鈕就不能回覆，按鈕取代輸入框；DS Button tertiary sm + `data-theme="dark"`。Comfy 與 Compact 都放在訊息下方一列：一顆撐滿、兩顆平分，間距 8（Compact 因此長高，訊息列不固定 28）。按下有 `result` 的按鈕 → 訊息列換成結果、按鈕收起（保留 28 高不跳）、3 秒後卡片收起。卡高：Comfy 136（同可回覆的卡）、Compact 隨內容。
   - **Emoji 回應**（`reaction: { emoji, message }`，2026-11-17 user）：DM / Group chat 有人對你的訊息按 emoji。頭像 40×40 範圍內右下角疊 16px 圓（白底、emoji 12px 置中、外框 1.5px #33337B = 卡片底色）。DM：第一排人名、第二排「Reacted to your message: 原訊息」；Group chat：第一排群組名、第二排「人名 reacted to your message: 原訊息」。不能回覆 → 卡片 hug（Comfy 100 / Compact 88）。
+  - **標籤光學置中**（2026-11-18 user：APP 看起來偏上）：DS Tag sm 高 20、行高 130% 不變，只把字往下推。APP 只在 2x 以上螢幕下移 0.5px（1x 會進位成 1px 反而偏下）；@You / @All 一律下移 0.5px（@ 字形頂端比大寫高）。
   - **@提及**（`mention: 'you' | 'all'`，2026-11-17 user）：第一排名字左邊加標籤，間距 8；點名你 =「@You」、@所有人 =「@All」。大小同 APP 標籤（DS Tag sm、px-0 → 文字左右 4、上下 0；不加外框），顏色寫死：底 #FFECB2、字 #C36100（push banner 整體不隨深淺色主題變）。第二排照原情境（DM = 訊息；Group = 「人名: 訊息」，訊息本身含「@名字 / @All」，示範用「@Me」）；可以回覆，卡高同一般 DM / Group。
   - **預覽關閉**（Display › Show message and content previews 未勾選，2026-11-17 user）：第一排照常，第二排不論情境（DM / Group / App / 轉傳 / emoji 回應 / @提及）一律「Message preview hidden」。App 動作按鈕也藏起來（2026-11-17 user 選 A：看不到內容不能直接做決定，對齊 Apple HIG 隱藏預覽時須先看到內容才能操作；Teams 此行為未查到公開資料）→ 卡片 hug，點卡片打開 app。Chat 回覆框照留（回覆是自己寫內容，不是替別人的東西做決定；2026-11-17 user 確認保留）。
   - 這版不顯示：群組 / thread 來源、Urgent 標籤、「為什麼收到」、時間、則數、轉傳引用框（待設計）。螢幕閱讀器名稱仍帶回覆目的地。
