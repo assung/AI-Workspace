@@ -415,12 +415,9 @@ export function useBannerStack() {
       const prev = group && b.threadKey ? list.find((x) => x.threadKey === b.threadKey) : undefined
       if (!prev) return trim([fresh, ...list], max)
       const count = (prev.count ?? 1) + 1
-      // 停留中:同一張卡原地更新第二排(id / instanceKey 不變 → 回覆草稿、計時都保留;回覆仍送到同一個聊天)
-      if (pinned.current.has(prev.id)) {
-        return list.map((x) => (x === prev ? { ...b, id: prev.id, instanceKey: prev.instanceKey, count } : x))
-      }
-      // 沒停留:收合成一張移到最上面(最新),重新計時
-      return trim([{ ...fresh, count }, ...list.filter((x) => x !== prev)], max)
+      // 同一聊天的新訊息一律原地取代,不移到最上面(2026-11-18 user)。id / instanceKey 不變 → 回覆草稿保留,回覆仍送到同一個聊天;
+      // 計時:沒停留 → 重新算 10 秒;停留中 → 不重算,移開後接著剩下的時間(TimedBanner)
+      return list.map((x) => (x === prev ? { ...b, id: prev.id, instanceKey: prev.instanceKey, count } : x))
     })
   const dismiss = (id: string) => {
     pinned.current.delete(id)
@@ -535,7 +532,13 @@ function TimedBanner({
   const paused = hovered || interacting || !!data.urgent
   // 停留 / 回覆中 → 告訴疊放區別擠掉這張、同來源只原地更新(2026-11-17 user)
   useEffect(() => { onPinnedChange?.(data.id, hovered || interacting) }, [hovered, interacting, data.id, onPinnedChange])
+  // 同一聊天的新訊息原地取代(count 變了):沒停留時重新算 10 秒;停留中不重算(2026-11-18 user)
+  const lastCount = useRef(data.count)
   useEffect(() => {
+    if (lastCount.current !== data.count) {
+      lastCount.current = data.count
+      if (!paused) remaining.current = AUTO_HIDE_MS
+    }
     if (paused) return
     startedAt.current = Date.now()
     const t = window.setTimeout(onDismiss, remaining.current)
@@ -543,7 +546,7 @@ function TimedBanner({
       window.clearTimeout(t)
       remaining.current -= Date.now() - startedAt.current
     }
-  }, [paused, onDismiss])
+  }, [paused, onDismiss, data.count])
   return (
     <div className="pointer-events-auto" onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
       <NotificationBanner data={data} size={size} onDismiss={onDismiss} onOpen={onOpen} onInteractingChange={setInteracting} showPreview={showPreview} />

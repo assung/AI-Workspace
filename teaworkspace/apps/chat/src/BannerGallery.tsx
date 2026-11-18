@@ -127,7 +127,7 @@ export function BannerGallery() {
           <p className="text-caption font-semibold uppercase tracking-wide text-fg-secondary">tWorkspace · In-app notifications · Chats</p>
           <h1 className="text-h3 font-semibold">Push banner scenarios</h1>
           <p className="max-w-[68ch] text-body text-fg-secondary">
-            每張卡對到「Teams 通知決策流程圖」的一道關卡。按 Play 會把卡片送進右下角真的疊放區(距右 16、距底 120,由下〔舊〕往上〔新〕疊):10 秒收起、滑鼠停留暫停、同一對話合併、同時張數上限(預設 3 張,可改 3–5)。停留中的卡:同一聊天的新訊息只即時更新第二排、不換位置;就算變成最舊也不會被擠掉。
+            每張卡對到「Teams 通知決策流程圖」的一道關卡。按 Play 會把卡片送進右下角真的疊放區(距右 16、距底 120,由下〔舊〕往上〔新〕疊):10 秒收起、滑鼠停留暫停、同一對話合併、同時張數上限(預設 3 張,可改 3–5)。同一聊天的新訊息原地取代第二排,不移到最上面;停留中的卡就算變成最舊也不會被擠掉。
           </p>
           <Checkbox
             className="pt-2"
