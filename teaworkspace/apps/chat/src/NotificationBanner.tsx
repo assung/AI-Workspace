@@ -230,9 +230,10 @@ export function NotificationBanner({
       <Avatar src={data.actor.avatarUrl} alt={data.actor.name} size={40} />
       <span className="pointer-events-none absolute inset-0 rounded-full shadow-[inset_0_0_0_1px_#E8E8E8]" aria-hidden />
       {data.reaction && (
-        // Emoji 徽章:40×40 範圍內右下角,16px 圓、emoji 12px 置中;外框 1.5px 用卡片底色,像從頭像裡挖出一圈
+        // Emoji 徽章(2026-11-20 user):18px 白圓、emoji 14px 置中;從頭像右下角再往右、往下各推 4px,少遮一點頭像;
+        // 外框 1.5px 用卡片底色,像從頭像裡挖出一圈
         <span
-          className="absolute bottom-0 right-0 flex h-4 w-4 items-center justify-center rounded-full bg-white text-[12px] leading-none"
+          className="absolute -bottom-1 -right-1 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-white text-[14px] leading-none"
           style={{ boxShadow: '0 0 0 1.5px #33337B' }}
           aria-hidden
         >

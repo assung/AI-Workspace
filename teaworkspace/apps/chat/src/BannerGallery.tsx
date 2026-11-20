@@ -276,7 +276,7 @@ function ActionVariants({ onPlay }: { onPlay: (s: Scenario) => void }) {
   )
 }
 
-/** Emoji 回應(2026-11-17 user):頭像右下角 16px emoji 徽章;第一排人名、第二排「Reacted to your message: …」 */
+/** Emoji 回應(2026-11-17 user):頭像右下角 18px emoji 徽章(emoji 14px,右下各外推 4px);第一排人名、第二排「Reacted to your message: …」 */
 const REACT: { key: string; title: string; note: string; s: Scenario }[] = [
   {
     key: 'dm', title: 'DM', note: '對方對你的訊息按了 emoji。第一排是人名。',
