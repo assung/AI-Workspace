@@ -468,7 +468,7 @@ user：「我想照我寫好的對話劇本來演示」→ 劇本 `K8S_IMAGEPULL
   - **Focus**：Pause notifications（Pause ▾：For 1 hour / For 2 hours / For the rest of today / Until I turn them back on；暫停中變 Resume + 「Paused until …」）、☑ Let priority contacts through、Priority contacts（Edit → 子頁）、☑ Follow Do Not Disturb on this computer（預設勾，規格第 10 節第 8 點）。
   - **Display**（文案照 user 設計稿）：☑ Show message and content previews in notifications、☑ Show notifications while "In a Call" status（取消勾選 = 會議 / 通話中只放行該場聊天；取代原 Focus 的 Mute during meetings and calls）、☑ Group banners from the same chat（預設勾；同一聊天的橫幅收合成一張並累計則數）。Size：RadioGroup「Change the size of your message and content previews.」Comfy（預設）/ Compact（Teams 文案，2026-11-11）。Show this many notifications on screen at once：整句標籤 + 右側 Select 3 (default) / 4 / 5（句型對標 Teams「Dismiss notifications after this amount of time」；Teams 沒有張數設定，2026-11-12 user）。Sound 之後另立一區，目前移除。
   - **Native apps**：目前只有 Chats（2026-11-10 user：功能目前只有 chat）。Edit → Chats 子頁：
-    - **@Mentions**（標題列總開關）：Everyone in the chat @mentions / Personal @mentions，Select：Show in banner / Off，預設 Show in banner。
+    - **@Mentions**（標題列總開關）：Everyone in the chat @mentions / Personal @mentions，Select：Show in banner / Off，預設 Show in banner。選項對照 Teams（平台沒有 Activity）：Show in activity and banner → Show in banner；Show in activity / Off → Off。**暫停通知中**（2026-11-20 user，對齊 Teams Mute all notifications）：總開關與兩個 Select 都顯示 Off 且 disabled，區塊下方說明「Off while notifications are paused. Your choices come back when you resume.」；只改顯示、不改存的值，恢復通知後切回原設定（避免使用者以為已恢復卻還收不到）。Native apps 列的摘要（N shown in banners · N off）也照實際生效的值算。
     - **Messages**：New messages / Replies（預設 Show in banner）、Reactions（預設 Off）。
 - Priority contacts 子頁：上方 PeoplePicker 加人，下方逐列（ItemAvatar block + 名字 + 職稱 + Remove）。
 - 流程圖關卡 → 控制項對照寫在檔頭註解。

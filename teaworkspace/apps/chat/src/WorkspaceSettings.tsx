@@ -242,21 +242,28 @@ function SettingSection({
   title,
   enabled,
   onEnabledChange,
+  locked,
+  note,
   children,
 }: {
   title: string
   /** 有傳 = 功能區塊:標題列右側放總開關 Switch(2026-11-10 user:Switch 只用在這裡) */
   enabled?: boolean
   onEnabledChange?: (v: boolean) => void
+  /** 總開關被外部條件鎖住(例如暫停通知中),同時顯示原因 */
+  locked?: boolean
+  note?: string
   children: React.ReactNode
 }) {
   const id = useId()
+  const noteId = useId()
   return (
-    <section aria-labelledby={id} className="flex flex-col gap-[var(--layout-space-tight)]">
+    <section aria-labelledby={id} aria-describedby={note ? noteId : undefined} className="flex flex-col gap-[var(--layout-space-tight)]">
       <div className="flex items-center justify-between gap-4">
         <h3 id={id} className="text-body font-semibold text-foreground">{title}</h3>
-        {onEnabledChange && <Switch checked={!!enabled} onCheckedChange={onEnabledChange} aria-labelledby={id} />}
+        {onEnabledChange && <Switch checked={!!enabled} disabled={locked} onCheckedChange={onEnabledChange} aria-labelledby={id} />}
       </div>
+      {note && <p id={noteId} className="text-body text-fg-secondary">{note}</p>}
       <div className="flex flex-col">{children}</div>
     </section>
   )
@@ -540,7 +547,13 @@ function NotificationsPage({
 
       <SettingSection title="Native apps">
         {NATIVE_APPS.map((a) => {
-          const modes = Object.values(prefs.delivery[a.key] ?? {})
+          // 摘要照「實際生效」的值算:區塊總開關關閉、或暫停中的 @Mentions,都算 Off
+          const saved = prefs.delivery[a.key] ?? {}
+          const modes = a.sections.flatMap((sec) =>
+            sec.events.map((e) =>
+              (sec.key && prefs.sectionEnabled[sec.key] === false) || (paused && sec.key === 'mentions') ? 'off' : saved[e.key] ?? e.defaultMode,
+            ),
+          )
           const banners = modes.filter((m) => m === 'banner').length
           const off = modes.filter((m) => m === 'off').length
           const summary = `${banners} shown in banners${off ? ` · ${off} off` : ''}`
@@ -585,16 +598,23 @@ function AppDeliveryPage({
   onChange: (p: NotificationPrefs) => void
 }) {
   const modes = prefs.delivery[app.key] ?? {}
+  // 暫停通知中(2026-11-20 user,對齊 Teams Mute all notifications):@Mentions 區塊全部顯示 Off 且 disabled;
+  // 只改顯示,不改存的值 → 恢復通知後自動切回原本的設定,免得使用者以為「明明沒暫停了還收不到」
+  const paused = isPaused(prefs)
   return (
     <div className="flex flex-col gap-[var(--layout-space-loose)]">
       <p className="text-body text-fg-secondary">{app.intro}</p>
       {app.sections.map((sec) => {
-        const enabled = sec.key ? prefs.sectionEnabled[sec.key] !== false : true
+        const locked = paused && sec.key === 'mentions'
+        const savedEnabled = sec.key ? prefs.sectionEnabled[sec.key] !== false : true
+        const enabled = locked ? false : savedEnabled
         return (
           <SettingSection
             key={sec.title}
             title={sec.title}
             enabled={enabled}
+            locked={locked}
+            note={locked ? 'Off while notifications are paused. Your choices come back when you resume.' : undefined}
             onEnabledChange={sec.key ? (v) => onChange({ ...prefs, sectionEnabled: { ...prefs.sectionEnabled, [sec.key as string]: v } }) : undefined}
           >
             {sec.events.map((e) => (
@@ -608,10 +628,10 @@ function AppDeliveryPage({
                     size="sm"
                     aria-label={`${e.label} notifications`}
                     aria-describedby={labelId}
-                    // 總開關關閉 → disabled,保留原值(Teams 同)
+                    // 總開關關閉 → disabled,保留原值(Teams 同);暫停中的 @Mentions 顯示 Off(存的值不動)
                     disabled={!enabled}
                     options={DELIVERY_OPTIONS}
-                    value={modes[e.key] ?? e.defaultMode}
+                    value={locked ? 'off' : modes[e.key] ?? e.defaultMode}
                     onChange={(v) =>
                       onChange({ ...prefs, delivery: { ...prefs.delivery, [app.key]: { ...modes, [e.key]: v as DeliveryMode } } })
                     }
