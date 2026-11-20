@@ -64,7 +64,7 @@ const VARIANTS: Scenario[] = [
   {
     title: '暫停中,優先聯絡人仍通知',
     gate: '第 4 關:暫停 + Let priority contacts through',
-    behavior: '「為什麼收到」說明是因為優先名單才穿過暫停,使用者知道其他人的通知被擋下了。',
+    behavior: '優先聯絡人的一般訊息穿過暫停。@提及不會:暫停中 @Mentions 被強制 Off,優先聯絡人 @你 也不跳卡。',
     data: { id: 'priority', threadKey: 'chat:guanyu', app: 'chats', actor: P.guanyu, body: 'Quick one — are we still on for the 4 PM tasting?', reason: 'Priority contact · notifications are paused', reply: true, time: 'now' },
   },
   {
@@ -93,6 +93,7 @@ const SUPPRESSED: { gate: string; outcome: string; example: string }[] = [
   { gate: '這種通知 = Off', outcome: '不跳卡(聊天本身的未讀數照常)', example: 'Chats › Messages › Reactions(預設 Off)' },
   { gate: '聊天被靜音,不是 Personal @mention', outcome: '不通知', example: '已靜音的 Engineering 有人 @All' },
   { gate: '暫停中,寄件人不在優先名單', outcome: '不跳卡', example: '暫停 1 小時期間,Shinichi 傳訊息' },
+  { gate: '暫停中的 @提及(含優先聯絡人)', outcome: '不跳卡', example: '暫停期間,優先聯絡人 Guan-Yu 在 Product Team @你' },
   { gate: '通話 / 會議中且未勾選「Show notifications while "In a Call" status」', outcome: '不跳卡', example: '開會時 Product Team 的一般訊息' },
   { gate: '系統勿擾 / 專注模式開著', outcome: '不跳卡', example: 'macOS 專注模式期間的任何通知' },
 ]

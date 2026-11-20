@@ -607,6 +607,8 @@ export function routeNotification(
   const paused = prefs.pauseUntil === 'manual' || (typeof prefs.pauseUntil === 'number' && prefs.pauseUntil > now)
   const isPriority = !!e.actorId && prefs.priorityIds.includes(e.actorId)
   if (paused) {
+    // 暫停中 @Mentions 區塊被強制顯示 Off(設定頁鎖住)→ @提及一律不跳,優先聯絡人也一樣(2026-11-20 user:優先聯絡人 @我 跳不跳取決於 @Mentions 是不是 Off)
+    if (section?.key === 'mentions') return { outcome: 'badge', gate: 'Notifications paused · @Mentions off' }
     if (!(prefs.allowPriority && isPriority)) return { outcome: 'badge', gate: 'Notifications paused' }
     reason = 'Priority contact · notifications are paused'
   }
