@@ -62,12 +62,6 @@ const DELIVERED: Scenario[] = [
 
 const VARIANTS: Scenario[] = [
   {
-    title: '緊急訊息',
-    gate: '第 1 關:寄件人標記緊急',
-    behavior: '穿過暫停、會議靜音、系統勿擾;不自動收起,直到讀取或關閉。Teams 每 2 分鐘再提醒,最多 20 分鐘。螢幕閱讀器用 role=alert。',
-    data: { id: 'urgent', threadKey: 'chat:ai', app: 'chats', actor: P.ai, body: 'Lab results for batch #3 failed the moisture check. Please hold the shipment.', urgent: true, reply: true, time: 'now' },
-  },
-  {
     title: '暫停中,優先聯絡人仍通知',
     gate: '第 4 關:暫停 + Let priority contacts through',
     behavior: '「為什麼收到」說明是因為優先名單才穿過暫停,使用者知道其他人的通知被擋下了。',
@@ -82,7 +76,7 @@ const VARIANTS: Scenario[] = [
   {
     title: '通話 / 會議中,只放行這場會議的聊天',
     gate: '第 5 關:Display › Show notifications while "In a Call" status = 未勾選',
-    behavior: '取消勾選時,通話或會議中只有這場會議的聊天(和緊急訊息)會跳。',
+    behavior: '取消勾選時,通話或會議中只有這場會議的聊天會跳。',
     data: { id: 'meeting', threadKey: 'chat:weekly', app: 'chats', context: 'Weekly tasting sync', actor: P.yui, body: 'Sharing the scorecard link here for everyone.', reason: 'From your current meeting', reply: true, time: 'now' },
   },
   {
@@ -100,7 +94,7 @@ const SUPPRESSED: { gate: string; outcome: string; example: string }[] = [
   { gate: '聊天被靜音,不是 Personal @mention', outcome: '不通知', example: '已靜音的 Engineering 有人 @All' },
   { gate: '暫停中,寄件人不在優先名單', outcome: '不跳卡', example: '暫停 1 小時期間,Shinichi 傳訊息' },
   { gate: '通話 / 會議中且未勾選「Show notifications while "In a Call" status」', outcome: '不跳卡', example: '開會時 Product Team 的一般訊息' },
-  { gate: '系統勿擾 / 專注模式開著', outcome: '不跳卡', example: 'macOS 專注模式期間任何非緊急通知' },
+  { gate: '系統勿擾 / 專注模式開著', outcome: '不跳卡', example: 'macOS 專注模式期間的任何通知' },
 ]
 
 const SUPPRESSED_COLUMNS = [
@@ -528,7 +522,7 @@ function ThreadVsChat({ onPlay }: { onPlay: (s: Scenario) => void }) {
 }
 
 /** Comfy / Compact 並排:同一則通知兩種尺寸,看資訊取捨 */
-const COMPARE_IDS = ['mention', 'forward', 'grouped', 'urgent']
+const COMPARE_IDS = ['mention', 'forward', 'grouped']
 function SizeComparison() {
   const all = [...DELIVERED, ...VARIANTS]
   const rows = COMPARE_IDS.map((id) => all.find((x) => x.data.id === id)).filter(Boolean) as Scenario[]
@@ -538,7 +532,7 @@ function SizeComparison() {
         <h2 className="text-h5 font-semibold">Comfy 與 Compact</h2>
         <p className="max-w-[68ch] text-body text-fg-secondary">
           Teams 的 Display 設定可選 Comfy 或 Compact(預設 Comfy)。Teams 沒公開兩者的版面差異,以下是我們的定義:
-          Compact 把來源併到名字後面、內文只留一行,收掉「為什麼收到」和按鈕列,只留 Reply 圖示鈕;Urgent 標籤兩種都保留。寬度、陰影、計時規則相同。
+          Compact 把來源併到名字後面、內文只留一行,收掉「為什麼收到」和按鈕列,只留 Reply 圖示鈕。寬度、陰影、計時規則相同。
         </p>
       </div>
       <div className="grid grid-cols-1 gap-x-10 gap-y-6 lg:grid-cols-2">

@@ -9,7 +9,6 @@
 //
 // 行為(對照 Teams 規格第 3 節流程圖、第 10 節建議):
 // - 一般:10 秒後自動收起(DS Toast 含 action 的預設 10000ms,WCAG 2.2.1);滑鼠停在卡上 / 正在回覆時暫停計時。
-// - 緊急:不自動收起,直到讀取或關閉;Teams 每 2 分鐘再提醒、最多 20 分鐘。
 // - 同一個對話又有新訊息 → 取代原卡、顯示則數(不疊出一排同一個人)。設定 Display › Group banners from the same chat 關閉時每則各一張。
 // - 同時最多 3 張(預設,toast.spec.md 同規則;設定可改 3–5),更舊的收起,只留未讀數。
 //   張數多時(5 張 Comfy 約 1000px)放不下的整張先不顯示(最舊的先藏),不露出半張;視窗變大再出現。
@@ -48,9 +47,8 @@ export type BannerData = {
   /** 沒有人(系統提醒)時的標題 */
   title?: string
   body: string
-  /** 為什麼收到(@mention / 優先聯絡人 / 會議聊天…);urgent 另外用紅色標籤 */
+  /** 為什麼收到(@mention / 優先聯絡人 / 會議聊天…) */
   reason?: string
-  urgent?: boolean
   /** 同一對話累計則數(> 1 時標題後顯示) */
   count?: number
   /** 可直接回覆(Chats / Docs 留言) */
@@ -291,8 +289,8 @@ export function NotificationBanner({
     const compactBody = messageText
     return (
       <div
-        role={data.urgent ? 'alert' : 'status'}
-        aria-label={`${data.urgent ? 'Urgent: ' : ''}${name}${data.context ? ` in ${data.context}` : ''}`}
+        role="status"
+        aria-label={`${name}${data.context ? ` in ${data.context}` : ''}`}
         className="group flex w-[360px] max-w-full flex-col gap-2 overflow-hidden rounded-[8px] p-3 text-white"
         style={{ background: '#33337B', boxShadow: '0 8px 16px rgba(0, 0, 0, 0.16)' }}
       >
@@ -348,8 +346,8 @@ export function NotificationBanner({
   //   第二、三區間距 8;卡片 padding 12、圓角 8、底色 #33337B、陰影 0 8 16 #000 16%;頭像內框 1px #E8E8E8;輸入框 focus 框線 = primary(DS Textarea 同用 border-primary)。
   return (
     <div
-      role={data.urgent ? 'alert' : 'status'}
-      aria-label={`${data.urgent ? 'Urgent: ' : ''}${name}${data.context ? ` in ${data.context}` : ''}`}
+      role="status"
+      aria-label={`${name}${data.context ? ` in ${data.context}` : ''}`}
       className="flex w-[360px] max-w-full flex-col gap-2 overflow-hidden rounded-[8px] p-3 text-white"
       // drop shadow X0 Y8 Blur16 #000 16%(2026-11-17 user)
       style={{ background: '#33337B', boxShadow: '0 8px 16px rgba(0, 0, 0, 0.16)' }}
@@ -539,7 +537,7 @@ function TimedBanner({
   const [interacting, setInteracting] = useState(false)
   const remaining = useRef(AUTO_HIDE_MS)
   const startedAt = useRef(0)
-  const paused = hovered || interacting || !!data.urgent
+  const paused = hovered || interacting
   // 停留 / 回覆中 → 告訴疊放區別擠掉這張、同來源只原地更新(2026-11-17 user)
   useEffect(() => { onPinnedChange?.(data.id, hovered || interacting) }, [hovered, interacting, data.id, onPinnedChange])
   // 同一聊天的新訊息原地取代(count 變了):沒停留時重新算 10 秒;停留中不重算(2026-11-18 user)
@@ -573,7 +571,6 @@ export type IncomingEvent = {
   /** NATIVE_APPS[].sections[].events[].key(Chats:mentionsEveryone / mentionsPersonal / messages / replies / reactions) */
   kind: string
   actorId?: string
-  urgent?: boolean
   /** 直接 @ 我(不含 @channel / @everyone) */
   directMention?: boolean
   /** 這個聊天被我靜音 */
@@ -592,8 +589,7 @@ export function routeNotification(
   ctx: RouteContext,
   now = Date.now(),
 ): RouteResult {
-  // 1. 寄件人標緊急 → 一律通知(可穿過暫停、勿擾、會議靜音;收件人不能拒收)
-  if (e.urgent) return { outcome: 'banner', gate: 'Urgent', reason: undefined }
+  // (Urgent / 緊急訊息:平台目前沒有這個功能,2026-11-20 user 決定先不處理;之後做再加回第一關)
   // 2. 這類通知的設定:功能區塊總開關 → 該種通知 Show in banner / Off
   //    (聊天訊息的未讀數本來就在,所以 Off / 被擋下 = 不跳卡、只剩原本的未讀)
   const section = NATIVE_APPS.find((a) => a.key === e.app)?.sections.find((sec) => sec.events.some((x) => x.key === e.kind))

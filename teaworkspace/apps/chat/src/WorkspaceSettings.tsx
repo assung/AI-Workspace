@@ -3,7 +3,7 @@
 // 設計依據:Teams 通知機制規格 + Teams 通知決策流程圖(兩張圖的每道關卡對到一個控制項,見 STRUCTURE.md §Settings)。
 //
 // 關卡 → 控制項:
-//   寄件人標緊急           → 無設定(收件人不能拒收,同 Teams)
+//   寄件人標緊急           → 平台目前沒有緊急訊息功能,不處理(2026-11-20 user)
 //   這類通知怎麼設定        → Native apps › Chats 子頁:每種通知選 Show in banner / Off;功能區塊標題列的 Switch = 總開關
 //                            (關閉 → 子項 Select disabled、保留原值,同 Teams;2026-11-10 user 決定)
 //                            目前只有 Chats 有通知(2026-11-10 user:功能目前只有 chat)
@@ -70,7 +70,7 @@ export type NotificationPrefs = {
   allowPriority: boolean
   /** PersonData.id */
   priorityIds: string[]
-  /** Display › Show notifications while "In a Call" status;取消勾選 = 會議 / 通話中只放行該場聊天與緊急 */
+  /** Display › Show notifications while "In a Call" status;取消勾選 = 會議 / 通話中只放行該場聊天 */
   showDuringCalls: boolean
   followSystemFocus: boolean
   showPreview: boolean
