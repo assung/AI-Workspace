@@ -132,9 +132,8 @@ function PanelScope({ onOpen, children }: { onOpen: (kind: Panel['kind'], id: st
   )
 }
 
-/** 標題開頭的單號(SD-2318 / AR-5170);A 方案寫進標題,B 方案從標題抽出來做成 Tag */
+/** 標題開頭的單號(SD-2318 / AR-5170):資料上仍寫在標題裡(改名、Created in、頁首都用完整標題),側欄列把它抽成 Tag */
 const TICKET_KEY_RE = /^((?:SD|AR)-\d+) (.+)$/
-const TICKET_STYLE = new URLSearchParams(window.location.search).get('ticket') === 'tag' ? 'tag' : 'text'
 
 /** Artifacts 列表:點 Name 在右側預覽(同 PanelScope,要在 AppShell 子樹內才拿得到 requestAside) */
 function ArtifactsScope({ onOpen, children }: { onOpen: (id: string) => void; children: (open: (id: string) => void) => ReactNode }) {
@@ -260,14 +259,15 @@ export function TAgentPage({
     </DropdownMenu>
   )
 
-  // 單號樣式比較(2026-11-22 user:「想看一版做成 B 的樣式來比較」):
-  //   A(預設)= 單號就是標題文字的開頭;B(網址加 `?ticket=tag`)= 單號抽成 DS Tag sm 放在標題前。
-  //   B 不是 DS Sidebar 列的既有位置(sidebar.spec.md 列 = 圖示 / 標題 / 右側 badge / ⋯),比較用、定案前不當正式樣式。
+  // 單號(2026-11-22 user 比較 A / B 後選 B:「在介面辨識上快速很多」)= 從標題開頭抽出來,做成 DS Tag sm 放在標題前。
+  //   Sidebar 列本身沒有 Tag 位置(sidebar.spec.md:圖示 / 標題 / 右側 badge / ⋯)→ 產品端先做、之後跟 DS 提。
+  //   列高不變:照 MenuItem 的 tag 位置(menu-item.tsx tag/endContent 容器 `h-[1lh]`)—— 這一行高度固定 = 一行字高,
+  //   Tag sm(20px)比字行(18.2px)高的那 1.8px 往上下內距延伸、不把列撐高(沒這樣做時有單號的列 34px、其他 32px)。
   const conversationLabel = (title: string) => {
-    const m = TICKET_STYLE === 'tag' ? title.match(TICKET_KEY_RE) : null
+    const m = title.match(TICKET_KEY_RE)
     if (!m) return title
     return (
-      <span className="flex min-w-0 items-center gap-2">
+      <span className="flex h-[1lh] min-w-0 items-center gap-2">
         {/* tabular-nums:單號數字等寬 → 每列 Tag 同寬、後面標題起點對齊 */}
         <Tag size="sm" className="shrink-0 tabular-nums">{m[1]}</Tag>
         <span className="min-w-0 truncate">{m[2]}</span>
