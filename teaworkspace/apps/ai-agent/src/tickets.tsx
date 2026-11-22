@@ -47,7 +47,14 @@ export type Ticket = {
 const TODAY = '2026/10/30'
 
 /** 單子目前的樣子;`pos` = 這個身分的劇本進度(還沒開始 = 0),`M` = 這份劇本的里程碑 */
-export function getTicket(id: string, pos: number, M: TicketMilestones, created?: TicketDraft | null): Ticket | undefined {
+/** `channelActivity` = 這張單的聊天頻道同步回來的紀錄(channel.tsx;bot 同步,2026-11-22 user) */
+export function getTicket(
+  id: string,
+  pos: number,
+  M: TicketMilestones,
+  created?: TicketDraft | null,
+  channelActivity: Array<{ time: string; text: string }> = [],
+): Ticket | undefined {
   const done = (step: number) => pos > step
   if (id === 'SD-2318') {
     // 申請人自己按 Submit 送出的單:Title 與 What happened 照草稿(使用者改過的內容);其他欄位由 Service Desk 判斷,不受草稿影響
@@ -80,7 +87,9 @@ export function getTicket(id: string, pos: number, M: TicketMilestones, created?
         ...(done(M.reenabled) ? [{ time: '10:47 AM', text: 'Bob re-enabled robot$payments-ci' }] : []),
         ...(done(M.replied) ? [{ time: '10:48 AM', text: 'Bob replied to Aaron · waiting for confirmation' }] : []),
         ...(done(M.closed) ? [{ time: '10:51 AM', text: 'Closed · Aaron confirmed the pod is running' }] : []),
-      ],
+        ...channelActivity,
+        // 依時間先後(同一天、同格式 hh:mm AM → 字串排序即時間排序;sort 穩定,同時間保留原順序)
+      ].sort((a, b) => a.time.localeCompare(b.time)),
     }
   }
   if (id === 'SD-2320' && done(M.followUpOpened)) {
