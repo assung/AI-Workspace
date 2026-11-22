@@ -36,6 +36,8 @@ export type Persona = {
   artifacts: ArtifactItem[]
   /** 劇本跑完後代理產出的那一筆:收進 Artifacts、右側自動打開一次 */
   scriptArtifact?: ArtifactItem
+  /** 劇本那則對話跟單子扯上關係後(步驟索引 > afterStep),標題前面帶單號(2026-11-22 user 選 A) */
+  scriptRetitle?: { afterStep: number; title: (current: string) => string }
 }
 
 const agent = (id: string, steps: string[], text: ReactNode, copyText: string): TAgentTurn => ({
@@ -78,6 +80,8 @@ export const REQUESTER: Persona = {
   // (2026-11-03 加了「代理反問要不要開單 / 使用者答好」兩步;2026-11-04 user 選 A 又拿掉、和整理草稿合成一步,索引往前 2)
   milestones: { assigned: 8, reenabled: 9, replied: 9, closed: 11, followUpOpened: Infinity },
   artifacts: REQUESTER_ARTIFACTS,
+  // 第 6 步 = 按 Submit 開出 SD-2318 → 原標題前面帶單號
+  scriptRetitle: { afterStep: 6, title: (t) => (t.startsWith('SD-2318') ? t : `SD-2318 ${t}`) },
   updatesSeed: () => [
     update('u-ar', '2026/10/29 04:10 PM', 'Priya 核准了你的權限申請 AR-5170，你現在有 billing-service 的寫入權限。',
       'Priya 核准了你的權限申請 AR-5170，你現在有 billing-service 的寫入權限。', <OpenConversationButton conversationId="c-repo" />),
@@ -97,7 +101,7 @@ export const REQUESTER: Persona = {
     },
     {
       id: 'c-repo',
-      title: 'Request access to the billing-service repo',
+      title: 'AR-5170 Request access to the billing-service repo',
       turns: [
         user('r1', 'I need write access to the billing-service repo for the invoice export work.'),
         said('r2', ['Looked up the owners of billing-service', 'Created access request AR-5170'],
@@ -147,6 +151,8 @@ export const ONCALL: Persona = {
   script: ONCALL_SCRIPT,
   milestones: ONCALL_MILESTONES,
   artifacts: ONCALL_ARTIFACTS,
+  // 人找事:第 3 步 = 接下 SD-2318、指派給 Bob → 標題從「My on-call queue」換成那張單(同事找人劇本一開始的標題);事找人本來就是這個標題,不會再改
+  scriptRetitle: { afterStep: ONCALL_MILESTONES.assigned, title: () => 'SD-2318 payments-api ImagePullBackOff' },
   scriptArtifact: SOP_DRAFT_ARTIFACT,
   updatesSeed: () => ONCALL_UPDATES_SEED(),
   seed: () => [
@@ -162,7 +168,7 @@ export const ONCALL: Persona = {
     },
     {
       id: 'c-disk',
-      title: 'stg-cluster-01 disk usage climbing',
+      title: 'SD-2305 stg-cluster-01 disk usage climbing',
       turns: [
         user('d1', 'Why is disk usage on the stg-cluster-01 nodes climbing?'),
         said('d2', ['Checked node disk usage on stg-cluster-01', 'Checked image GC settings by node pool'],
@@ -171,7 +177,7 @@ export const ONCALL: Persona = {
     },
     {
       id: 'c-quota',
-      title: 'search-api quota request',
+      title: 'SD-2311 search-api quota request',
       turns: [
         user('q1', 'What exactly did the Search team ask for in their quota request?'),
         said('q2', ['Read SD-2311', 'Checked search-api CPU usage for the last 14 days'],

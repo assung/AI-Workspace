@@ -66,7 +66,7 @@ import {
   useAppShell,
   useFormValidation,
 } from '@qijenchen/design-system'
-import { SquarePen, Bell, Shapes, MoreHorizontal, Pin, PinOff, Pencil, Trash2 } from 'lucide-react'
+import { SquarePen, Search, Bell, Shapes, MoreHorizontal, Pin, PinOff, Pencil, Trash2 } from 'lucide-react'
 import {
   TAGENT_LABEL,
   TAgentOpenArticleProvider,
@@ -85,6 +85,7 @@ import { DraftActionsProvider, INITIAL_DRAFT, TicketDraftForm, type TicketDraft 
 import { ReportPreview } from './managerReport'
 import { ArtifactActionsProvider, ArtifactPreview, ArtifactsView, type ArtifactItem } from './artifacts'
 import type { Persona } from './personas'
+import { ConversationSearch } from './conversationSearch'
 import { CHROME_SIDEBAR_BG, CHROME_SIDEBAR_FILL_X } from './chrome'
 
 /**
@@ -205,6 +206,17 @@ export function TAgentPage({
     setArtifactAutoOpened(true)
     setPanel({ scope: engine.scriptConvId!, kind: 'artifact', id: persona.scriptArtifact.id })
   }, [scriptDone, persona.scriptArtifact, artifactAutoOpened, activeConversation?.id, engine.scriptConvId])
+  // 對話跟某張單扯上關係 → 標題前面帶單號(2026-11-22 user 選 A;只改一次,之後使用者自己改名不再動)
+  const [retitled, setRetitled] = useState(false)
+  useEffect(() => {
+    const rt = persona.scriptRetitle
+    if (!rt || retitled || engine.scriptConvId === null || engine.scriptPos <= rt.afterStep) return
+    const conv = engine.conversations.find((c) => c.id === engine.scriptConvId)
+    if (!conv) return
+    setRetitled(true)
+    const next = rt.title(conv.title)
+    if (next !== conv.title) engine.rename(conv.id, next)
+  }, [persona.scriptRetitle, retitled, engine])
   const openArtifactPanel = (id: string) => {
     if (activeConversation) setPanel({ scope: activeConversation.id, kind: 'artifact', id })
   }
@@ -266,6 +278,7 @@ export function TAgentPage({
 
   const pinned = engine.listed.filter((c) => c.pinned)
   const recents = engine.listed.filter((c) => !c.pinned)
+  const [searchOpen, setSearchOpen] = useState(false)
 
   const sidebar = (
     <Sidebar collapsible="offcanvas" contentType="agent-nav" widthRange={MENU_WIDTH} className={`${CHROME_SIDEBAR_BG} ${CHROME_SIDEBAR_FILL_X}`}>
@@ -280,6 +293,18 @@ export function TAgentPage({
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton id="new" startIcon={SquarePen} tooltip="New conversation">New conversation</SidebarMenuButton>
+              </SidebarMenuItem>
+              {/* Search(2026-11-22 user 選 A + C):開搜尋對話框,不是導覽目的地 → 不傳 id、不參與選取;位置同 Claude(New 的下一列) */}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  startIcon={Search}
+                  tooltip="Search"
+                  onClick={() => setSearchOpen(true)}
+                  aria-haspopup="dialog"
+                  aria-expanded={searchOpen}
+                >
+                  Search
+                </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton id={conversationRoute(UPDATES_ID)} startIcon={Bell} tooltip={UPDATES_TITLE}>{UPDATES_TITLE}</SidebarMenuButton>
@@ -308,6 +333,7 @@ export function TAgentPage({
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <ConversationSearch open={searchOpen} onOpenChange={setSearchOpen} pinned={pinned} recents={recents} onSelect={(id) => onRouteChange(conversationRoute(id))} />
     </Sidebar>
   )
 
