@@ -66,7 +66,7 @@ import {
   useAppShell,
   useFormValidation,
 } from '@qijenchen/design-system'
-import { SquarePen, Search, Bell, Shapes, MoreHorizontal, Pin, PinOff, Pencil, Trash2 } from 'lucide-react'
+import { SquarePen, Bell, Shapes, MoreHorizontal, Pin, PinOff, Pencil, Trash2 } from 'lucide-react'
 import {
   TAGENT_LABEL,
   TAgentOpenArticleProvider,
@@ -85,7 +85,6 @@ import { DraftActionsProvider, INITIAL_DRAFT, TicketDraftForm, type TicketDraft 
 import { ReportPreview } from './managerReport'
 import { ArtifactActionsProvider, ArtifactPreview, ArtifactsView, type ArtifactItem } from './artifacts'
 import type { Persona } from './personas'
-import { ConversationSearch } from './conversationSearch'
 import { CHROME_SIDEBAR_BG, CHROME_SIDEBAR_FILL_X } from './chrome'
 
 /**
@@ -132,6 +131,10 @@ function PanelScope({ onOpen, children }: { onOpen: (kind: Panel['kind'], id: st
     </TAgentOpenArticleProvider>
   )
 }
+
+/** 標題開頭的單號(SD-2318 / AR-5170);A 方案寫進標題,B 方案從標題抽出來做成 Tag */
+const TICKET_KEY_RE = /^((?:SD|AR)-\d+) (.+)$/
+const TICKET_STYLE = new URLSearchParams(window.location.search).get('ticket') === 'tag' ? 'tag' : 'text'
 
 /** Artifacts 列表:點 Name 在右側預覽(同 PanelScope,要在 AppShell 子樹內才拿得到 requestAside) */
 function ArtifactsScope({ onOpen, children }: { onOpen: (id: string) => void; children: (open: (id: string) => void) => ReactNode }) {
@@ -257,11 +260,26 @@ export function TAgentPage({
     </DropdownMenu>
   )
 
+  // 單號樣式比較(2026-11-22 user:「想看一版做成 B 的樣式來比較」):
+  //   A(預設)= 單號就是標題文字的開頭;B(網址加 `?ticket=tag`)= 單號抽成 DS Tag sm 放在標題前。
+  //   B 不是 DS Sidebar 列的既有位置(sidebar.spec.md 列 = 圖示 / 標題 / 右側 badge / ⋯),比較用、定案前不當正式樣式。
+  const conversationLabel = (title: string) => {
+    const m = TICKET_STYLE === 'tag' ? title.match(TICKET_KEY_RE) : null
+    if (!m) return title
+    return (
+      <span className="flex min-w-0 items-center gap-2">
+        {/* tabular-nums:單號數字等寬 → 每列 Tag 同寬、後面標題起點對齊 */}
+        <Tag size="sm" className="shrink-0 tabular-nums">{m[1]}</Tag>
+        <span className="min-w-0 truncate">{m[2]}</span>
+      </span>
+    )
+  }
+
   const conversationRows = (list: TAgentConversation[]) =>
     list.map((c) => (
       <SidebarMenuItem key={c.id}>
         <SidebarMenuButton id={conversationRoute(c.id)} tooltip={c.title}>
-          {c.title}
+          {conversationLabel(c.title)}
         </SidebarMenuButton>
         {/* 未讀紅點(2026-10-30 user:沿用現有 dot 樣式):Badge dot + 同色;滑過 / 焦點在列上時讓位給 ⋯ */}
         {engine.unreadIds.has(c.id) && (
@@ -278,7 +296,6 @@ export function TAgentPage({
 
   const pinned = engine.listed.filter((c) => c.pinned)
   const recents = engine.listed.filter((c) => !c.pinned)
-  const [searchOpen, setSearchOpen] = useState(false)
 
   const sidebar = (
     <Sidebar collapsible="offcanvas" contentType="agent-nav" widthRange={MENU_WIDTH} className={`${CHROME_SIDEBAR_BG} ${CHROME_SIDEBAR_FILL_X}`}>
@@ -293,18 +310,6 @@ export function TAgentPage({
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton id="new" startIcon={SquarePen} tooltip="New conversation">New conversation</SidebarMenuButton>
-              </SidebarMenuItem>
-              {/* Search(2026-11-22 user 選 A + C):開搜尋對話框,不是導覽目的地 → 不傳 id、不參與選取;位置同 Claude(New 的下一列) */}
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  startIcon={Search}
-                  tooltip="Search"
-                  onClick={() => setSearchOpen(true)}
-                  aria-haspopup="dialog"
-                  aria-expanded={searchOpen}
-                >
-                  Search
-                </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton id={conversationRoute(UPDATES_ID)} startIcon={Bell} tooltip={UPDATES_TITLE}>{UPDATES_TITLE}</SidebarMenuButton>
@@ -333,7 +338,6 @@ export function TAgentPage({
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <ConversationSearch open={searchOpen} onOpenChange={setSearchOpen} pinned={pinned} recents={recents} onSelect={(id) => onRouteChange(conversationRoute(id))} />
     </Sidebar>
   )
 
