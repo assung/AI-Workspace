@@ -1255,9 +1255,11 @@ function RoomRow({
     ? { fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-9)' }
     : { fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-8)' }
 
+  // 複本修正(2026-11-23 user「hover 時整個 chat list 都變成 hover 狀態」):原本用沒命名的 `group`,
+  // 外層 DS Sidebar 也帶 group class → 滑進側欄任一處,每一列的 group-hover 都成立。改具名 group/row,只認這一列。
   return (
     <div
-      className={`group relative flex cursor-pointer items-center gap-2 rounded-[4px] px-2 ${
+      className={`group/row relative flex cursor-pointer items-center gap-2 rounded-[4px] px-2 ${
         showPreview ? 'py-2' : 'py-1.5'
       } ${active ? 'bg-neutral-selected' : 'hover:bg-neutral-hover'}`}
       onClick={() => onSelect(room.id)}
@@ -1276,17 +1278,17 @@ function RoomRow({
       )}
 
       {/* Text content — min-w-0 flex-1 allows truncation without clipping right-side items.
-          group-hover:pr-6 reserves the 24px more-button footprint so text truncates at the
+          group-hover/row:pr-6 reserves the 24px more-button footprint so text truncates at the
           button's left edge instead of being overlapped by it. */}
       {showPreview ? (
-        <div className="min-w-0 flex-1 group-hover:pr-6">
+        <div className="min-w-0 flex-1 group-hover/row:pr-6">
           {/* Line 1: name (flex-1 truncate) + time (shrink-0; invisible on hover — keeps its
               box so row height is identical across initial/hover/clicked) */}
           <div className="flex items-baseline gap-1">
             <span className="min-w-0 flex-1 truncate" style={titleStyle}>
               {room.title}
             </span>
-            <span className="shrink-0 group-hover:invisible" style={timeStyle}>
+            <span className="shrink-0 group-hover/row:invisible" style={timeStyle}>
               {latestMsg ? formatListTime(latestMsg, now) : ''}
             </span>
           </div>
@@ -1296,19 +1298,19 @@ function RoomRow({
               {previewText}
             </p>
             {isUnread && (
-              <span className="shrink-0 group-hover:invisible">
+              <span className="shrink-0 group-hover/row:invisible">
                 <Badge dot variant="critical" className="!bg-[#EC540F]" />
               </span>
             )}
           </div>
         </div>
       ) : (
-        <div className="flex min-w-0 flex-1 items-center gap-1 group-hover:pr-6">
+        <div className="flex min-w-0 flex-1 items-center gap-1 group-hover/row:pr-6">
           <span className="min-w-0 flex-1 truncate" style={titleStyle}>
             {room.title}
           </span>
           {isUnread && (
-            <span className="shrink-0 group-hover:invisible">
+            <span className="shrink-0 group-hover/row:invisible">
               <Badge dot variant="critical" className="!bg-[#EC540F]" />
             </span>
           )}
@@ -1318,7 +1320,7 @@ function RoomRow({
       {/* Hover: 24×24 more button, box right edge 12px from divider (right-1 = 4px inside the row's 8px right padding).
           invisible (not hidden) keeps a measurable box so Radix anchors the dropdown correctly; overlays date/time + badge. */}
       <div
-        className="absolute right-1 top-1/2 -translate-y-1/2 invisible group-hover:visible [&:has([data-state=open])]:visible"
+        className="absolute right-1 top-1/2 -translate-y-1/2 invisible group-hover/row:visible [&:has([data-state=open])]:visible"
         onClick={(e) => e.stopPropagation()}
       >
         <RoomMoreMenu
@@ -3243,7 +3245,11 @@ export default function App({
   config,
   onAction,
 }: { config?: ChatVariantConfig; onAction?: (a: ChatAction) => void } = {}) {
-  const [rooms, setRooms] = useState<Room[]>(() => orderedRooms(config?.roomOrderSeed, config?.includeTeamsRooms, config?.teamsRoomMarker, config?.adjacentTeamsNamesake))
+  const [rooms, setRooms] = useState<Room[]>(() => {
+    const list = orderedRooms(config?.roomOrderSeed, config?.includeTeamsRooms, config?.teamsRoomMarker, config?.adjacentTeamsNamesake)
+    // TICKET CHANNEL(2026-11-23 user「這個 demo 情境下，只有這個 chat channel 旁有紅點」):其他聊天一開始全部已讀
+    return config?.ticketChannel ? list.map((r) => ({ ...r, unread: false })) : list
+  })
   const [activeId, setActiveId] = useState<string>(() => orderedRooms(config?.roomOrderSeed, config?.includeTeamsRooms, config?.teamsRoomMarker, config?.adjacentTeamsNamesake)[0].id)
   const [listOpen, setListOpen] = useState(config?.initialListOpen ?? true)
   const [listWidth, setListWidth] = useState(320)
