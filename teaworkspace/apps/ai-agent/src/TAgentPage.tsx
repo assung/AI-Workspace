@@ -238,7 +238,7 @@ export function TAgentPage({
   const channelActivity = (ticketId: string) => {
     const list = channels[ticketId]
     const t = list && getTicket(ticketId, engine.scriptPos, persona.milestones, createdTicket)
-    return list && t ? [{ time: list[0].time, text: `Bob opened ${channelName(ticketId)} in Chat with ${t.requester}` }] : []
+    return list && t ? [{ time: list[0].time, text: `Bob opened “${channelName(ticketId)}” in Chat with ${t.requester}` }] : []
   }
 
   const openTicket = panel?.kind === 'ticket' ? getTicket(panel.id, engine.scriptPos, persona.milestones, createdTicket, channelActivity(panel.id)) : undefined

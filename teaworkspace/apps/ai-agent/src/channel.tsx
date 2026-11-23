@@ -1,4 +1,4 @@
-// 單子的聊天頻道(2026-11-22 user):值班者按「Chat with requester」→ 呼叫 Chat 的 API 開一個這張單專屬的頻道(#sd-2318),
+// 單子的聊天頻道(2026-11-22 user):值班者按「Chat with requester」→ 呼叫 Chat 的 API 開一個這張單專屬的頻道(IT Service Desk - SD-2318),
 // 成員 = 值班者、報案者、bot;值班者在右側面板直接跟報案者對話。bot 把單子狀態更新發到頻道、把頻道訊息同步回單子,
 // 之後也由它發總結。user 決定:1 每張單一個獨立頻道;2 bot 與 IT Service Desk 的 AI agent 同一個身分;
 // 3 走 workspace chat 樣式;4 支線,不擋主劇本;5 報案者那邊先不動;6 prototype 模擬 API,不真的呼叫 Chat。
@@ -28,8 +28,13 @@ import { TAGENT_LABEL } from './TAgent'
 import aaronAvatar from './chat/assets/avatars/me.jpg'
 import bobAvatar from './chat/assets/avatars/bob.jpg'
 
-/** 頻道名稱 = 單號小寫(#sd-2318) */
-export const channelName = (ticketId: string) => `#${ticketId.toLowerCase()}`
+/**
+ * 頻道名稱(2026-11-23 user 同意建議):「產品名 - 單號」→ IT Service Desk - SD-2318。
+ * 用途前綴在前、單號在後(Slack 頻道命名指引「以用途前綴開頭」;PagerDuty 事件頻道 = 類型 + Jira 單號,#major-incident-IR-49);
+ * 分隔「 - 」沿用 Chat 既有群組名寫法(IT Sales - Table格式範例);不加 #(列表群組名都沒有、側欄單號 Tag 也沒有,
+ * 且 #SD-2318 在訊息裡是單號連結的寫法)。原本 #sd-2318(Slack 式小寫)。
+ */
+export const channelName = (ticketId: string) => `${TAGENT_LABEL} - ${ticketId}`
 /** 示範劇本那張單(有預填問句與報案者回覆) */
 export const CHANNEL = { name: channelName('SD-2318'), ticket: 'SD-2318', me: 'Bob', requester: 'Aaron' }
 /** 有人像的人(其他人退回 DS Avatar 的字首) */

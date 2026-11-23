@@ -42,7 +42,7 @@ function usePageVisible() {
   return visible
 }
 
-// 報案者在 workspace Chat 被值班者聯繫(2026-11-23 user):`#requester-chat` = workspace Chat 複本(chat/App.tsx)+ #sd-2318 頻道劇本。
+// 報案者在 workspace Chat 被值班者聯繫(2026-11-23 user):`#requester-chat` = workspace Chat 複本(chat/App.tsx)+ 單子頻道(IT Service Desk - SD-2318)劇本。
 // 不是 IT Service Desk 的畫面,所以不走 persona;外圍 = tWorkspace 的 Chat 分頁(agent: true 的版面),
 // 只關掉它自己的 tAgent 劇本(那是 tWorkspace 時期的示範,跟這條無關)。
 const REQUESTER_CHAT_HASH = '#requester-chat'

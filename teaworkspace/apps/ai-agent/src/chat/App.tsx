@@ -4,7 +4,7 @@
 // 相對原檔只加了 `config.ticketChannel` 這一條(搜尋 TICKET CHANNEL):
 // - Person.bot → 頭像改用 DS AgentLogo(bot 與 IT Service Desk 的 AI agent 同一個身分,2026-11-22 user 決定 2)
 // - InputBox / Conversation 的 composerPrefill(劇本的下一句預先填好,按 Enter 送出;同 IT Service Desk 的演示方式)
-// - App 的頻道劇本(user 選:Chat 首頁 → 幾秒後收到 #sd-2318 + 未讀 + 通知卡;bot 狀態更新延續;外圍假資料保留)
+// - App 的頻道劇本(user 選:Chat 首頁 → 幾秒後收到單子頻道 + 未讀 + 通知卡;bot 狀態更新延續;外圍假資料保留)
 // - 通知卡 = NotificationBanner.tsx(Push banner scenarios 的複本,2026-11-23 user),不用 DS Toast
 // 原本的 tWorkspace 結構文件:apps/chat/STRUCTURE.md。
 //
@@ -328,7 +328,7 @@ const GENERATED_DM_PEOPLE: { key: string; person: Person }[] = [
 GENERATED_DM_PEOPLE.forEach(({ key, person }) => { PEOPLE[key] = person })
 
 // ── TICKET CHANNEL(config.ticketChannel;IT Service Desk `#requester-chat`)──────────────────────────
-// 報案者 Aaron 這邊看到的 #sd-2318:值班者 Bob 在 IT Service Desk 按〔Chat with requester〕開的頻道(channel.tsx)。
+// 報案者 Aaron 這邊看到的單子頻道(CHANNEL.name = IT Service Desk - SD-2318):值班者 Bob 在 IT Service Desk 按〔Chat with requester〕開的頻道(channel.tsx)。
 // 台詞與 bot 第一則跟值班者那邊同一份(channel.tsx CHANNEL_PREFILL / REQUESTER_REPLY / channelOpened),兩邊演的是同一段對話。
 // 劇本:Chat 首頁 → 5 秒後收到頻道(列表最上方、未讀、Toast)→ Aaron 回覆(預填,Enter 送出)
 // → 8 秒後 bot 發「待申請人確認」→ Aaron 回「重新部署了」(預填)→ 3 秒後 bot 發「已結案」。
