@@ -11,7 +11,7 @@
 // - 報告段落標題 / 條列 / 字級 = articles.tsx 同一組(text-h4、list utilities、text-body);期間等 metadata = DescriptionList horizontal
 // - 對話裡的報告檔(artifacts.tsx ArtifactCard)= DS FileItem compact、surface="form"、無 status(file-item.spec.md「表單 / 訊息附件」靜態態,點了打開 = 主要動作;
 //   rich 要縮圖,HTML 沒有縮圖會顯示檔名首字,不用)
-// - 預覽開在右側面板(2026-11-03 user 同意:照 Claude artifact 的做法);頂列 × 左邊 Download + Open in new tab(AsideHeaderActions,暫時做法)
+// - 預覽開在右側面板(2026-11-03 user 同意:照 Claude artifact 的做法);頂列 × 左邊 Download(→ DownloadDialog,2026-11-23)+ Open in new tab(AsideHeaderActions,暫時做法)
 import { flushSync } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import {
@@ -32,10 +32,12 @@ import {
   type ChartConfig,
   type DataTableProps,
 } from '@qijenchen/design-system'
+import { useState } from 'react'
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 import { Download, ExternalLink } from 'lucide-react'
 import { AsideHeaderActions } from './AsideHeaderActions'
 import { inArtifactViewer, saveFile } from './download'
+import { DownloadDialog, REPORT_FORMATS } from './DownloadDialog'
 import type { ArtifactItem } from './artifacts'
 import { TicketLink } from './TAgent'
 import { CATEGORIES, COMPARISON, OBSERVATIONS, OPEN_TICKETS, PERIOD, PREV_PERIOD, TEAM, TOTALS, pct } from './teamStats'
@@ -197,7 +199,11 @@ async function renderStandaloneHtml() {
 
 export function ReportPreview() {
   const blobUrl = async () => URL.createObjectURL(new Blob([await renderStandaloneHtml()], { type: 'text/html' }))
-  const download = async () => saveFile(REPORT.fileName, await renderStandaloneHtml(), 'text/html')
+  const [downloadOpen, setDownloadOpen] = useState(false)
+  // HTML 保留真的下載(2026-11-04 修好的那條);PDF 只示意
+  const download = async (format: string, fileName: string) => {
+    if (format === 'html') saveFile(fileName, await renderStandaloneHtml(), 'text/html')
+  }
   const openInNewTab = async () => {
     // 先開分頁再填網址:等報告畫完才 window.open 會被瀏覽器當成彈出視窗擋掉
     const tab = window.open('', '_blank')
@@ -209,7 +215,7 @@ export function ReportPreview() {
       <AsideHeaderActions deps="report">
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="text" size="sm" iconOnly startIcon={Download} aria-label="Download" title="" onClick={() => void download()} />
+            <Button variant="text" size="sm" iconOnly startIcon={Download} aria-label="Download" title="" onClick={() => setDownloadOpen(true)} />
           </TooltipTrigger>
           <TooltipContent>Download</TooltipContent>
         </Tooltip>
@@ -223,6 +229,7 @@ export function ReportPreview() {
         <ButtonDivider />
       </AsideHeaderActions>
       <ReportBody />
+      <DownloadDialog open={downloadOpen} onOpenChange={setDownloadOpen} title="Download report" baseName={REPORT.fileName.replace(/\.html$/, '')} formats={REPORT_FORMATS} onDownload={download} />
     </div>
   )
 }

@@ -8,36 +8,22 @@
 //   Name 點了 → 右側預覽;Created in = 站內連結(LinkInput view)回到產生它的對話(2026-11-04 user 同意)
 // - 預覽(Doc)= 知識庫文章預覽同一套字級 / 區塊(articles.tsx renderBlock:text-h4 標題、list utilities、bg-muted 指令區塊);
 //   引用段落 = 代理草稿引用同款(左邊線 + 次要字色,oncallScript.tsx)。頂列 × 左邊 Download(.md),同週報那顆。
-//   預覽不重複 `# 標題`(標題已在面板頂列,同文章預覽)。Download → DS Dialog 示意(見下方 DownloadDialog)。
+//   預覽不重複 `# 標題`(標題已在面板頂列,同文章預覽)。Download → DS Dialog 示意(DownloadDialog.tsx)。
 // - 對話裡的草稿卡 = DS FileItem compact、surface="form"、無 status(同週報;file-item.spec.md「表單 / 訊息附件」靜態態)
 import { createContext, useContext, useState, type ReactNode } from 'react'
 import {
   Button,
   ButtonDivider,
   DataTable,
-  Dialog,
-  DialogBody,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  Field,
-  FieldError,
-  FieldLabel,
   FileItem,
-  Input,
   LinkInput,
-  RadioGroup,
-  RadioGroupItem,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-  toast,
-  useFormValidation,
 } from '@qijenchen/design-system'
 import { Download } from 'lucide-react'
 import { AsideHeaderActions } from './AsideHeaderActions'
+import { DOC_FORMATS, DownloadDialog } from './DownloadDialog'
 
 export type ArtifactItem = {
   id: string
@@ -102,65 +88,6 @@ function renderBlock(b: Block, i: number) {
   }
 }
 
-// ── 下載對話框(2026-11-23 user:「按下 download 後跳出的 download modal 要照 DS > Dialog 的樣式…不一定要真的可以下載,
-// 只需要做到跳出彈窗,讓 demo 時可以示意這邊是下載入口」)────────────────────────────────────────────
-// 寫法照 DS Dialog「表單」範例(dialog.stories WithForm):DialogContent height="hug"、DialogHeader/Title、DialogBody 內欄位 gap loose、
-// DialogFooter 取消(tertiary)+ 主要動作(primary);表單接 useFormValidation;送出成功 → Toast 再關閉;每次打開都 reset。
-// 內容 = 檔名 + 格式:對照 Notion 匯出對話框(選匯出格式再按 Export);格式 3 個 → RadioGroup(radio-group.spec「2-5 個選項且全部可見」)。
-// 示意用:不真的產生檔案(PDF / Word 也沒有轉檔),按 Download 只跳成功提示。
-const FORMATS = [
-  { value: 'md', label: 'Markdown (.md)' },
-  { value: 'pdf', label: 'PDF (.pdf)' },
-  { value: 'docx', label: 'Word (.docx)' },
-] as const
-
-function DownloadDialog({ open, onOpenChange, defaultName }: { open: boolean; onOpenChange: (open: boolean) => void; defaultName: string }) {
-  const form = useFormValidation({
-    initialValues: { name: defaultName, format: 'md' },
-    validate: { name: (v) => (String(v).trim() ? undefined : 'Enter a file name') },
-    onSubmit: (values) => {
-      toast({ variant: 'success', title: `Downloaded ${values.name.trim()}.${values.format}` })
-      onOpenChange(false)
-    },
-  })
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (next) form.reset()
-        onOpenChange(next)
-      }}
-    >
-      <DialogContent height="hug">
-        <DialogHeader>
-          <DialogTitle>Download draft</DialogTitle>
-        </DialogHeader>
-        <DialogBody>
-          <div className="flex flex-col gap-[var(--layout-space-loose)]">
-            <Field required invalid={!!form.errors.name}>
-              <FieldLabel>File name</FieldLabel>
-              <Input {...form.getInputProps('name')} />
-              <FieldError>{form.errors.name}</FieldError>
-            </Field>
-            <Field>
-              <FieldLabel>Format</FieldLabel>
-              <RadioGroup value={form.values.format} onValueChange={(v) => form.setFieldValue('format', v)}>
-                {FORMATS.map((f) => <RadioGroupItem key={f.value} value={f.value} label={f.label} />)}
-              </RadioGroup>
-            </Field>
-          </div>
-        </DialogBody>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="tertiary">Cancel</Button>
-          </DialogClose>
-          <Button variant="primary" loading={form.isSubmitting} onClick={() => void form.handleSubmit()}>Download</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
 /** 右側面板的 Doc 預覽(標題在面板頂列;這裡從「類型 · 來源 · 更新時間」開始,位置同文章預覽的麵包屑列) */
 export function ArtifactPreview({ artifact, createdIn }: { artifact: ArtifactItem; createdIn: string }) {
   const [downloadOpen, setDownloadOpen] = useState(false)
@@ -185,7 +112,7 @@ export function ArtifactPreview({ artifact, createdIn }: { artifact: ArtifactIte
       </AsideHeaderActions>
       <span className="text-body text-fg-secondary">{artifact.type} · Created in {createdIn} · Last updated {artifact.updated}</span>
       {parse(artifact.markdown ?? '').map(renderBlock)}
-      <DownloadDialog open={downloadOpen} onOpenChange={setDownloadOpen} defaultName={artifact.fileName.replace(/\.md$/, '')} />
+      <DownloadDialog open={downloadOpen} onOpenChange={setDownloadOpen} title="Download draft" baseName={artifact.fileName.replace(/\.md$/, '')} formats={DOC_FORMATS} />
     </div>
   )
 }
