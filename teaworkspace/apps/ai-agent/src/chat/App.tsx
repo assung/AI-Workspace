@@ -3398,10 +3398,11 @@ export default function App({
   const navTabRef = useRef(navTab)
   navTabRef.current = navTab
   // 通知卡(2026-11-23 user:用 artifacts › Push banner scenarios 的樣式)= NotificationBanner 複本:Group chat 情境
-  // (第一排頻道名、第二排「誰: 說了什麼」)、右下疊放、10 秒自動收起、同頻道原地更新;卡上可直接回覆(回覆框預填劇本下一句)
+  // (第一排頻道名、第二排「誰: 說了什麼」)、右下疊放、10 秒自動收起、同頻道原地更新;卡上也能回覆(送進頻道)。
+  // 回覆框不預填(2026-11-23 user:demo 時會點卡片或左側列表進頻道再回覆)→ 預填只在頻道的輸入盒
   const banners = useBannerStack()
   /** 新訊息進頻道:沒在看這個頻道 → 未讀 + 通知卡 */
-  const tcDeliver = (msgs: Message[], roomFactory?: () => Room, nextDraft?: string) => {
+  const tcDeliver = (msgs: Message[], roomFactory?: () => Room) => {
     const viewing = activeIdRef.current === TC_ROOM_ID && navTabRef.current === 'chat' && document.visibilityState === 'visible'
     setRooms((prev) => {
       if (roomFactory && !prev.some((r) => r.id === TC_ROOM_ID)) return [{ ...roomFactory(), unread: !viewing }, ...prev]
@@ -3417,7 +3418,6 @@ export default function App({
         context: CHANNEL.name,
         actor: { name: p?.name ?? '', avatarUrl: p?.avatar || undefined, bot: p?.bot },
         body: last.text,
-        defaultDraft: nextDraft,
       })
     }
   }
@@ -3429,8 +3429,8 @@ export default function App({
   useEffect(() => {
     if (!ticketChannel) return
     let t: number | undefined
-    if (tcStep === 'before') t = window.setTimeout(() => { const room = tcRoom(); tcDeliver(room.messages, () => room, REQUESTER_REPLY); setTcStep('ask') }, TC_ARRIVE_MS)
-    if (tcStep === 'waiting-fix') t = window.setTimeout(() => { tcDeliver([tcMessage('tc-replied', 'tc-bot', '10:48', TC_TEXT.replied)], undefined, TC_CONFIRM); setTcStep('confirm') }, TC_REPLIED_MS)
+    if (tcStep === 'before') t = window.setTimeout(() => { const room = tcRoom(); tcDeliver(room.messages, () => room); setTcStep('ask') }, TC_ARRIVE_MS)
+    if (tcStep === 'waiting-fix') t = window.setTimeout(() => { tcDeliver([tcMessage('tc-replied', 'tc-bot', '10:48', TC_TEXT.replied)]); setTcStep('confirm') }, TC_REPLIED_MS)
     if (tcStep === 'waiting-close') t = window.setTimeout(() => { tcDeliver([tcMessage('tc-closed', 'tc-bot', '10:51', TC_TEXT.closed)]); setTcStep('done') }, TC_CLOSED_MS)
     return () => window.clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps

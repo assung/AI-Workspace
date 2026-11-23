@@ -3,7 +3,7 @@
 // 原檔不動。相對原檔的差異(搜尋 TICKET CHANNEL):
 // - 拿掉 routeNotification(依 WorkspaceSettings 的通知設定判斷;這條 demo 沒有設定頁)→ BannerApp 改成本檔自己的型別
 // - actor.bot:頭像用 DS AgentLogo(頻道 bot = IT Service Desk 的 AI agent)
-// - defaultDraft / onReply:卡上的回覆真的送進聊天(原檔送出只收卡);defaultDraft = 劇本下一句預先填好
+// - onReply:卡上的回覆真的送進聊天(原檔送出只收卡)
 //
 // tWorkspace push banner(app 內通知卡,2026-11-07)。
 //
@@ -87,8 +87,6 @@ export type BannerData = {
   reaction?: { emoji: string; message: string }
   /** 被 @ 提及(2026-11-17 user):'you' = 點名你 →「@You」標籤;'all' = @All →「@All」標籤。訊息內文本身含 @名字 / @All。 */
   mention?: 'you' | 'all'
-  /** TICKET CHANNEL:回覆框預先填好的句子(劇本的下一句) */
-  defaultDraft?: string
   /** 疊放區內部用:同一張卡的 React key(原地更新時不變,保留回覆草稿) */
   instanceKey?: string
 }
@@ -124,7 +122,7 @@ export function NotificationBanner({
   const AppIcon = meta.icon
   const [replying, setReplying] = useState(defaultReplying)
   const openReply = () => setReplying(true)
-  const [draft, setDraft] = useState(data.defaultDraft ?? '')
+  const [draft, setDraft] = useState('')
   const [result, setResult] = useState<string | null>(null)
 
   useEffect(() => { onInteractingChange?.(replying) }, [replying, onInteractingChange])
