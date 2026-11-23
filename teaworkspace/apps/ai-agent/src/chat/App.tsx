@@ -4,7 +4,8 @@
 // 相對原檔只加了 `config.ticketChannel` 這一條(搜尋 TICKET CHANNEL):
 // - Person.bot → 頭像改用 DS AgentLogo(bot 與 IT Service Desk 的 AI agent 同一個身分,2026-11-22 user 決定 2)
 // - InputBox / Conversation 的 composerPrefill(劇本的下一句預先填好,按 Enter 送出;同 IT Service Desk 的演示方式)
-// - App 的頻道劇本(user 選:Chat 首頁 → 幾秒後收到 #sd-2318 + 未讀 + Toast;bot 狀態更新延續;外圍假資料保留)
+// - App 的頻道劇本(user 選:Chat 首頁 → 幾秒後收到 #sd-2318 + 未讀 + 通知卡;bot 狀態更新延續;外圍假資料保留)
+// - 通知卡 = NotificationBanner.tsx(Push banner scenarios 的複本,2026-11-23 user),不用 DS Toast
 // 原本的 tWorkspace 結構文件:apps/chat/STRUCTURE.md。
 //
 // Chat prototype — 3-column messaging UI(Nav rail / Chat list / Conversation + Thread panel)
@@ -57,6 +58,7 @@ import {
 import './chat.css'
 import { CHANNEL, CHANNEL_PREFILL, REQUESTER_REPLY, channelOpened } from '../channel'
 import { TAGENT_LABEL as SERVICE_DESK_LABEL } from '../TAgent'
+import { BannerStack, useBannerStack } from './NotificationBanner'
 import {
   Home,
   MessageCircle,
@@ -3318,6 +3320,8 @@ export default function App({
   }
 
   function handleSelectRoom(id: string) {
+    // TICKET CHANNEL:打開頻道 = 讀過 → 收起它的通知卡(Push banner 規則「在任何地方讀過 → 卡片收起」)
+    if (ticketChannel && id === TC_ROOM_ID) banners.dismissThread(TC_ROOM_ID)
     if (id === activeId) return
     const r = rooms.find((x) => x.id === id)
     if (r) onAction?.({ type: 'open-room', roomId: r.id, roomTitle: r.title, unread: !!r.unread })
@@ -3366,17 +3370,21 @@ export default function App({
   }
 
   function handleSend(text: string, html?: string) {
+    sendToRoom(activeId, text, html)
+  }
+
+  function sendToRoom(roomId: string, text: string, html?: string) {
     const now = new Date()
     let time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
     // TICKET CHANNEL:頻道裡照劇本的時間;送出就推進劇本
-    if (ticketChannel && activeId === TC_ROOM_ID) {
+    if (ticketChannel && roomId === TC_ROOM_ID) {
       if (tcStep === 'ask') { time = '10:47'; setTcStep('waiting-fix') }
       else if (tcStep === 'confirm') { time = '10:50'; setTcStep('waiting-close') }
       else time = '10:52'
     }
-    const newMsg: Message = { id: `sent-${Date.now()}`, author: 'me', text, html, time, msgStatus: ticketChannel && activeId === TC_ROOM_ID ? 'sent' : 'sending' }
+    const newMsg: Message = { id: `sent-${Date.now()}`, author: 'me', text, html, time, msgStatus: ticketChannel && roomId === TC_ROOM_ID ? 'sent' : 'sending' }
     setRooms((prev) => prev.map((r) =>
-      r.id === activeId ? { ...r, messages: [...r.messages, newMsg] } : r
+      r.id === roomId ? { ...r, messages: [...r.messages, newMsg] } : r
     ))
   }
 
@@ -3389,8 +3397,11 @@ export default function App({
   activeIdRef.current = activeId
   const navTabRef = useRef(navTab)
   navTabRef.current = navTab
-  /** 新訊息進頻道:沒在看這個頻道 → 未讀 + Toast(標題 = 頻道名、內文 = 「誰: 說了什麼」,同 Teams / Slack 訊息通知) */
-  const tcDeliver = (msgs: Message[], roomFactory?: () => Room) => {
+  // 通知卡(2026-11-23 user:用 artifacts › Push banner scenarios 的樣式)= NotificationBanner 複本:Group chat 情境
+  // (第一排頻道名、第二排「誰: 說了什麼」)、右下疊放、10 秒自動收起、同頻道原地更新;卡上可直接回覆(回覆框預填劇本下一句)
+  const banners = useBannerStack()
+  /** 新訊息進頻道:沒在看這個頻道 → 未讀 + 通知卡 */
+  const tcDeliver = (msgs: Message[], roomFactory?: () => Room, nextDraft?: string) => {
     const viewing = activeIdRef.current === TC_ROOM_ID && navTabRef.current === 'chat' && document.visibilityState === 'visible'
     setRooms((prev) => {
       if (roomFactory && !prev.some((r) => r.id === TC_ROOM_ID)) return [{ ...roomFactory(), unread: !viewing }, ...prev]
@@ -3399,16 +3410,27 @@ export default function App({
     if (!viewing) {
       const last = msgs[msgs.length - 1]
       const p = PEOPLE[last.author]
-      const who = p?.bot ? p.name : (p?.name.split(' ')[0] ?? '')
-      const body = `${who}: ${last.text}`
-      toast({ title: CHANNEL.name, description: body.length > 80 ? `${body.slice(0, 80)}…` : body })
+      banners.push({
+        id: `tc-${last.id}`,
+        threadKey: TC_ROOM_ID,
+        app: 'chats',
+        context: CHANNEL.name,
+        actor: { name: p?.name ?? '', avatarUrl: p?.avatar || undefined, bot: p?.bot },
+        body: last.text,
+        defaultDraft: nextDraft,
+      })
     }
+  }
+  /** 卡上回覆:送進頻道(= 讀過 → 取消未讀),劇本照常往下 */
+  const tcReplyFromBanner = (text: string) => {
+    sendToRoom(TC_ROOM_ID, text)
+    setRooms((prev) => prev.map((r) => (r.id === TC_ROOM_ID ? { ...r, unread: false } : r)))
   }
   useEffect(() => {
     if (!ticketChannel) return
     let t: number | undefined
-    if (tcStep === 'before') t = window.setTimeout(() => { const room = tcRoom(); tcDeliver(room.messages, () => room); setTcStep('ask') }, TC_ARRIVE_MS)
-    if (tcStep === 'waiting-fix') t = window.setTimeout(() => { tcDeliver([tcMessage('tc-replied', 'tc-bot', '10:48', TC_TEXT.replied)]); setTcStep('confirm') }, TC_REPLIED_MS)
+    if (tcStep === 'before') t = window.setTimeout(() => { const room = tcRoom(); tcDeliver(room.messages, () => room, REQUESTER_REPLY); setTcStep('ask') }, TC_ARRIVE_MS)
+    if (tcStep === 'waiting-fix') t = window.setTimeout(() => { tcDeliver([tcMessage('tc-replied', 'tc-bot', '10:48', TC_TEXT.replied)], undefined, TC_CONFIRM); setTcStep('confirm') }, TC_REPLIED_MS)
     if (tcStep === 'waiting-close') t = window.setTimeout(() => { tcDeliver([tcMessage('tc-closed', 'tc-bot', '10:51', TC_TEXT.closed)]); setTcStep('done') }, TC_CLOSED_MS)
     return () => window.clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -3615,6 +3637,16 @@ export default function App({
       />
       {/* AI agent 背景回覆的通知;落點照 DS 預設(右下、以整個視窗為準,toast.spec.md「落點」) */}
       <Toaster containerAriaLabel="Notifications" />
+      {ticketChannel && (
+        <BannerStack
+          items={banners.items}
+          onDismiss={banners.dismiss}
+          onPinnedChange={banners.setPinned}
+          onOpen={() => { setNavTab('chat'); handleSelectRoom(TC_ROOM_ID) }}
+          onReply={(_, text) => tcReplyFromBanner(text)}
+          showPreview
+        />
+      )}
       {/* AppShell 不撐滿視窗(左邊是 NavRail)→ 這一層當 Menu 浮層的定位框:transform 讓 fixed 以它為準,
           ChatList 左側浮層與遮罩從 AppShell 左緣起、不蓋 NavRail(app-shell.spec.md「版面規則」§9「從版面左緣開始」+
           API `portalContainer`;DS stories-helpers/scene/simulated-browser.tsx 畫布同款 translateZ(0)) */}
