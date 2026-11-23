@@ -331,13 +331,13 @@ export function TAgentPage({
         <SidebarMenuButton id={conversationRoute(c.id)} tooltip={c.title}>
           {conversationLabel(c.title)}
         </SidebarMenuButton>
-        {/* 未讀紅點(2026-10-30 user:沿用現有 dot 樣式):Badge dot + 同色;滑過 / 焦點在列上時讓位給 ⋯ */}
+        {/* 未讀點(2026-10-30 user:沿用現有 dot 樣式;2026-11-23 user:改藍 = DS Badge high,同 Primary):滑過 / 焦點在列上時讓位給 ⋯ */}
         {engine.unreadIds.has(c.id) && (
           <SidebarMenuBadge
             dot
-            variant="critical"
+            variant="high"
             aria-label="New reply"
-            className="!bg-[#EC540F] group-hover/menu-item:invisible group-focus-within/menu-item:invisible"
+            className="group-hover/menu-item:invisible group-focus-within/menu-item:invisible"
           />
         )}
         {rowMenu(c)}
@@ -364,7 +364,7 @@ export function TAgentPage({
               <SidebarMenuItem>
                 <SidebarMenuButton id={conversationRoute(UPDATES_ID)} startIcon={Bell} tooltip={UPDATES_TITLE}>{UPDATES_TITLE}</SidebarMenuButton>
                 {/* 未讀紅點:同對話列(2026-10-30 user:「一樣有紅點機制」);這一列沒有 ⋯,紅點常駐 */}
-                {engine.unreadIds.has(UPDATES_ID) && <SidebarMenuBadge dot variant="critical" aria-label="New update" className="!bg-[#EC540F]" />}
+                {engine.unreadIds.has(UPDATES_ID) && <SidebarMenuBadge dot variant="high" aria-label="New update" />}
               </SidebarMenuItem>
               {/* Artifacts(2026-11-04 user:放在 Updates 下方;圖示沿用 2026-10-30 版 Shapes) */}
               <SidebarMenuItem>

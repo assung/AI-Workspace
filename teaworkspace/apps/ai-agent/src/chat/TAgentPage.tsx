@@ -193,9 +193,9 @@ export function TAgentPage({
         {engine.unreadIds.has(c.id) && (
           <SidebarMenuBadge
             dot
-            variant="critical"
+            variant="high"
             aria-label="New reply"
-            className={`!bg-[#EC540F] group-hover/menu-item:invisible group-focus-within/menu-item:invisible`}
+            className={`group-hover/menu-item:invisible group-focus-within/menu-item:invisible`}
           />
         )}
         {rowMenu(c)}

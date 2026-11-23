@@ -951,9 +951,12 @@ function NavRail({
 
   // workspace:Logo 列 / 分頁 / 底部群組都用 w-12(48)欄寬置中 —— rail 48 扣右邊線只剩 47,在 47 裡置中 32px 圖標會落在 x=7.5(半像素,1x 螢幕會糊);
   // 改以 48 欄置中 → 圖標 x=8、中心 24 都是整數,選中直線 6–8、tooltip 離圖標剛好 8(2026-10-25)。欄的最後 1px 疊在右邊線下,內容到 40 為止碰不到線。
-  const chatBadge = unreadCount > 0 ? <Badge variant="critical" count={unreadCount} max={99} className="!bg-[#EC540F]" /> : undefined
+  // 未讀點 / 計數 = 藍(2026-11-23 user「Workspace 平台的通知紅點都改成藍點(Primary color),包含 badge」):
+  // DS Badge variant="high"(bg-info;Workspace 主題下 --info 與 --primary 同值 oklch(0.54 0.22 258) / 暗 0.63)。
+  // 原本 variant="critical" + !bg-[#EC540F]。尺寸不變:dot 6×6、count 16×16(DS Badge 預設)。
+  const chatBadge = unreadCount > 0 ? <Badge variant="high" count={unreadCount} max={99} /> : undefined
   // AI agent 未讀 = 純點(不計數:代理回覆以「對話」為單位,DS Badge dot = 「這裡有東西要看」)
-  const agentBadge = <Badge dot variant="critical" aria-label="New AI agent reply" className="!bg-[#EC540F]" />
+  const agentBadge = <Badge dot variant="high" aria-label="New AI agent reply" />
   const workspace = variant === 'workspace'
   // workspace:底部選單鈕 = lucide Settings、名稱「Settings and more」(2026-10-25 user;選單內容 Settings / Help / Sign out 不變)。
   // 對照 Microsoft Teams 左下同名入口「Settings and more」;icon 依 user 指定用 Settings 齒輪。
@@ -1301,7 +1304,7 @@ function RoomRow({
             </p>
             {isUnread && (
               <span className="shrink-0 group-hover/row:invisible">
-                <Badge dot variant="critical" className="!bg-[#EC540F]" />
+                <Badge dot variant="high" />
               </span>
             )}
           </div>
@@ -1313,7 +1316,7 @@ function RoomRow({
           </span>
           {isUnread && (
             <span className="shrink-0 group-hover/row:invisible">
-              <Badge dot variant="critical" className="!bg-[#EC540F]" />
+              <Badge dot variant="high" />
             </span>
           )}
         </div>
