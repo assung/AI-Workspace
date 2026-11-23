@@ -6,9 +6,12 @@
 // `[標題]…[新對話 +][ButtonDivider][關閉 ×]`,而且 spec 自己寫 AgentPanel「是與 AppShell aside 同級的常駐面板」;
 // header-canonical.spec.md 的標題列也預留「title + close X / actions」。
 //
-// 做法:把 children 插進 AppShellAside 頂列那一排、× 的前面(容器 display: contents,子元素直接成為那一排的 flex 項目,
-// 吃到 ChromeHeader 自己的 gap-2 與垂直置中;不另寫位置、間距)。排法逐字照 AgentPanelHeader:
+// 做法:把 children 插進 AppShellAside 頂列那一排、× 的前面,包成高度隨內容的群組 `flex items-center gap-2`。
+// 排法照 AgentPanelHeader(agent-panel.tsx 頂列 `<div className="flex items-center gap-2">` 包動作 + ButtonDivider + ×):
 // `Button variant="text" size="sm" iconOnly` + `ButtonDivider` + 既有的 ×。
+// 為什麼要包:ButtonDivider 的線長 = 同列最高元件 − 8px,前提是「住在自動高度的 cluster 內」;直接放在固定高度的
+// ChromeHeader 會拿頂列高度當基準、線變長(action-bar.spec.md「分隔線幾何」;2026-11-23 user 抓到「divider 過高」)。
+// 群組與 × 之間仍是 ChromeHeader 的 gap-2 → 分隔線兩側各 8 + 4 = 12px,同 DS。
 // 依賴 DS 內部 DOM(aside > header 內最後一顆按鈕 = ×)—— 只為示意;DS 改版若換了結構,這裡找不到就什麼都不插。
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
@@ -23,7 +26,7 @@ export function AsideHeaderActions({ children, deps }: { children: ReactNode; de
     const close = buttons?.[buttons.length - 1]
     if (!close?.parentElement) return
     const el = document.createElement('div')
-    el.style.display = 'contents'
+    el.className = 'flex items-center gap-2'
     close.parentElement.insertBefore(el, close)
     setSlot(el)
     return () => {
