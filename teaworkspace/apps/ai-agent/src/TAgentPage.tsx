@@ -80,12 +80,12 @@ import {
 } from './TAgent'
 import { UpdatesActionsProvider } from './updates'
 import { ARTICLES, ArticlePreview } from './articles'
-import { getTicket, TicketPreview } from './tickets'
+import { getTicket, TicketPreview, type TicketTab } from './tickets'
 import { DraftActionsProvider, INITIAL_DRAFT, TicketDraftForm, type TicketDraft } from './ticketDraft'
 import { ReportPreview } from './managerReport'
 import { ArtifactActionsProvider, ArtifactPreview, ArtifactsView, type ArtifactItem } from './artifacts'
 import type { Persona } from './personas'
-import { CHANNEL, CHANNEL_PREFILL, ChannelPanel, REQUESTER_REPLY, channelOpened, type ChannelMessage } from './channel'
+import { CHANNEL, CHANNEL_PREFILL, ChannelEmpty, ChannelThread, REQUESTER_REPLY, channelName, channelOpened, type ChannelMessage } from './channel'
 import { ChannelActionsProvider } from './contact'
 import { CHROME_SIDEBAR_BG, CHROME_SIDEBAR_FILL_X } from './chrome'
 
@@ -107,7 +107,7 @@ const PANEL_WIDTH = { min: 320, initial: 480, max: 720 }
 const COLUMN_MAX_WIDTH = 880
 
 /** `scope` = 在哪裡打開的(對話 id 或 'artifacts' 列表);換地方就收起 */
-type Panel = { scope: string; kind: 'article' | 'ticket' | 'draft' | 'artifact' | 'channel'; id: string }
+type Panel = { scope: string; kind: 'article' | 'ticket' | 'draft' | 'artifact'; id: string; /** 單子面板的分頁(省略 = Details) */ tab?: TicketTab }
 
 /** 新對話首頁的問候(沿用 tWorkspace:帶名字、依當地時間分早 / 午 / 晚) */
 function greeting(name: string, now = new Date()) {
@@ -193,42 +193,55 @@ export function TAgentPage({
   })
   const openArticle = panel?.kind === 'article' ? ARTICLES[panel.id] : undefined
   // 單子跟著劇本進度變(狀態、負責人、活動紀錄)
-  // ── 單子的聊天頻道(channel.tsx;2026-11-22 user):值班者按「Chat with requester」才建立(模擬 Chat API)──
-  // null = 還沒建立。bot 在單子狀態變動時發一則到頻道;頻道裡的人說的話同步到單子 Activity。
-  const [channel, setChannel] = useState<ChannelMessage[] | null>(null)
-  const [channelDraft, setChannelDraft] = useState(CHANNEL_PREFILL)
+  // ── 單子的聊天頻道(channel.tsx):值班者按「Chat with requester」或 Chat 分頁的「Start chat」才建立(模擬 Chat API)──
+  // 一張單一個頻道(2026-11-22 user);收進單子面板的 Chat 分頁(2026-11-23 user)。只有值班者有(報案者先不動)。
+  // bot 在單子狀態變動時發一則到頻道;Activity 只記「開了頻道」(聊天內容只在 Chat 分頁,2026-11-23 user)。
+  const hasChat = persona.id === 'oncall' || persona.id === 'oncall-updates'
+  const [channels, setChannels] = useState<Record<string, ChannelMessage[]>>({})
+  const [channelDrafts, setChannelDrafts] = useState<Record<string, string>>({ [CHANNEL.ticket]: CHANNEL_PREFILL })
+  const demoChannel = channels[CHANNEL.ticket]
   const M = persona.milestones
   useEffect(() => {
-    if (!channel || engine.scriptConvId === null) return
+    if (!demoChannel || engine.scriptConvId === null) return
     const add = (id: string, time: string, text: string) =>
-      setChannel((prev) => (prev && !prev.some((m) => m.id === id) ? [...prev, { id, author: 'bot', time, text }] : prev))
+      setChannels((prev) => {
+        const list = prev[CHANNEL.ticket]
+        return list && !list.some((m) => m.id === id) ? { ...prev, [CHANNEL.ticket]: [...list, { id, author: 'bot', time, text }] } : prev
+      })
     if (engine.scriptPos > M.replied) add('bot-replied', '10:48 AM', `#${CHANNEL.ticket} 狀態改為「待申請人確認」：Bob 已重新啟用 robot account，請 Aaron 重新部署試試看。`)
     if (engine.scriptPos > M.closed) add('bot-closed', '10:51 AM', `#${CHANNEL.ticket} 已結案：Aaron 確認 pod 已經起來。`)
-  }, [channel !== null, engine.scriptPos, engine.scriptConvId, M.replied, M.closed])
-  const channelActivity = channel
-    ? [
-        { time: channel[0].time, text: `Bob opened ${CHANNEL.name} in Chat with Aaron` },
-        ...channel.filter((m) => m.author !== 'bot').map((m) => ({ time: m.time, text: `${m.author === 'me' ? 'Bob' : 'Aaron'} in ${CHANNEL.name}: ${m.text}` })),
-      ]
-    : []
+  }, [demoChannel !== undefined, engine.scriptPos, engine.scriptConvId, M.replied, M.closed])
+  /** 建立頻道(示範時間:SD-2318 照劇本 10:45 AM;其他單用同一個時間) */
+  const startChannel = (ticketId: string, requester: string) =>
+    setChannels((prev) => (prev[ticketId] ? prev : { ...prev, [ticketId]: [channelOpened(ticketId, requester, '10:45 AM')] }))
+  // 代理訊息裡的「Chat with requester」(劇本那張 SD-2318):建立頻道 + 打開單子的 Chat 分頁
   const openChannel = () => {
     if (!activeConversation) return
-    if (!channel) setChannel([channelOpened('10:45 AM')])
-    setPanel({ scope: activeConversation.id, kind: 'channel', id: CHANNEL.ticket })
+    startChannel(CHANNEL.ticket, CHANNEL.requester)
+    setPanel({ scope: activeConversation.id, kind: 'ticket', id: CHANNEL.ticket, tab: 'chat' })
   }
-  const sendToChannel = (text: string) => {
-    setChannel((prev) => [...(prev ?? []), { id: `me-${Date.now()}`, author: 'me', time: '10:45 AM', text }])
-    setChannelDraft('')
-    // 報案者第一次被問到時回覆(示範;之後再送的訊息不再自動回)
-    if (!channel?.some((m) => m.author === 'requester')) {
+  const sendToChannel = (ticketId: string, text: string) => {
+    setChannels((prev) => ({ ...prev, [ticketId]: [...(prev[ticketId] ?? []), { id: `me-${Date.now()}`, author: 'me', time: '10:45 AM', text }] }))
+    setChannelDrafts((prev) => ({ ...prev, [ticketId]: '' }))
+    // 示範:SD-2318 的報案者第一次被問到時回覆(其他單、之後再送的訊息不自動回)
+    if (ticketId === CHANNEL.ticket && !channels[ticketId]?.some((m) => m.author === 'requester')) {
       window.setTimeout(() => {
-        setChannel((prev) => (prev && !prev.some((m) => m.author === 'requester') ? [...prev, { id: 'aaron-1', author: 'requester', time: '10:46 AM', text: REQUESTER_REPLY }] : prev))
+        setChannels((prev) => {
+          const list = prev[ticketId]
+          return list && !list.some((m) => m.author === 'requester')
+            ? { ...prev, [ticketId]: [...list, { id: 'aaron-1', author: 'requester', time: '10:46 AM', text: REQUESTER_REPLY }] }
+            : prev
+        })
       }, 3000)
     }
   }
-  const openChannelPanel = panel?.kind === 'channel'
+  const channelActivity = (ticketId: string) => {
+    const list = channels[ticketId]
+    const t = list && getTicket(ticketId, engine.scriptPos, persona.milestones, createdTicket)
+    return list && t ? [{ time: list[0].time, text: `Bob opened ${channelName(ticketId)} in Chat with ${t.requester}` }] : []
+  }
 
-  const openTicket = panel?.kind === 'ticket' ? getTicket(panel.id, engine.scriptPos, persona.milestones, createdTicket, panel.id === CHANNEL.ticket ? channelActivity : []) : undefined
+  const openTicket = panel?.kind === 'ticket' ? getTicket(panel.id, engine.scriptPos, persona.milestones, createdTicket, channelActivity(panel.id)) : undefined
   const openDraft = panel?.kind === 'draft'
   const openArtifact = panel?.kind === 'artifact' ? artifactRows.find((a) => a.id === panel.id) : undefined
 
@@ -503,17 +516,13 @@ export function TAgentPage({
         className="h-full"
         sidebar={sidebar}
         header={header}
-        asideOpen={!!(openArticle || openTicket || openDraft || openArtifact || openChannelPanel)}
+        asideOpen={!!(openArticle || openTicket || openDraft || openArtifact)}
         onAsideOpenChange={(open) => { if (!open) setPanel(null) }}
         aside={
           // FILL_X:Right panel 內層 ScrollArea 同側欄的撐寬問題(chrome.ts CHROME_SIDEBAR_FILL_X 說明),長指令行改在區塊內橫捲
           openArticle ? (
             <AppShellAside title={openArticle.title} contentType="article" widthRange={PANEL_WIDTH} className={CHROME_SIDEBAR_FILL_X}>
               <ArticlePreview article={openArticle} />
-            </AppShellAside>
-          ) : openChannelPanel && channel ? (
-            <AppShellAside title={CHANNEL.name} contentType="channel" widthRange={PANEL_WIDTH} className={CHROME_SIDEBAR_FILL_X}>
-              <ChannelPanel messages={channel} draft={channelDraft} onDraftChange={setChannelDraft} onSend={sendToChannel} />
             </AppShellAside>
           ) : openArtifact ? (
             // 週報 = HTML(managerReport.tsx 畫,頂列標題用檔名);其他 = markdown 草稿(名稱)
@@ -541,7 +550,28 @@ export function TAgentPage({
             </AppShellAside>
           ) : openTicket ? (
             <AppShellAside title={`#${openTicket.id}`} contentType="ticket" widthRange={PANEL_WIDTH} className={CHROME_SIDEBAR_FILL_X}>
-              <TicketPreview ticket={openTicket} />
+              <TicketPreview
+                ticket={openTicket}
+                tab={panel?.tab ?? 'details'}
+                onTabChange={(tab) => setPanel((prev) => (prev ? { ...prev, tab } : prev))}
+                chat={
+                  // 監控告警開的單沒有報案人可以聊 → 不給 Chat 分頁
+                  hasChat && openTicket.requester !== 'Monitoring alert' ? (
+                    channels[openTicket.id] ? (
+                      <ChannelThread
+                        name={channelName(openTicket.id)}
+                        requester={openTicket.requester}
+                        messages={channels[openTicket.id]}
+                        draft={channelDrafts[openTicket.id] ?? ''}
+                        onDraftChange={(v) => setChannelDrafts((prev) => ({ ...prev, [openTicket.id]: v }))}
+                        onSend={(text) => sendToChannel(openTicket.id, text)}
+                      />
+                    ) : (
+                      <ChannelEmpty requester={openTicket.requester} onStart={() => startChannel(openTicket.id, openTicket.requester)} />
+                    )
+                  ) : undefined
+                }
+              />
             </AppShellAside>
           ) : undefined
         }

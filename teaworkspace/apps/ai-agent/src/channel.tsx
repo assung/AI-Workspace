@@ -2,6 +2,9 @@
 // 成員 = 值班者、報案者、bot;值班者在右側面板直接跟報案者對話。bot 把單子狀態更新發到頻道、把頻道訊息同步回單子,
 // 之後也由它發總結。user 決定:1 每張單一個獨立頻道;2 bot 與 IT Service Desk 的 AI agent 同一個身分;
 // 3 走 workspace chat 樣式;4 支線,不擋主劇本;5 報案者那邊先不動;6 prototype 模擬 API,不真的呼叫 Chat。
+// 2026-11-23 user:頻道收進單子面板的「Chat」分頁(tickets.tsx TicketPreview);還沒建立 → 分頁裡放空狀態 + Start chat;
+// Activity 只記「開了頻道」與狀態變更,聊天內容只在 Chat 分頁(避免同一句話出現兩次)。
+// 每張單都可以開(值班者看得到的單);示範的預填問句與報案者回覆只有 SD-2318 有。
 //
 // 對照:Zendesk side conversation 在既有 Slack 頻道開討論串、Slack 回覆自動帶回工單
 // (support.zendesk.com/hc/en-us/articles/4408844202778);JSM + Rovo agent 讓 Slack 討論串與工單留言雙向同步
@@ -16,12 +19,15 @@
 // - 輸入盒 = ThreadInputBox 外框(rounded-lg border bg-canvas px-3 py-2、有字時框變 border-hover)+ Send 24×24(無值 text、有值 primary);
 //   固定在面板底部 = AsideFooter(同報案草稿的暫時做法)
 import { useEffect, useRef, useState } from 'react'
-import { AgentLogo, Avatar, Button, ButtonDivider, Tooltip, TooltipContent, TooltipTrigger } from '@qijenchen/design-system'
-import { ExternalLink, Send } from 'lucide-react'
-import { AsideFooter, AsideHeaderActions } from './AsideHeaderActions'
+import { AgentLogo, Avatar, Button, Empty, Tooltip, TooltipContent, TooltipTrigger } from '@qijenchen/design-system'
+import { MessagesSquare, Send } from 'lucide-react'
+import { AsideFooter } from './AsideHeaderActions'
 import { TAGENT_LABEL } from './TAgent'
 
-export const CHANNEL = { name: '#sd-2318', ticket: 'SD-2318', me: 'Bob', requester: 'Aaron' }
+/** 頻道名稱 = 單號小寫(#sd-2318) */
+export const channelName = (ticketId: string) => `#${ticketId.toLowerCase()}`
+/** 示範劇本那張單(有預填問句與報案者回覆) */
+export const CHANNEL = { name: channelName('SD-2318'), ticket: 'SD-2318', me: 'Bob', requester: 'Aaron' }
 const MY_BUBBLE_BG = 'bg-[#EBEEFF] [[data-theme=dark]_&]:bg-[#282B3E]'
 
 export type ChannelMessage = { id: string; author: 'bot' | 'me' | 'requester'; time: string; text: string }
@@ -31,17 +37,17 @@ export const CHANNEL_PREFILL = 'Aaron 你好，我是 K8s 平台團隊的 Bob。
 /** 報案者的回覆(值班者送出後 3 秒) */
 export const REQUESTER_REPLY = '今天下午會部署 payment-dev，大概 2 點左右。'
 
-/** 開頻道時 bot 的第一則(說明成員、同步規則,附上單子目前的摘要給報案者看) */
-export const channelOpened = (time: string): ChannelMessage => ({
+/** 開頻道時 bot 的第一則(說明成員;單子狀態有變動時 bot 也會發在這裡) */
+export const channelOpened = (ticketId: string, requester: string, time: string): ChannelMessage => ({
   id: 'bot-open',
   author: 'bot',
   time,
-  text: `已為 #${CHANNEL.ticket} 建立這個頻道，成員：Bob（值班者）、Aaron（報案者）。這裡的訊息會同步到單子的 Activity，單子狀態有變動時我也會發在這裡。`,
+  text: `已為 #${ticketId} 建立這個頻道，成員：Bob（值班者）、${requester}（報案者）。單子狀態有變動時，我也會發在這裡。`,
 })
 
-function Bubble({ m }: { m: ChannelMessage }) {
+function Bubble({ m, requester }: { m: ChannelMessage; requester: string }) {
   const mine = m.author === 'me'
-  const name = m.author === 'bot' ? TAGENT_LABEL : m.author === 'requester' ? CHANNEL.requester : CHANNEL.me
+  const name = m.author === 'bot' ? TAGENT_LABEL : m.author === 'requester' ? requester : CHANNEL.me
   return (
     <div className={`flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
       <div className={`flex max-w-[85%] items-start gap-2 ${mine ? 'flex-row-reverse' : ''}`}>
@@ -62,7 +68,24 @@ function Bubble({ m }: { m: ChannelMessage }) {
   )
 }
 
-export function ChannelPanel({ messages, draft, onDraftChange, onSend }: {
+/** 還沒建立頻道時的 Chat 分頁(DS Empty:說明 + 一顆 CTA;2026-11-23 user 選 A) */
+export function ChannelEmpty({ requester, onStart }: { requester: string; onStart: () => void }) {
+  return (
+    <div className="px-[var(--layout-space-loose)] py-12">
+      <Empty
+        icon={MessagesSquare}
+        title="No chat yet"
+        description={`Start a chat with ${requester}. It opens a channel for this ticket in Chat.`}
+        action={<Button onClick={onStart}>Start chat</Button>}
+      />
+    </div>
+  )
+}
+
+/** 頻道內容(Chat 分頁裡;訊息 + 底部輸入盒) */
+export function ChannelThread({ name, requester, messages, draft, onDraftChange, onSend }: {
+  name: string
+  requester: string
   messages: ChannelMessage[]
   draft: string
   onDraftChange: (v: string) => void
@@ -79,26 +102,16 @@ export function ChannelPanel({ messages, draft, onDraftChange, onSend }: {
   }
   return (
     <>
-      <AsideHeaderActions deps="channel">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            {/* 到 Chat 看同一個頻道(假連結,接上 Chat 後開頻道網址);圖示同其他「Open in …」 */}
-            <Button variant="text" size="sm" iconOnly startIcon={ExternalLink} aria-label="Open in Chat" title="" onClick={() => {}} />
-          </TooltipTrigger>
-          <TooltipContent>Open in Chat</TooltipContent>
-        </Tooltip>
-        <ButtonDivider />
-      </AsideHeaderActions>
-      <div className="flex flex-col gap-4 px-4 py-4" role="log" aria-label={`${CHANNEL.name} messages`}>
-        {messages.map((m) => <Bubble key={m.id} m={m} />)}
+      <div className="flex flex-col gap-4 px-4 pb-4" role="log" aria-label={`${name} messages`}>
+        {messages.map((m) => <Bubble key={m.id} m={m} requester={requester} />)}
         <div ref={end} />
       </div>
       <AsideFooter>
         <div className="bg-surface px-3 py-2">
           <div className={`rounded-lg border bg-canvas px-3 py-2 ${focused || draft ? 'border-border-hover' : 'border-border'}`}>
             <textarea
-              aria-label={`Message ${CHANNEL.name}`}
-              placeholder={`Message ${CHANNEL.name}`}
+              aria-label={`Message ${name}`}
+              placeholder={`Message ${name}`}
               rows={2}
               value={draft}
               onChange={(e) => onDraftChange(e.target.value)}

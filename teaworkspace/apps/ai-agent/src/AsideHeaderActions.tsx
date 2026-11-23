@@ -68,3 +68,38 @@ export function AsideFooter({ children }: { children: ReactNode }) {
     </>
   )
 }
+
+// ⚠️ 暫時做法(2026-11-23 user:「right panel 瀏覽開單的內容做成更有結構性…在 header 下方加 tab」;
+// 樣式參考 DS「Patterns › Header Anatomy › 含分頁列」)—— DS 的 AppShellAside 開放 tabsSlot 後整段刪掉。
+//
+// DS 現況(beta.148):AppShellAside 頂列是 ChromeHeader 單列模式(標題 + ×、自帶 border-b),沒有傳 tabsSlot 的入口。
+// DS 的寫法(header-canonical WithTabs):ChromeHeader 收到 tabsSlot → 第 2 列放 TabsList、頂列讓出底線
+// (W1:一條線,由 TabsList 的 border-b border-divider 畫)、TabsList 內縮 px-loose 對齊標題(W2,HEADER_TABS_SLOT_WRAPPER_CLASS)。
+// 做法:在頂列正下方插一列放 TabsList(wrapper 用 DS 的 HEADER_TABS_SLOT_WRAPPER_CLASS),同時拿掉頂列自己的底線
+// → 視覺同 DS 的含分頁列;這一列在 ScrollArea 外,內文捲動時分頁列不動。依賴 DS 內部 DOM,只為示意。
+export function AsideHeaderTabs({ children, className }: { children: ReactNode; className: string }) {
+  const probe = useRef<HTMLSpanElement>(null)
+  const [slot, setSlot] = useState<HTMLElement | null>(null)
+  useLayoutEffect(() => {
+    const aside = probe.current?.closest('aside[data-app-shell-panel="right"]')
+    const header = aside?.querySelector<HTMLElement>(':scope > header')
+    if (!header) return
+    const el = document.createElement('div')
+    el.className = `shrink-0 ${className}`
+    header.insertAdjacentElement('afterend', el)
+    const prev = header.style.borderBottomWidth
+    header.style.borderBottomWidth = '0'
+    setSlot(el)
+    return () => {
+      header.style.borderBottomWidth = prev
+      el.remove()
+      setSlot(null)
+    }
+  }, [className])
+  return (
+    <>
+      <span ref={probe} hidden />
+      {slot && createPortal(children, slot)}
+    </>
+  )
+}

@@ -9,9 +9,24 @@
 //   Waiting for requester 黃(等別人回覆,需要留意;tag.spec.md yellow「常用於注意類」)、Closed 綠。
 // - 段落標題 / 條列 / 字級 = articles.tsx 同一組(text-h4、list utilities、text-body)
 // 單子內容跟著劇本走(SD-2318 / SD-2320 的狀態、負責人、活動紀錄 = engine.scriptPos;各身分的劇本步數不同,里程碑由 personas.tsx 給)。
-import { Button, ButtonDivider, DescriptionItem, DescriptionList, Tag, Tooltip, TooltipContent, TooltipTrigger } from '@qijenchen/design-system'
+import type { ReactNode } from 'react'
+import {
+  Button,
+  ButtonDivider,
+  DescriptionItem,
+  DescriptionList,
+  HEADER_TABS_SLOT_WRAPPER_CLASS,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+  Tag,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@qijenchen/design-system'
 import { ExternalLink } from 'lucide-react'
-import { AsideHeaderActions } from './AsideHeaderActions'
+import { AsideHeaderActions, AsideHeaderTabs } from './AsideHeaderActions'
 import type { TicketMilestones } from './oncallScript'
 import { whatHappenedItems, type TicketDraft } from './ticketDraft'
 import { OPEN_TICKETS, TEAM } from './teamStats'
@@ -160,54 +175,84 @@ export function getTicket(
   return undefined
 }
 
-/** 右側面板的單子內容(標題列 = 單號,這裡從單子標題開始;內距 = 文章預覽同值 loose) */
-export function TicketPreview({ ticket }: { ticket: Ticket }) {
+export type TicketTab = 'details' | 'activity' | 'chat'
+
+/**
+ * 右側面板的單子(2026-11-23 user:做得更有結構 → 頂列下方加分頁):
+ * Details = 標題 + 欄位 + Summary;Activity = 時間軸;Chat = 這張單的頻道(只有值班者有,channel.tsx)。
+ * 分頁列樣式照 DS「Patterns › Header Anatomy › 含分頁列」(ChromeHeader tabsSlot):頂列下方一列、與頂列共用一條底線、
+ * TabsList 內縮對齊標題;AppShellAside 沒開放 tabsSlot → AsideHeaderTabs(暫時做法)。
+ * 分頁內容間距同 DS 範例:TabsContent 自帶上方 tight,內層補水平 loose + 底部。
+ * 對照:Jira 工單的 Activity 區有 All / Comments 分頁(support.atlassian.com/jira/kb/set-default-issue-tab-all-jira/);
+ * ServiceNow 事故頁分 Overview / Details / Related records 分頁,協作放側欄(servicenow.com/docs … incident-sow)。
+ * 我們的右側面板一次只放一樣東西 → 頻道收進單子的分頁,跟這張單有關的都在同一處。
+ */
+export function TicketPreview({ ticket, tab, onTabChange, chat }: {
+  ticket: Ticket
+  tab: TicketTab
+  onTabChange: (tab: TicketTab) => void
+  /** Chat 分頁內容;不給 = 這個身分沒有 Chat 分頁(報案者,2026-11-22 user「報案者先不動」) */
+  chat?: ReactNode
+}) {
+  const current: TicketTab = tab === 'chat' && !chat ? 'details' : tab
+  const BODY = 'flex flex-col gap-[var(--layout-space-loose)] px-[var(--layout-space-loose)] pb-[var(--layout-space-loose)]'
   return (
-    <div className="flex flex-col gap-[var(--layout-space-loose)] p-[var(--layout-space-loose)]">
-      <AsideHeaderActions deps={ticket.id}>
+    <Tabs value={current} onValueChange={(v) => onTabChange(v as TicketTab)}>
+      <AsideHeaderActions deps={`${ticket.id}-${current}`}>
         <Tooltip>
           <TooltipTrigger asChild>
-            {/* 同文章預覽的「Open in new tab」:假連結(同 TicketLink),接上 Service Desk 後開單子網址 */}
-            <Button variant="text" size="sm" iconOnly startIcon={ExternalLink} aria-label="Open in Service Desk" title="" onClick={() => {}} />
+            {/* 假連結:Details / Activity = 開 Service Desk 的單子;Chat = 開 Chat 的同一個頻道(接上後換成網址) */}
+            <Button variant="text" size="sm" iconOnly startIcon={ExternalLink} aria-label={current === 'chat' ? 'Open in Chat' : 'Open in Service Desk'} title="" onClick={() => {}} />
           </TooltipTrigger>
-          <TooltipContent>Open in Service Desk</TooltipContent>
+          <TooltipContent>{current === 'chat' ? 'Open in Chat' : 'Open in Service Desk'}</TooltipContent>
         </Tooltip>
         <ButtonDivider />
       </AsideHeaderActions>
-      <h2 className="text-h4 font-semibold">{ticket.title}</h2>
-      {/* Category / Environment / Priority 不在單子詳情顯示(2026-11-03 user:報案者與值班者兩邊都拿掉) */}
-      <DescriptionList orientation="horizontal" divided>
-        <DescriptionItem label="Status">
-          <Tag size="sm" color={STATUS_COLOR[ticket.status]}>{ticket.status}</Tag>
-        </DescriptionItem>
-        <DescriptionItem label="Requester">{ticket.requester}</DescriptionItem>
-        <DescriptionItem label="Assignee">{ticket.assignee}</DescriptionItem>
-        <DescriptionItem label="Team">{ticket.team}</DescriptionItem>
-        {ticket.service && <DescriptionItem label="Service">{ticket.service}</DescriptionItem>}
-        <DescriptionItem label="Created">{ticket.created}</DescriptionItem>
-        {ticket.linked && <DescriptionItem label="Linked">{ticket.linked.map((l) => `#${l}`).join(', ')}</DescriptionItem>}
-      </DescriptionList>
-      <h2 className="text-h4 font-semibold">Summary</h2>
-      {(() => {
-        const items = (
-          <>
-                {ticket.summary.map((s) => (
-                  <li key={s.text}>{s.label ? <><strong>{s.label}：</strong>{s.text}</> : s.text}</li>
-                ))}
-          </>
-        )
-        // 報案者送出的經過有順序 → 編號(同 articles.tsx 的 ol 樣式);其他單子條列
-        return ticket.summaryOrdered
-          ? <ol className="flex list-decimal flex-col gap-1 ps-[var(--layout-space-loose)] text-body">{items}</ol>
-          : <ul className="flex list-disc flex-col gap-1 ps-[var(--layout-space-loose)] text-body">{items}</ul>
-      })()}
-      <h2 className="text-h4 font-semibold">Activity</h2>
-      {/* 依時間先後(與對話同方向,由上往下讀) */}
-      <DescriptionList>
-        {ticket.activity.map((a) => (
-          <DescriptionItem key={a.text} label={a.time}>{a.text}</DescriptionItem>
-        ))}
-      </DescriptionList>
-    </div>
+      <AsideHeaderTabs className={HEADER_TABS_SLOT_WRAPPER_CLASS}>
+        <TabsList>
+          <TabsTrigger value="details">Details</TabsTrigger>
+          <TabsTrigger value="activity">Activity</TabsTrigger>
+          {chat && <TabsTrigger value="chat">Chat</TabsTrigger>}
+        </TabsList>
+      </AsideHeaderTabs>
+      <TabsContent value="details">
+        <div className={BODY}>
+          <h2 className="text-h4 font-semibold">{ticket.title}</h2>
+          {/* Category / Environment / Priority 不在單子詳情顯示(2026-11-03 user:報案者與值班者兩邊都拿掉) */}
+          <DescriptionList orientation="horizontal" divided>
+            <DescriptionItem label="Status">
+              <Tag size="sm" color={STATUS_COLOR[ticket.status]}>{ticket.status}</Tag>
+            </DescriptionItem>
+            <DescriptionItem label="Requester">{ticket.requester}</DescriptionItem>
+            <DescriptionItem label="Assignee">{ticket.assignee}</DescriptionItem>
+            <DescriptionItem label="Team">{ticket.team}</DescriptionItem>
+            {ticket.service && <DescriptionItem label="Service">{ticket.service}</DescriptionItem>}
+            <DescriptionItem label="Created">{ticket.created}</DescriptionItem>
+            {ticket.linked && <DescriptionItem label="Linked">{ticket.linked.map((l) => `#${l}`).join(', ')}</DescriptionItem>}
+          </DescriptionList>
+          <h3 className="text-h4 font-semibold">Summary</h3>
+          {(() => {
+            const items = ticket.summary.map((s) => (
+              <li key={s.text}>{s.label ? <><strong>{s.label}：</strong>{s.text}</> : s.text}</li>
+            ))
+            // 報案者送出的經過有順序 → 編號(同 articles.tsx 的 ol 樣式);其他單子條列
+            return ticket.summaryOrdered
+              ? <ol className="flex list-decimal flex-col gap-1 ps-[var(--layout-space-loose)] text-body">{items}</ol>
+              : <ul className="flex list-disc flex-col gap-1 ps-[var(--layout-space-loose)] text-body">{items}</ul>
+          })()}
+        </div>
+      </TabsContent>
+      <TabsContent value="activity">
+        <div className={BODY}>
+          {/* 依時間先後(與對話同方向,由上往下讀) */}
+          <DescriptionList>
+            {ticket.activity.map((a) => (
+              <DescriptionItem key={a.text} label={a.time}>{a.text}</DescriptionItem>
+            ))}
+          </DescriptionList>
+        </div>
+      </TabsContent>
+      {chat && <TabsContent value="chat">{chat}</TabsContent>}
+    </Tabs>
   )
 }
