@@ -338,7 +338,7 @@ const TC_CLOSED_MS = 3000
 /** Aaron 的第二句(確認重新部署成功;= 報案者那邊的「好了，pod 起來了」) */
 const TC_CONFIRM = '重新部署了，pod 起來了，謝謝！'
 PEOPLE['tc-bot'] = { name: SERVICE_DESK_LABEL, color: 'blue', status: 'online', role: 'Bot', email: 'service-desk@teachat.app', avatar: '', bot: true }
-PEOPLE['tc-bob'] = { name: 'Bob', color: 'green', status: 'online', role: 'K8s 平台團隊 · 值班', email: 'bob@teachat.app', avatar: '' }
+PEOPLE['tc-bob'] = { name: 'Bob', color: 'green', status: 'online', role: 'K8s 平台團隊 · 值班', email: 'bob@teachat.app', avatar: AVATAR['bob'] }
 const tcMessage = (id: string, author: string, time: string, text: string): Message => ({ id, author, time, text })
 const TC_TEXT = {
   replied: `#${CHANNEL.ticket} 狀態改為「待申請人確認」：Bob 已重新啟用 robot account，請 Aaron 重新部署試試看。`,

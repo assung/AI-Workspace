@@ -23,11 +23,17 @@ import { AgentLogo, Avatar, Button, Empty, Tooltip, TooltipContent, TooltipTrigg
 import { MessagesSquare, Send } from 'lucide-react'
 import { AsideFooter } from './AsideHeaderActions'
 import { TAGENT_LABEL } from './TAgent'
+// 人像(2026-11-23 user:「Bob 跟 Aaron 都提供一個人像 avatar」):跟 #requester-chat 的 Chat 複本同一張
+// (Aaron = Chat 的「我」me.jpg;Bob = bob.jpg),同一個人在兩邊同一張臉。來源見 chat/assets/avatars/README.md
+import aaronAvatar from './chat/assets/avatars/me.jpg'
+import bobAvatar from './chat/assets/avatars/bob.jpg'
 
 /** 頻道名稱 = 單號小寫(#sd-2318) */
 export const channelName = (ticketId: string) => `#${ticketId.toLowerCase()}`
 /** 示範劇本那張單(有預填問句與報案者回覆) */
 export const CHANNEL = { name: channelName('SD-2318'), ticket: 'SD-2318', me: 'Bob', requester: 'Aaron' }
+/** 有人像的人(其他人退回 DS Avatar 的字首) */
+const AVATAR_SRC: Record<string, string | undefined> = { Aaron: aaronAvatar, Bob: bobAvatar }
 const MY_BUBBLE_BG = 'bg-[#EBEEFF] [[data-theme=dark]_&]:bg-[#282B3E]'
 
 export type ChannelMessage = { id: string; author: 'bot' | 'me' | 'requester'; time: string; text: string }
@@ -53,7 +59,7 @@ function Bubble({ m, requester }: { m: ChannelMessage; requester: string }) {
       <div className={`flex max-w-[85%] items-start gap-2 ${mine ? 'flex-row-reverse' : ''}`}>
         {!mine && (
           <div className="mt-0.5 shrink-0">
-            {m.author === 'bot' ? <AgentLogo size={32} label={name} /> : <Avatar size={32} alt={name} color="green" />}
+            {m.author === 'bot' ? <AgentLogo size={32} label={name} /> : <Avatar size={32} alt={name} color="green" src={AVATAR_SRC[name]} />}
           </div>
         )}
         <div className="flex min-w-0 flex-col gap-1">
