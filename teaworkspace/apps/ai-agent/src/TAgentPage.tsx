@@ -143,6 +143,12 @@ function ArtifactsScope({ onOpen, children }: { onOpen: (id: string) => void; ch
   return <>{children((id) => { onOpen(id); requestAside('artifact') })}</>
 }
 
+// 側欄未讀點(2026-11-23 user):8×8、左右各 6px,避免跟截斷的文字太近。
+// DS SidebarMenuBadge = 絕對定位在列右側 right-[loose]、Badge dot 6×6,且 SidebarMenuButton 不替它留位 → 文字會跑到點下面。
+// 產品端:點往內移 6px(右側 6px)、改 8×8;有未讀時按鈕右側多留 6 + 8 + 6 = 20px(左側 6px)。之後跟 DS 提。
+const UNREAD_DOT_CLASS = '!h-2 !w-2 right-[calc(var(--layout-space-loose)+6px)]'
+const UNREAD_ROW_PAD = '!pr-[calc(var(--layout-space-loose)+20px)]'
+
 export function TAgentPage({
   engine,
   route,
@@ -328,7 +334,7 @@ export function TAgentPage({
   const conversationRows = (list: TAgentConversation[]) =>
     list.map((c) => (
       <SidebarMenuItem key={c.id}>
-        <SidebarMenuButton id={conversationRoute(c.id)} tooltip={c.title}>
+        <SidebarMenuButton id={conversationRoute(c.id)} tooltip={c.title} className={engine.unreadIds.has(c.id) ? UNREAD_ROW_PAD : undefined}>
           {conversationLabel(c.title)}
         </SidebarMenuButton>
         {/* 未讀點(2026-10-30 user:沿用現有 dot 樣式;2026-11-23 user:改藍 = DS Badge high,同 Primary):滑過 / 焦點在列上時讓位給 ⋯ */}
@@ -337,7 +343,7 @@ export function TAgentPage({
             dot
             variant="high"
             aria-label="New reply"
-            className="group-hover/menu-item:invisible group-focus-within/menu-item:invisible"
+            className={`${UNREAD_DOT_CLASS} group-hover/menu-item:invisible group-focus-within/menu-item:invisible`}
           />
         )}
         {rowMenu(c)}
@@ -362,9 +368,9 @@ export function TAgentPage({
                 <SidebarMenuButton id="new" startIcon={SquarePen} tooltip="New conversation">New conversation</SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton id={conversationRoute(UPDATES_ID)} startIcon={Bell} tooltip={UPDATES_TITLE}>{UPDATES_TITLE}</SidebarMenuButton>
+                <SidebarMenuButton id={conversationRoute(UPDATES_ID)} startIcon={Bell} tooltip={UPDATES_TITLE} className={engine.unreadIds.has(UPDATES_ID) ? UNREAD_ROW_PAD : undefined}>{UPDATES_TITLE}</SidebarMenuButton>
                 {/* 未讀紅點:同對話列(2026-10-30 user:「一樣有紅點機制」);這一列沒有 ⋯,紅點常駐 */}
-                {engine.unreadIds.has(UPDATES_ID) && <SidebarMenuBadge dot variant="high" aria-label="New update" />}
+                {engine.unreadIds.has(UPDATES_ID) && <SidebarMenuBadge dot variant="high" aria-label="New update" className={UNREAD_DOT_CLASS} />}
               </SidebarMenuItem>
               {/* Artifacts(2026-11-04 user:放在 Updates 下方;圖示沿用 2026-10-30 版 Shapes) */}
               <SidebarMenuItem>

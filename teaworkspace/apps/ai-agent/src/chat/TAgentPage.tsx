@@ -119,6 +119,12 @@ const ARTIFACTS: Artifact[] = [
   { id: 'a-staging', name: 'Staging deploy checklist', type: 'Doc', conversationId: 'c-staging', updated: '2026/10/17 11:03 AM' },
 ]
 
+// 側欄未讀點(2026-11-23 user):8×8、左右各 6px,避免跟截斷的文字太近。
+// DS SidebarMenuBadge = 絕對定位在列右側 right-[loose]、Badge dot 6×6,且 SidebarMenuButton 不替它留位 → 文字會跑到點下面。
+// 產品端:點往內移 6px(右側 6px)、改 8×8;有未讀時按鈕右側多留 6 + 8 + 6 = 20px(左側 6px)。之後跟 DS 提。
+const UNREAD_DOT_CLASS = '!h-2 !w-2 right-[calc(var(--layout-space-loose)+6px)]'
+const UNREAD_ROW_PAD = '!pr-[calc(var(--layout-space-loose)+20px)]'
+
 export function TAgentPage({
   engine,
   route,
@@ -186,16 +192,16 @@ export function TAgentPage({
   const conversationRows = (list: TAgentConversation[]) =>
     list.map((c) => (
       <SidebarMenuItem key={c.id}>
-        <SidebarMenuButton id={conversationRoute(c.id)} tooltip={c.title}>
+        <SidebarMenuButton id={conversationRoute(c.id)} tooltip={c.title} className={engine.unreadIds.has(c.id) ? UNREAD_ROW_PAD : undefined}>
           {c.title}
         </SidebarMenuButton>
-        {/* 未讀紅點:同 Chat 列表(Badge dot + 同色);與 hover 才出現的 ⋯ 同位置 → 滑過 / 焦點在列上時讓位給 ⋯ */}
+        {/* 未讀點:同 Chat 列表(Badge dot high、8×8、左右 6px);與 hover 才出現的 ⋯ 同位置 → 滑過 / 焦點在列上時讓位給 ⋯ */}
         {engine.unreadIds.has(c.id) && (
           <SidebarMenuBadge
             dot
             variant="high"
             aria-label="New reply"
-            className={`group-hover/menu-item:invisible group-focus-within/menu-item:invisible`}
+            className={`${UNREAD_DOT_CLASS} group-hover/menu-item:invisible group-focus-within/menu-item:invisible`}
           />
         )}
         {rowMenu(c)}

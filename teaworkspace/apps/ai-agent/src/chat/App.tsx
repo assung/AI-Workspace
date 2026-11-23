@@ -334,6 +334,8 @@ GENERATED_DM_PEOPLE.forEach(({ key, person }) => { PEOPLE[key] = person })
 // → 8 秒後 bot 發「待申請人確認」→ Aaron 回「重新部署了」(預填)→ 3 秒後 bot 發「已結案」。
 // 時間照 IT Service Desk 劇本(10:45 開頻道…10:51 結案),用 Chat 自己的 24 小時制。
 const TC_ROOM_ID = 'sd-2318'
+/** 未讀點 8×8(2026-11-23 user;DS Badge dot 預設 6×6 = w-1.5 h-1.5,這裡蓋掉)。列表裡另加左右各 6px(見 ChatListItem) */
+const UNREAD_DOT_SIZE = '!h-2 !w-2'
 const TC_ARRIVE_MS = 5000
 const TC_REPLIED_MS = 8000
 const TC_CLOSED_MS = 3000
@@ -956,7 +958,7 @@ function NavRail({
   // 原本 variant="critical" + !bg-[#EC540F]。尺寸不變:dot 6×6、count 16×16(DS Badge 預設)。
   const chatBadge = unreadCount > 0 ? <Badge variant="high" count={unreadCount} max={99} /> : undefined
   // AI agent 未讀 = 純點(不計數:代理回覆以「對話」為單位,DS Badge dot = 「這裡有東西要看」)
-  const agentBadge = <Badge dot variant="high" aria-label="New AI agent reply" />
+  const agentBadge = <Badge dot variant="high" aria-label="New AI agent reply" className={UNREAD_DOT_SIZE} />
   const workspace = variant === 'workspace'
   // workspace:底部選單鈕 = lucide Settings、名稱「Settings and more」(2026-10-25 user;選單內容 Settings / Help / Sign out 不變)。
   // 對照 Microsoft Teams 左下同名入口「Settings and more」;icon 依 user 指定用 Settings 齒輪。
@@ -1297,26 +1299,27 @@ function RoomRow({
               {latestMsg ? formatListTime(latestMsg, now) : ''}
             </span>
           </div>
-          {/* Line 2: preview (flex-1 truncate) + unread dot (shrink-0; invisible on hover) */}
-          <div className="flex items-center gap-1">
+          {/* Line 2: preview (flex-1 truncate) + unread dot (shrink-0; invisible on hover)
+              未讀點 8×8、左右各 6px(2026-11-23 user:避免跟截斷的文字太近)→ 外框 px-1.5、不再用 gap-1 */}
+          <div className="flex items-center">
             <p className="min-w-0 flex-1 truncate" style={subtitleStyle}>
               {previewText}
             </p>
             {isUnread && (
-              <span className="shrink-0 group-hover/row:invisible">
-                <Badge dot variant="high" />
+              <span className="flex shrink-0 px-1.5 group-hover/row:invisible">
+                <Badge dot variant="high" className={UNREAD_DOT_SIZE} />
               </span>
             )}
           </div>
         </div>
       ) : (
-        <div className="flex min-w-0 flex-1 items-center gap-1 group-hover/row:pr-6">
+        <div className="flex min-w-0 flex-1 items-center group-hover/row:pr-6">
           <span className="min-w-0 flex-1 truncate" style={titleStyle}>
             {room.title}
           </span>
           {isUnread && (
-            <span className="shrink-0 group-hover/row:invisible">
-              <Badge dot variant="high" />
+            <span className="flex shrink-0 px-1.5 group-hover/row:invisible">
+              <Badge dot variant="high" className={UNREAD_DOT_SIZE} />
             </span>
           )}
         </div>
