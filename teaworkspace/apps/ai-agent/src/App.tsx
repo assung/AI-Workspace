@@ -10,12 +10,14 @@
 //
 // Demo 身分(2026-10-30 user 選 A):沒有 hash = 申請人 Aaron;`#oncall` = 值班者 Bob「人找事」;
 // `#oncall-updates` = Bob「事找人」(打開 5 秒後 Updates 收到新單)。見 personas.tsx。
+// `#requester-chat` = 報案者在 workspace Chat 收到值班者開的單子頻道(見下方 REQUESTER_CHAT_HASH)。
 // 換 hash 就換一整套(對話、劇本、記住的位置各自一份);分享用 artifact 只傳得過純 `#name`,所以用 hash 不用 query。
 import { useEffect, useRef, useState } from 'react'
 import { Toaster, toast } from '@qijenchen/design-system'
 import { TAGENT_LABEL, useTAgentEngine } from './TAgent'
 import { TAgentPage, type TAgentRoute } from './TAgentPage'
 import { personaFromHash, type Persona } from './personas'
+import ChatApp from './chat/App'
 
 const routeKey = (persona: Persona) => `it-service-desk:${persona.id}:route`
 
@@ -40,13 +42,20 @@ function usePageVisible() {
   return visible
 }
 
+// 報案者在 workspace Chat 被值班者聯繫(2026-11-23 user):`#requester-chat` = workspace Chat 複本(chat/App.tsx)+ #sd-2318 頻道劇本。
+// 不是 IT Service Desk 的畫面,所以不走 persona;外圍 = tWorkspace 的 Chat 分頁(agent: true 的版面),
+// 只關掉它自己的 tAgent 劇本(那是 tWorkspace 時期的示範,跟這條無關)。
+const REQUESTER_CHAT_HASH = '#requester-chat'
+
 export default function App() {
-  const [persona, setPersona] = useState(() => personaFromHash(window.location.hash))
+  const [hash, setHash] = useState(() => window.location.hash)
   useEffect(() => {
-    const onHash = () => setPersona(personaFromHash(window.location.hash))
+    const onHash = () => setHash(window.location.hash)
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
+  if (hash === REQUESTER_CHAT_HASH) return <ChatApp key={hash} config={{ agent: true, agentScript: false, ticketChannel: true }} />
+  const persona = personaFromHash(hash)
   // key = 身分:換身分就重新掛載整套
   return <PersonaApp key={persona.id} persona={persona} />
 }
