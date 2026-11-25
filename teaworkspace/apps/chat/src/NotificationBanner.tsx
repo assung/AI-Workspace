@@ -229,8 +229,7 @@ export function NotificationBanner({
                 <SmilePlus size={16} aria-hidden />
               </button>
             </PopoverTrigger>
-            {/* 2026-11-25 user:emoji 24px、彼此間距 4、popover padding 上下 4 / 左右 8;z-[70] 疊在通知卡(z-[60])上。
-                emoji 字形比字級寬(彩色 emoji 字型約 1.2–1.25 倍),字級 24 會畫成約 30px 寬、擠掉 4px 間距 → 鈕固定 24×24、字級 20,畫出來約 24px */}
+            {/* 2026-11-25 user:每顆 emoji 範圍 32×32、字級 24、彼此間距 4;popover padding 上下 4 / 左右 8;z-[70] 疊在通知卡(z-[60])上 */}
             <PopoverContent
               align="end"
               sideOffset={6}
@@ -246,7 +245,7 @@ export function NotificationBanner({
                   type="button"
                   aria-label={`React with ${r.label}`}
                   onClick={() => { setReactOpen(false); onReact?.(r.emoji); onDismiss?.() }}
-                  className="flex h-6 w-6 items-center justify-center rounded text-[20px] leading-none hover:bg-neutral-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                  className="flex h-8 w-8 items-center justify-center rounded text-[24px] leading-none hover:bg-neutral-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
                 >
                   <span aria-hidden>{r.emoji}</span>
                 </button>
