@@ -15,8 +15,8 @@
 // - 在任何地方讀過 → 卡片收起(規格第 10 節第 3 點)。
 // - 卡上「為什麼收到」一行(規格第 10 節第 1 點)。
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Avatar, Button, Tag } from '@qijenchen/design-system'
-import { FileText, HardDrive, Hexagon, ListChecks, MessageCircle, SendHorizontal, Sparkles, X, type LucideIcon } from 'lucide-react'
+import { Avatar, Button, Popover, PopoverContent, PopoverTrigger, Tag, Tooltip, TooltipContent, TooltipTrigger } from '@qijenchen/design-system'
+import { FileText, HardDrive, Hexagon, ListChecks, MessageCircle, SendHorizontal, Settings, SmilePlus, Sparkles, X, type LucideIcon } from 'lucide-react'
 import { NATIVE_APPS, type NativeAppKey } from './WorkspaceSettings'
 
 export type BannerApp = NativeAppKey | 'agent'
@@ -93,6 +93,8 @@ export function NotificationBanner({
   onDismiss,
   onOpen,
   onInteractingChange,
+  onOpenSettings,
+  onReact,
   showPreview = true,
   size = 'comfy',
   defaultReplying = false,
@@ -105,6 +107,10 @@ export function NotificationBanner({
   onOpen?: () => void
   /** 回覆中 / 滑鼠停留 → 暫停自動收起 */
   onInteractingChange?: (v: boolean) => void
+  /** 第一列「Go to Notification settings」(2026-11-25 user) */
+  onOpenSettings?: () => void
+  /** 第一列快速回應 emoji;送出後卡片收起(同回覆) */
+  onReact?: (emoji: string) => void
   /** 設定「Show message and content previews」關閉 → 第二排一律「Message preview hidden」(2026-11-17 user) */
   showPreview?: boolean
 }) {
@@ -115,7 +121,13 @@ export function NotificationBanner({
   const [draft, setDraft] = useState('')
   const [result, setResult] = useState<string | null>(null)
 
-  useEffect(() => { onInteractingChange?.(replying) }, [replying, onInteractingChange])
+  // 快速回應 popover:滑鼠移上 emoji 鈕就打開(2026-11-25 user),移開 150ms 後收;打開期間卡片不計時(popover 在卡片外,不算 hover 卡片)
+  const [reactOpen, setReactOpen] = useState(false)
+  const reactCloseTimer = useRef<number | undefined>(undefined)
+  const openReact = () => { window.clearTimeout(reactCloseTimer.current); setReactOpen(true) }
+  const closeReactSoon = () => { window.clearTimeout(reactCloseTimer.current); reactCloseTimer.current = window.setTimeout(() => setReactOpen(false), 150) }
+  useEffect(() => () => window.clearTimeout(reactCloseTimer.current), [])
+  useEffect(() => { onInteractingChange?.(replying || reactOpen) }, [replying, reactOpen, onInteractingChange])
   useEffect(() => {
     if (!result) return
     const t = window.setTimeout(() => onDismiss?.(), 3000)
@@ -200,20 +212,62 @@ export function NotificationBanner({
   const replyTarget = data.thread ? 'Reply in thread' : data.context ? `Reply to ${data.context}` : `Reply to ${name.split(' ')[0]}`
 
   // ── Comfy / Compact 共用的區塊 ──
+  // 第一列右側功能鈕(2026-11-25 user):由左至右 emoji 快速回應 → 設定 → 關閉。
+  // 三顆同一種樣式(16px 圖示、白 65%、hover 白、可點範圍 24px);鈕與鈕之間 8px。
+  // emoji 回應只出現在「一則訊息」的卡(DM / 群組 / 提及 / 轉傳);App 卡與「別人回應你」的卡沒有可回應的訊息。
+  const canReact = kind !== 'app' && !data.reaction
+  const iconBtnClass = '-m-1 flex shrink-0 items-center justify-center rounded p-1 text-white/65 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white data-[state=open]:text-white'
   const brandRow = (
     <div className="flex items-center gap-1 text-white/65">
       <Hexagon size={16} className="shrink-0" aria-hidden />
       <span className="min-w-0 flex-1 truncate text-[12px] font-bold leading-[1.3]">Workspace</span>
-      {onDismiss && (
-        <button
-          type="button"
-          aria-label="Dismiss notification"
-          onClick={onDismiss}
-          className="-m-1 flex shrink-0 items-center justify-center rounded p-1 text-white/65 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
-        >
-          <X size={16} aria-hidden />
-        </button>
-      )}
+      <div className="flex shrink-0 items-center gap-2">
+        {canReact && (
+          <Popover open={reactOpen} onOpenChange={setReactOpen}>
+            <PopoverTrigger asChild>
+              <button type="button" aria-label="Add reaction" className={iconBtnClass} onMouseEnter={openReact} onMouseLeave={closeReactSoon}>
+                <SmilePlus size={16} aria-hidden />
+              </button>
+            </PopoverTrigger>
+            {/* 樣式沿用聊天訊息 hover 的 ReactionBar(App.tsx):emoji 鈕 rounded-md px-1.5 py-1;z-[70] 疊在通知卡(z-[60])上 */}
+            <PopoverContent
+              align="end"
+              sideOffset={6}
+              className="z-[70] w-auto p-0.5"
+              onMouseEnter={openReact}
+              onMouseLeave={closeReactSoon}
+              onOpenAutoFocus={(e) => e.preventDefault()}
+            >
+              <div role="group" aria-label="Quick reactions" className="flex items-center gap-0.5">
+              {QUICK_REACTIONS.map((r) => (
+                <button
+                  key={r.emoji}
+                  type="button"
+                  aria-label={`React with ${r.label}`}
+                  onClick={() => { setReactOpen(false); onReact?.(r.emoji); onDismiss?.() }}
+                  className="rounded-md px-1.5 py-1 text-body leading-none hover:bg-neutral-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                >
+                  <span className="text-[20px]" aria-hidden>{r.emoji}</span>
+                </button>
+              ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+        )}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button type="button" aria-label="Go to Notification settings" onClick={onOpenSettings} className={iconBtnClass}>
+              <Settings size={16} aria-hidden />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Go to Notification settings</TooltipContent>
+        </Tooltip>
+        {onDismiss && (
+          <button type="button" aria-label="Dismiss notification" onClick={onDismiss} className={iconBtnClass}>
+            <X size={16} aria-hidden />
+          </button>
+        )}
+      </div>
     </div>
   )
   const avatarEl = data.appInfo ? (
@@ -380,6 +434,14 @@ export function NotificationBanner({
   )
 }
 
+/** 通知卡快速回應(2026-11-25 user):由左至右 讚 / 愛心 / 笑哭 / OK 手勢 */
+const QUICK_REACTIONS = [
+  { emoji: '👍', label: 'Like' },
+  { emoji: '❤️', label: 'Heart' },
+  { emoji: '😂', label: 'Laugh' },
+  { emoji: '👌', label: 'OK' },
+] as const
+
 /** 預覽關閉時第二排的固定文字(2026-11-17 user) */
 const PREVIEW_HIDDEN = 'Message preview hidden'
 
@@ -457,6 +519,7 @@ export function BannerStack({
   onDismiss,
   onOpen,
   onPinnedChange,
+  onOpenSettings,
   showPreview,
   size = 'comfy',
 }: {
@@ -465,6 +528,8 @@ export function BannerStack({
   onOpen?: (b: BannerData) => void
   /** 卡片停留 / 回覆中狀態 → useBannerStack().setPinned */
   onPinnedChange?: (id: string, pinned: boolean) => void
+  /** 卡片第一列的設定鈕 → 打開 Settings › Notifications */
+  onOpenSettings?: () => void
   showPreview: boolean
   size?: BannerSize
 }) {
@@ -510,6 +575,7 @@ export function BannerStack({
             onDismiss={() => onDismiss(b.id)}
             onOpen={onOpen ? () => { onOpen(b); onDismiss(b.id) } : undefined}
             onPinnedChange={onPinnedChange}
+            onOpenSettings={onOpenSettings}
             showPreview={showPreview}
           />
         </div>
@@ -524,6 +590,7 @@ function TimedBanner({
   onDismiss,
   onOpen,
   onPinnedChange,
+  onOpenSettings,
   showPreview,
 }: {
   data: BannerData
@@ -531,6 +598,7 @@ function TimedBanner({
   onDismiss: () => void
   onOpen?: () => void
   onPinnedChange?: (id: string, pinned: boolean) => void
+  onOpenSettings?: () => void
   showPreview: boolean
 }) {
   const [hovered, setHovered] = useState(false)
@@ -557,7 +625,7 @@ function TimedBanner({
   }, [paused, onDismiss, data.count])
   return (
     <div className="pointer-events-auto" onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
-      <NotificationBanner data={data} size={size} onDismiss={onDismiss} onOpen={onOpen} onInteractingChange={setInteracting} showPreview={showPreview} />
+      <NotificationBanner data={data} size={size} onDismiss={onDismiss} onOpen={onOpen} onInteractingChange={setInteracting} onOpenSettings={onOpenSettings} showPreview={showPreview} />
     </div>
   )
 }

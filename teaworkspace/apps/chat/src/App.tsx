@@ -3595,6 +3595,7 @@ export default function App({
         items={bannerStack.items}
         onDismiss={bannerStack.dismiss}
         onPinnedChange={bannerStack.setPinned}
+        onOpenSettings={() => { setSettingsRoute('notifications'); setSettingsOpen(true); onAction?.({ type: 'open-settings' }) }}
         showPreview={notifPrefs.showPreview}
         size={notifPrefs.bannerSize}
         onOpen={(b) => {
