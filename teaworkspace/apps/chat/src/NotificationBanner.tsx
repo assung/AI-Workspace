@@ -229,25 +229,26 @@ export function NotificationBanner({
                 <SmilePlus size={16} aria-hidden />
               </button>
             </PopoverTrigger>
-            {/* 樣式沿用聊天訊息 hover 的 ReactionBar(App.tsx):emoji 鈕 rounded-md px-1.5 py-1;z-[70] 疊在通知卡(z-[60])上 */}
+            {/* 2026-11-25 user:emoji 24px、彼此間距 4、popover padding 上下 4 / 左右 8;z-[70] 疊在通知卡(z-[60])上。
+                emoji 字形比字級寬(彩色 emoji 字型約 1.2–1.25 倍),字級 24 會畫成約 30px 寬、擠掉 4px 間距 → 鈕固定 24×24、字級 20,畫出來約 24px */}
             <PopoverContent
               align="end"
               sideOffset={6}
-              className="z-[70] w-auto p-0.5"
+              className="z-[70] w-auto px-2 py-1"
               onMouseEnter={openReact}
               onMouseLeave={closeReactSoon}
               onOpenAutoFocus={(e) => e.preventDefault()}
             >
-              <div role="group" aria-label="Quick reactions" className="flex items-center gap-0.5">
+              <div role="group" aria-label="Quick reactions" className="flex items-center gap-1">
               {QUICK_REACTIONS.map((r) => (
                 <button
                   key={r.emoji}
                   type="button"
                   aria-label={`React with ${r.label}`}
                   onClick={() => { setReactOpen(false); onReact?.(r.emoji); onDismiss?.() }}
-                  className="rounded-md px-1.5 py-1 text-body leading-none hover:bg-neutral-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                  className="flex h-6 w-6 items-center justify-center rounded text-[20px] leading-none hover:bg-neutral-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
                 >
-                  <span className="text-[20px]" aria-hidden>{r.emoji}</span>
+                  <span aria-hidden>{r.emoji}</span>
                 </button>
               ))}
               </div>
