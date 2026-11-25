@@ -245,7 +245,8 @@ export function NotificationBanner({
                   type="button"
                   aria-label={`React with ${r.label}`}
                   onClick={() => { setReactOpen(false); onReact?.(r.emoji); onDismiss?.() }}
-                  className="flex h-8 w-8 items-center justify-center rounded text-[24px] leading-none hover:bg-neutral-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                  className="flex h-8 w-8 items-center justify-center rounded leading-none hover:bg-neutral-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                  style={{ fontSize: emojiFontPx(24) }}
                 >
                   <span aria-hidden>{r.emoji}</span>
                 </button>
@@ -434,6 +435,38 @@ export function NotificationBanner({
   )
 }
 
+/**
+ * 讓 emoji 畫出來剛好 size px(2026-11-25 user:emoji 24、範圍 32 → 四周看起來各 4)。
+ * 各平台彩色 emoji 字型畫出來的大小不一樣(Noto 在 24px 字級下 😂 約 28px 寬,Apple / Segoe 較接近字級),
+ * 所以量一次本機的實際筆畫:在 canvas 用 100px 畫 😂,掃不透明像素算出寬高,反推字級。量不到就用原字級。
+ */
+let emojiInkRatio: number | null = null
+function emojiFontPx(size: number) {
+  if (emojiInkRatio == null) {
+    emojiInkRatio = 1
+    try {
+      const N = 160
+      const cv = document.createElement('canvas')
+      cv.width = N; cv.height = N
+      const ctx = cv.getContext('2d', { willReadFrequently: true })
+      if (ctx) {
+        ctx.font = `100px ${getComputedStyle(document.body).fontFamily}`
+        ctx.textBaseline = 'middle'
+        ctx.textAlign = 'center'
+        ctx.fillText('😂', N / 2, N / 2)
+        const { data } = ctx.getImageData(0, 0, N, N)
+        let x0 = N, y0 = N, x1 = -1, y1 = -1
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+          if (data[(y * N + x) * 4 + 3] > 32) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y }
+        }
+        const ink = Math.max(x1 - x0 + 1, y1 - y0 + 1)
+        if (x1 >= 0 && ink > 40) emojiInkRatio = ink / 100
+      }
+    } catch { /* 量不到就用原字級 */ }
+  }
+  return Math.round((size / emojiInkRatio) * 10) / 10
+}
+
 /** 通知卡快速回應(2026-11-25 user):由左至右 讚 / 愛心 / 笑哭 / OK 手勢 */
 const QUICK_REACTIONS = [
   { emoji: '👍', label: 'Like' },
@@ -498,7 +531,8 @@ export function useBannerStack() {
 const APP_TAG_NUDGE = '[@media(min-resolution:2dppx)]:[&>span]:translate-y-[0.5px]'
 const MENTION_TAG_NUDGE = '[&>span]:translate-y-[0.5px]'
 
-/** 疊放區位置(2026-11-17 user):右下角,距右 16、距底 120 */
+/** 疊放區位置(2026-11-17 user):右下角,距右 16、距底 120;卡片之間 16(2026-11-25 user,原 8) */
+const STACK_GAP = 16
 
 /** 視窗右緣、疊放區高度那一帶,底下可捲動容器的直向捲軸寬(overlay 捲軸 = 0) */
 function rightEdgeScrollbarWidth(stack: HTMLElement) {
@@ -548,7 +582,7 @@ export function BannerStack({
       let used = 0
       let n = 0
       for (const k of kids) {
-        const h = k.scrollHeight + (n > 0 ? 8 : 0) // gap-2
+        const h = k.scrollHeight + (n > 0 ? STACK_GAP : 0)
         if (used + h > limit) break
         used += h
         n++
@@ -564,7 +598,7 @@ export function BannerStack({
       ref={ref}
       aria-label="Notifications"
       // 由下(舊)往上(新)疊:items 是新→舊,底部對齊 → 最新在最上面、最舊在最下面,停留中的卡不會被新卡推動
-      className="pointer-events-none fixed bottom-[120px] z-[60] flex flex-col gap-2"
+      className="pointer-events-none fixed bottom-[120px] z-[60] flex flex-col gap-4"
       style={{ right: 16 + scrollbarW }}
     >
       {items.map((b, i) => (
