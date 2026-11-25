@@ -15,7 +15,7 @@
 // - 在任何地方讀過 → 卡片收起(規格第 10 節第 3 點)。
 // - 卡上「為什麼收到」一行(規格第 10 節第 1 點)。
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Avatar, Button, Popover, PopoverContent, PopoverTrigger, Tag, Tooltip, TooltipContent, TooltipTrigger } from '@qijenchen/design-system'
+import { AgentLogo, Avatar, Button, Popover, PopoverContent, PopoverTrigger, Tag, Tooltip, TooltipContent, TooltipTrigger } from '@qijenchen/design-system'
 import { FileText, HardDrive, Hexagon, ListChecks, MessageCircle, SendHorizontal, Settings, Smile, Sparkles, X, type LucideIcon } from 'lucide-react'
 import { NATIVE_APPS, type NativeAppKey } from './WorkspaceSettings'
 
@@ -43,7 +43,11 @@ export type BannerData = {
   app: BannerApp
   /** 來源脈絡:聊天室 / 專案 / 文件名稱(1:1 聊天不填) */
   context?: string
-  actor?: { name: string; avatarUrl?: string }
+  /**
+   * bot = AI agent 這類非人的發話者(2026-11-25,交接文件第 5 點):頭像改用 DS AgentLogo;沒有人可以回應 emoji → 不出 emoji 鈕。
+   * AI agent 背景回覆用 Group chat 版面:第一排對話名(context)、第二排「AI agent: 回覆」。
+   */
+  actor?: { name: string; avatarUrl?: string; bot?: boolean }
   /** 沒有人(系統提醒)時的標題 */
   title?: string
   body: string
@@ -95,6 +99,7 @@ export function NotificationBanner({
   onInteractingChange,
   onOpenSettings,
   onReact,
+  onReply,
   showPreview = true,
   size = 'comfy',
   defaultReplying = false,
@@ -111,6 +116,8 @@ export function NotificationBanner({
   onOpenSettings?: () => void
   /** 第一列快速回應 emoji;送出後卡片收起(同回覆) */
   onReact?: (emoji: string) => void
+  /** 回覆送出(交接文件第 5 點):先交出文字,再收起卡片。沒接 = 只收卡(示範用的聊天卡) */
+  onReply?: (text: string) => void
   /** 設定「Show message and content previews」關閉 → 第二排一律「Message preview hidden」(2026-11-17 user) */
   showPreview?: boolean
 }) {
@@ -218,7 +225,7 @@ export function NotificationBanner({
   // 三顆同一種樣式(16px 圖示、白 65%、hover 白、可點範圍 24px);鈕(可點範圍)與鈕之間 8px(2026-11-25 user)→ 圖示之間 16。
   // emoji 入口用 lucide smile(user 指定 face-slightly-smiling,Lucide 沒有,選同風格的 smile)
   // emoji 回應只出現在「一則訊息」的卡(DM / 群組 / 提及 / 轉傳);App 卡與「別人回應你」的卡沒有可回應的訊息。
-  const canReact = kind !== 'app' && !data.reaction
+  const canReact = kind !== 'app' && !data.reaction && !data.actor?.bot
   const iconBtnClass = '-m-1 flex shrink-0 items-center justify-center rounded p-1 text-white/65 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white data-[state=open]:text-white'
   const brandRow = (
     <div className="flex items-center gap-1 text-white/65">
@@ -281,6 +288,11 @@ export function NotificationBanner({
       <data.appInfo.icon size={20} />
       <span className="pointer-events-none absolute inset-0 rounded-full shadow-[inset_0_0_0_1px_#E8E8E8]" />
     </span>
+  ) : data.actor?.bot ? (
+    // AI agent:DS AgentLogo 40(agent-panel-logo.spec.md 產品尺寸 16–48,所有尺寸同一造型);logo 自帶外形,不加頭像內框
+    <span className="relative flex h-10 w-10 shrink-0 items-center justify-center" aria-hidden>
+      <AgentLogo size={40} state="still" />
+    </span>
   ) : data.actor ? (
     // 頭像內框 1px #E8E8E8(2026-11-17 user):疊一層 inset ring,不佔版面、不改變 40px 尺寸
     <span className="relative h-10 w-10 shrink-0">
@@ -305,6 +317,7 @@ export function NotificationBanner({
   )
   const sendReply = () => {
     if (!draft.trim()) return
+    onReply?.(draft.trim())
     // 送出後卡片直接收起,不顯示「Reply sent」(2026-11-17 user)
     setDraft('')
     setReplying(false)
@@ -445,7 +458,7 @@ export function NotificationBanner({
  * 所以量一次本機的實際筆畫:在 canvas 用 100px 畫 😂,掃不透明像素算出寬高,反推字級。量不到就用原字級。
  */
 let emojiInkRatio: number | null = null
-function emojiFontPx(size: number) {
+export function emojiFontPx(size: number) {
   if (emojiInkRatio == null) {
     emojiInkRatio = 1
     try {
@@ -471,8 +484,8 @@ function emojiFontPx(size: number) {
   return Math.round((size / emojiInkRatio) * 10) / 10
 }
 
-/** 通知卡快速回應(2026-11-25 user):由左至右 讚 / 愛心 / 笑哭 / OK 手勢 */
-const QUICK_REACTIONS = [
+/** 快速回應(2026-11-25 user):由左至右 讚 / 愛心 / 笑哭 / OK 手勢。通知卡與聊天訊息 hover 列(App.tsx ReactionBar)共用 */
+export const QUICK_REACTIONS = [
   { emoji: '👍', label: 'Like' },
   { emoji: '❤️', label: 'Heart' },
   { emoji: '😂', label: 'Laugh' },
@@ -522,7 +535,7 @@ export function useBannerStack() {
     setItems((list) => list.filter((x) => x.id !== id))
   }
   /** 在別處讀過 → 收起同一對話的卡 */
-  const dismissThread = (threadKey: string) => setItems((list) => list.filter((x) => x.threadKey !== threadKey))
+  const dismissThread = useCallback((threadKey: string) => setItems((list) => list.filter((x) => x.threadKey !== threadKey)), [])
   return { items, push, dismiss, dismissThread, setPinned }
 }
 
@@ -556,6 +569,7 @@ export function BannerStack({
   items,
   onDismiss,
   onOpen,
+  onReply,
   onPinnedChange,
   onOpenSettings,
   showPreview,
@@ -564,6 +578,8 @@ export function BannerStack({
   items: BannerData[]
   onDismiss: (id: string) => void
   onOpen?: (b: BannerData) => void
+  /** 卡上回覆送出(交接文件第 5 點);沒接 = 只收卡 */
+  onReply?: (b: BannerData, text: string) => void
   /** 卡片停留 / 回覆中狀態 → useBannerStack().setPinned */
   onPinnedChange?: (id: string, pinned: boolean) => void
   /** 卡片第一列的設定鈕 → 打開 Settings › Notifications */
@@ -612,6 +628,7 @@ export function BannerStack({
             size={size}
             onDismiss={() => onDismiss(b.id)}
             onOpen={onOpen ? () => { onOpen(b); onDismiss(b.id) } : undefined}
+            onReply={onReply ? (text) => onReply(b, text) : undefined}
             onPinnedChange={onPinnedChange}
             onOpenSettings={onOpenSettings}
             showPreview={showPreview}
@@ -627,6 +644,7 @@ function TimedBanner({
   size,
   onDismiss,
   onOpen,
+  onReply,
   onPinnedChange,
   onOpenSettings,
   showPreview,
@@ -635,6 +653,7 @@ function TimedBanner({
   size: BannerSize
   onDismiss: () => void
   onOpen?: () => void
+  onReply?: (text: string) => void
   onPinnedChange?: (id: string, pinned: boolean) => void
   onOpenSettings?: () => void
   showPreview: boolean
@@ -663,7 +682,7 @@ function TimedBanner({
   }, [paused, onDismiss, data.count])
   return (
     <div className="pointer-events-auto" onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
-      <NotificationBanner data={data} size={size} onDismiss={onDismiss} onOpen={onOpen} onInteractingChange={setInteracting} onOpenSettings={onOpenSettings} showPreview={showPreview} />
+      <NotificationBanner data={data} size={size} onDismiss={onDismiss} onOpen={onOpen} onReply={onReply} onInteractingChange={setInteracting} onOpenSettings={onOpenSettings} showPreview={showPreview} />
     </div>
   )
 }

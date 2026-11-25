@@ -166,7 +166,7 @@ ChatList
   - 選單出現在 more 按鈕**下方 8px**（`side="bottom" sideOffset={8}`）；保留 Radix 預設碰撞避讓，靠近視窗邊緣時自動翻上方以維持可見。
   - more 按鈕為 **24×24px**（`!h-6 !w-6 !p-0`），外層 `absolute right-1 top-1/2 -translate-y-1/2`，框右緣距分隔線 **12px**（icon 視覺右緣落在 16px，與 date/time 右緣重疊）。用 **`invisible` 而非 `hidden`**（保留可量測 box，讓 Radix 正確錨定 dropdown）；`group-hover:visible` + `[&:has([data-state=open])]:visible` → hover 才出現、選單開啟時保持顯示。
 - **間距**：列表外層 `px-2` + row `px-2` → date/time & badge 右緣距右側分隔線 **16px**；hover 時 date/time + badge 用 `group-hover:invisible` 隱藏，由 more 按鈕覆蓋。
-- **ReactionBar**：用 `invisible/visible`（非 `hidden/flex`）控制顯隱，確保 Radix trigger 保留 box、選單開啟時 bar 不消失。
+- **ReactionBar**：快速回應跟 push banner 的 emoji popover 同一套（2026-11-25 user）：`QUICK_REACTIONS` 👍 ❤️ 😂 👌、每顆範圍 32×32、emoji 畫出 24（`emojiFontPx`）、彼此間距 4、外框 padding 上下 4 / 左右 8；右側功能鈕維持 DS Button sm 28。用 `invisible/visible`（非 `hidden/flex`）控制顯隱，確保 Radix trigger 保留 box、選單開啟時 bar 不消失。
 - **ScrollArea 寬度約束**：Radix viewport 內部會自動包一層 `display:table; min-width:100%` 的 div，會讓 `truncate` 的 row 以 max-content 撐大、溢出被分隔線遮擋。ChatList 的 ScrollArea 加 `[&_[data-radix-scroll-area-viewport]>div]:!block` 把它改回 block，row 才會被 aside 寬度約束、正常 truncate。
 - **Header「Chats」spec（2026-06-18 confirmed）**：`header` 上下 padding 改 10px（`style={{ paddingTop:10, paddingBottom:10 }}`，取代原 `py-2`=8px）；標題 `fontSize:16 / fontWeight:500 / lineHeight:'130%' / color:var(--color-neutral-9)`。
 - **Section spec（2026-06-18 confirmed）**：容器 `p-1`=4px all sides + `gap-1`=4px（左 icon ↔ label ↔ trailing icon 各 4px）；外層 ChatList `px-2`=8px 提供 section 與列表邊界的左右間隔。左側展開/收起鈕 `IconBtnSm` + `!h-5 !w-5`=20×20（icon 16px，由 `size="sm"` 預設對齊），color `var(--color-neutral-7)`。右側 trailing 鈕（"Add chat" Plus）改用 `IconBtnSm` + `!h-6 !w-6`=24×24，同色 neutral-7（原為 `ListBtn`，已換成可控尺寸的 `IconBtnSm`）。Section name 字級 `fontSize:12 / fontWeight:500 / lineHeight:'130%' / color:var(--color-neutral-7)`。`IconBtnSm` 新增 `style` prop 支援顏色 override。
@@ -355,12 +355,12 @@ TAgentDock
 
 **背景回覆的通知與紅點**（2026-10-29 user：「處理案件的過程中，使用者可能會關掉 Agent panel 或跳離 AI Agent 頁面，需要通知機制以及紅點：nav bar 圖標右上角、Agent chat list 的該則 chat」）
 
-- 「使用者正看著」= AI agent 整頁開著那一則，或側邊面板開著（在有面板的分頁）且顯示那一則（App `viewedConversationId`）。代理在**沒被看著**的對話回完一則 → 該則記為未讀（engine `unreadIds`）+ 發 DS Toast；打開那一則（整頁點進去 / 面板顯示它）即清除。
+- 「使用者正看著」= AI agent 整頁開著那一則，或側邊面板開著（在有面板的分頁）且顯示那一則（App `viewedConversationId`）。代理在**沒被看著**的對話回完一則 → 該則記為未讀（engine `unreadIds`）+ 發 push banner；打開那一則（整頁點進去 / 面板顯示它）即清除。
 - 未讀點 = 同 Chat 列表未讀點（`Badge dot variant="high"`，藍、8×8；2026-11-23 起取代原橘紅）：
   - NavRail AI agent 圖示右上角（`overlayBadge`，同 Chat 分頁的未讀數位置；不計數 —— 代理回覆以對話為單位）。
   - AI agent 整頁 Pinned / Recents 的該則列尾（DS `SidebarMenuBadge`；點往內移 6px、有未讀時按鈕右側多留 20px，長標題在點左側 6px 截斷 —— DS 不替點留位置，§4.5 第 8 項）；與 hover 才出現的 ⋯ 同位置 → 滑過 / 焦點在列上時讓位給 ⋯（同 Chat 列表）。
   - 側邊面板歷史浮層：DS 沒有欄位，暫無（§4.5 第 7 項）。入口鈕本身照 DS 用招喚態（`attract`）提示有新訊。
-- Toast：DS `toast()` neutral，標題 = 對話名、內文 = 回覆開頭 80 字（Teams / Slack 訊息通知「哪裡 + 說了什麼」）；`<Toaster>` 掛在 tWorkspace 外框，落點照 DS 預設右下、可能疊在入口鈕上（toast.spec.md「落點」刻意如此）。**不放「View」動作**：toast.spec.md 的 action 只給「復原 / 重試」這類後手，回到對話靠紅點。
+- **通知 = push banner（2026-11-25 user，取代 DS Toast 版）**：AI agent 通知跟 Chat 的 push banner 同一套樣式與疊放規則。Group chat 版面：頭像 = DS `AgentLogo` 40（`actor.bot`，交接文件第 5 點；不加頭像內框）、第一排 = 對話名、第二排 =「AI agent: 回覆」、來源列「AI agent · 對話名」；`threadKey = agent:<對話 id>` → 同一則對話的新回覆原地取代。沒有 emoji 鈕（沒有人可以回應）。卡上回覆 = 送進那則對話（`onReply` → `engine.send`）；點卡片 = 切到 AI agent 整頁那一則（打開即已讀）；在整頁或側邊面板看到那一則 → 收起同一則對話的卡（`dismissThread`）。目前不過 `routeNotification`（Settings 沒有 AI agent 區塊；暫停 / 勿擾下照樣跳，待定）。
 
 ### 4.5b Tasks 分頁（`TasksPage.tsx`，2026-10-28 keyscreen → 同日 user 確認，已加入 prototype）
 

@@ -3,6 +3,7 @@
 
 import { Fragment, createContext, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import {
+  Toaster,
   TooltipProvider,
   Tooltip,
   TooltipTrigger,
@@ -12,8 +13,6 @@ import {
   ProfileCard,
   ProfileCardDefaultActions,
   Badge,
-  Toaster,
-  toast,
   Separator,
   ScrollArea,
   Popover,
@@ -94,7 +93,7 @@ import { TAgentPage, type TAgentRoute } from './TAgentPage'
 import { TasksPage, type TasksRoute } from './TasksPage'
 import { DrivePage, type DriveRoute } from './DrivePage'
 import { DocsPage, type DocsRoute } from './DocsPage'
-import { BannerStack, routeNotification, useBannerStack, type BannerData, type IncomingEvent } from './NotificationBanner'
+import { BannerStack, QUICK_REACTIONS, emojiFontPx, routeNotification, useBannerStack, type BannerData, type IncomingEvent } from './NotificationBanner'
 import { WorkspaceSettingsModal, WorkspaceAccountMenu, defaultNotificationPrefs, isPaused, type NotificationPrefs, type SettingsRoute } from './WorkspaceSettings'
 import { K8S_IMAGEPULL_SCRIPT } from './tagentScripts'
 import { CHROME_RAIL_BG, CHROME_SIDEBAR_BG, CHROME_SIDEBAR_FILL_X, NO_MOUNT_PANEL_TRANSITION, SHELL_SETTLE_MS } from './chrome'
@@ -646,7 +645,6 @@ const TEAMS_MIGRATED_ROOMS: Room[] = [
   },
 ]
 
-const COMMON_EMOJI = ['👍', '❤️', '😂', '🎉']
 
 // ── Status dot ────────────────────────────────────────────────────────────────
 function StatusDot({ status, size = 8 }: { status: Presence; size?: number }) {
@@ -1732,13 +1730,21 @@ function ReactionMoreMenu({
 
 function ReactionBar({ onOpenThread, mine, room, hideReplyInThread, onEdit }: { onOpenThread: () => void; mine: boolean; room: Room; hideReplyInThread?: boolean; onEdit?: () => void }) {
   return (
-    <div className="absolute -top-4 right-2 z-[8] flex items-center gap-0.5 rounded-lg border border-divider bg-surface-raised p-0.5 shadow-md invisible group-hover/msg:visible [&:has([data-state=open])]:visible">
-      {COMMON_EMOJI.map((e) => (
-        <Tooltip key={e}>
+    // 快速回應跟 push banner 的 emoji popover 同一套(2026-11-25 user):👍 ❤️ 😂 👌、每顆範圍 32×32、emoji 畫出 24、彼此間距 4、外框 padding 上下 4 / 左右 8
+    <div className="absolute -top-4 right-2 z-[8] flex items-center gap-1 rounded-lg border border-divider bg-surface-raised px-2 py-1 shadow-md invisible group-hover/msg:visible [&:has([data-state=open])]:visible">
+      {QUICK_REACTIONS.map((r) => (
+        <Tooltip key={r.emoji}>
           <TooltipTrigger asChild>
-            <button type="button" aria-label={`React ${e}`} className="rounded-md px-1.5 py-1 text-body hover:bg-neutral-hover">{e}</button>
+            <button
+              type="button"
+              aria-label={`React with ${r.label}`}
+              className="flex h-8 w-8 items-center justify-center rounded leading-none hover:bg-neutral-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+              style={{ fontSize: emojiFontPx(24) }}
+            >
+              <span aria-hidden>{r.emoji}</span>
+            </button>
           </TooltipTrigger>
-          <TooltipContent>{e}</TooltipContent>
+          <TooltipContent>{r.label}</TooltipContent>
         </Tooltip>
       ))}
       <IconBtnSm icon={SmilePlus} label="Add reaction" />
@@ -3423,19 +3429,25 @@ export default function App({
     onSendToRoom: handleAgentSendToRoom,
     script: agentEnabled && config?.agentScript !== false ? K8S_IMAGEPULL_SCRIPT : undefined,
     isViewing: (id) => viewedRef.current === id,
-    // DS Toast(neutral、無 action:toast.spec.md 的 action 只給「復原 / 重試」這類後手;回到對話靠紅點)。
-    // 標題 = 對話名(哪一件事),內文 = 回覆開頭 —— 同 Teams / Slack 訊息通知「誰 + 說了什麼」
+    // Push banner(2026-11-25 user:AI agent 通知跟 push banner 同一套樣式,取代原本的 DS Toast)。
+    // Group chat 版面:頭像 = AgentLogo、第一排 = 對話名(哪一件事)、第二排 =「AI agent: 回覆」(誰 + 說了什麼);
+    // 同一則對話的新回覆原地取代(threadKey);卡上可直接回覆 = 送進那則對話(在情境內完成)。
     onBackgroundReply: (conversation, replyText) => {
-      toast({
-        title: conversation.title,
-        description: replyText.length > 80 ? `${replyText.slice(0, 80)}…` : replyText,
-      })
+      bannerStack.push(
+        { id: `agent-${conversation.id}`, threadKey: `agent:${conversation.id}`, app: 'agent', context: conversation.title, actor: { name: TAGENT_LABEL, bot: true }, body: replyText, reply: true, time: 'now' },
+        notifPrefsRef.current.groupBanners,
+        notifPrefsRef.current.maxBanners,
+      )
     },
   })
   const markAgentRead = agentEngine.markRead
+  const dismissBannerThread = bannerStack.dismissThread
   useEffect(() => {
-    if (viewedConversationId) markAgentRead(viewedConversationId)
-  }, [viewedConversationId, markAgentRead])
+    if (!viewedConversationId) return
+    markAgentRead(viewedConversationId)
+    // 在別處讀過 → 收起同一則對話的通知卡(同 push banner 規則「在任何地方讀過,卡片就收起」)
+    dismissBannerThread(`agent:${viewedConversationId}`)
+  }, [viewedConversationId, markAgentRead, dismissBannerThread])
   // 代理內文的 Docs 連結:切到 Docs 分頁並開該頁(DocsPage 以 key 重新掛載、從指定位置開始)。
   // 從整頁對話點的 → 這則對話接到 Docs 頁的側邊面板、面板打開,看完文章可以在 Docs 頁繼續對話
   // (2026-10-29 user:「導到 doc 看 SOP 時 agent panel 可以打開,並將對話內容帶入」)。
@@ -3597,7 +3609,7 @@ export default function App({
           />
         }
       />
-      {/* AI agent 背景回覆的通知;落點照 DS 預設(右下、以整個視窗為準,toast.spec.md「落點」) */}
+      {/* DS Toast:Settings 的「Notifications paused」+ Undo(WorkspaceSettings);落點照 DS 預設(toast.spec.md「落點」)。AI agent 背景回覆改走下方 push banner */}
       <Toaster containerAriaLabel="Notifications" />
       {/* Push banner(右下,距右 16、距底 120;由下〔舊〕往上〔新〕疊)。點卡片內容 = 打開來源:聊天 → 切到 Chat 分頁該聊天室 */}
       <BannerStack
@@ -3607,7 +3619,13 @@ export default function App({
         onOpenSettings={() => { setSettingsRoute('notifications'); setSettingsOpen(true); onAction?.({ type: 'open-settings' }) }}
         showPreview={notifPrefs.showPreview}
         size={notifPrefs.bannerSize}
+        onReply={(b, text) => {
+          // AI agent 卡:回覆送進那則對話(背景跑完再回來時,卡片 / 紅點照原規則再通知一次)
+          if (b.threadKey?.startsWith('agent:')) agentEngine.send(b.threadKey.slice('agent:'.length), text, [])
+        }}
         onOpen={(b) => {
+          // AI agent 卡 → AI agent 整頁的那則對話(打開即已讀,紅點消失)
+          if (b.threadKey?.startsWith('agent:')) { handleNavTabChange('agent'); setAgentRoute(`conversation:${b.threadKey.slice('agent:'.length)}`); return }
           const roomId = b.threadKey?.startsWith('chat:') ? b.threadKey.slice(5) : undefined
           if (roomId && rooms.some((r) => r.id === roomId)) { handleNavTabChange('chat'); setActiveId(roomId) }
           else if (b.app === 'drive') handleNavTabChange('drive')

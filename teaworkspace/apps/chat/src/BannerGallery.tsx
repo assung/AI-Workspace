@@ -202,14 +202,18 @@ const CTX: { key: string; title: string; note: string; s: Scenario }[] = [
     key: 'app', title: 'App', note: '左邊是 app logo(圓形),第一排是 app 名稱 + APP 標籤。沒有回覆功能,卡片高度隨內容(hug)。',
     s: { title: '', gate: '', behavior: '', data: { id: 'ctx-app', app: 'chats', appInfo: { name: 'Approvals', icon: ClipboardCheck, color: 'var(--color-turquoise-6)' }, body: 'Lin Ya-Ting submitted expense report #4821 (NT$12,400) for your approval.', time: 'now' } },
   },
+  {
+    key: 'agent', title: 'AI agent', note: '在背景處理的對話回完時通知(使用者沒看著那則對話)。Group chat 版面:左邊是 AgentLogo,第一排是對話名,第二排是「AI agent: 回覆」。沒有 emoji 鈕;回覆會送進那則對話,點卡片打開那則對話。',
+    s: { title: '', gate: '', behavior: '', data: { id: 'ctx-agent', threadKey: 'agent:sd-2318', app: 'agent', context: 'payments-api ImagePullBackOff on staging', actor: { name: 'AI agent', bot: true }, body: 'Ticket #SD-2318 is open and assigned to Platform on-call. I’ll update you here when they pick it up.', reply: true, time: 'now' } },
+  },
 ]
 function ContextVariants({ onPlay }: { onPlay: (s: Scenario) => void }) {
   return (
     <section className="flex flex-col gap-6" data-contexts>
       <div className="flex flex-col gap-2">
-        <h2 className="text-h5 font-semibold">情境樣式:DM / Group chat / App</h2>
+        <h2 className="text-h5 font-semibold">情境樣式:DM / Group chat / App / AI agent</h2>
         <p className="max-w-[68ch] text-body text-fg-secondary">
-          同一套外框,第二區依來源換內容。DM 和 Group chat 可以回覆;App 通知不能回覆,所以沒有輸入框(Comfy)也沒有 Reply 按鈕(Compact),卡片比較矮。
+          同一套外框,第二區依來源換內容。DM 和 Group chat 可以回覆;App 通知不能回覆,所以沒有輸入框(Comfy)也沒有 Reply 按鈕(Compact),卡片比較矮。AI agent 用 Group chat 版面,頭像換成 AgentLogo。
         </p>
       </div>
       {/* 卡片以實際寬 360 並排:360 × 3 + 32 × 2 = 1144 = 頁面內容寬 */}
