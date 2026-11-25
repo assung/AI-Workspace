@@ -863,6 +863,13 @@ const WORKSPACE_NAV_ITEMS: { tab: Exclude<NavTab, 'home'>; icon: React.Component
  */
 const MY_BUBBLE_BG = 'bg-[#EBEEFF] [[data-theme=dark]_&]:bg-[#282B3E]'
 
+/**
+ * 未讀點 8×8(DS Badge dot 預設 6×6 = w-1.5 h-1.5,這裡蓋掉;2026-11-23 Aaron)。
+ * 列表裡的點左右各留 6px(外框 px-1.5),避免貼著被截斷的文字;疊在 NavRail 圖示上的點不加間距。
+ * 頭像的在線狀態點(忙碌 / 離開 / 在線)是狀態不是通知,不套用。
+ */
+const UNREAD_DOT_SIZE = '!h-2 !w-2'
+
 function NavRail({
   unreadCount,
   agentUnread = false,
@@ -907,9 +914,10 @@ function NavRail({
 
   // workspace:Logo 列 / 分頁 / 底部群組都用 w-12(48)欄寬置中 —— rail 48 扣右邊線只剩 47,在 47 裡置中 32px 圖標會落在 x=7.5(半像素,1x 螢幕會糊);
   // 改以 48 欄置中 → 圖標 x=8、中心 24 都是整數,選中直線 6–8、tooltip 離圖標剛好 8(2026-10-25)。欄的最後 1px 疊在右邊線下,內容到 40 為止碰不到線。
-  const chatBadge = unreadCount > 0 ? <Badge variant="critical" count={unreadCount} max={99} className="!bg-[#EC540F]" /> : undefined
-  // AI agent 未讀 = 純點(不計數:代理回覆以「對話」為單位,DS Badge dot = 「這裡有東西要看」)
-  const agentBadge = <Badge dot variant="critical" aria-label="New AI agent reply" className="!bg-[#EC540F]" />
+  const chatBadge = unreadCount > 0 ? <Badge variant="high" count={unreadCount} max={99} /> : undefined
+  // AI agent 未讀 = 純點(不計數:代理回覆以「對話」為單位,DS Badge dot = 「這裡有東西要看」)。
+  // 通知用的點 / 數字一律藍(Primary)= DS Badge variant="high"(bg-info,與 --primary 同為 blue-6;2026-11-23 Aaron)
+  const agentBadge = <Badge dot variant="high" aria-label="New AI agent reply" className={UNREAD_DOT_SIZE} />
   const workspace = variant === 'workspace'
   // workspace:底部選單鈕 = lucide Settings、名稱「Settings and more」(2026-10-25 user;選單內容 Settings / Help / Sign out 不變)。
   // 對照 Microsoft Teams 左下同名入口「Settings and more」;icon 依 user 指定用 Settings 齒輪。
@@ -1214,7 +1222,8 @@ function RoomRow({
 
   return (
     <div
-      className={`group relative flex cursor-pointer items-center gap-2 rounded-[4px] px-2 ${
+      // 具名 group/row:外層 DS Sidebar 也帶 `group` class,沒命名的 group-hover 會在滑進側欄任一處時讓每一列都成立
+      className={`group/row relative flex cursor-pointer items-center gap-2 rounded-[4px] px-2 ${
         showPreview ? 'py-2' : 'py-1.5'
       } ${active ? 'bg-neutral-selected' : 'hover:bg-neutral-hover'}`}
       onClick={() => onSelect(room.id)}
@@ -1233,40 +1242,40 @@ function RoomRow({
       )}
 
       {/* Text content — min-w-0 flex-1 allows truncation without clipping right-side items.
-          group-hover:pr-6 reserves the 24px more-button footprint so text truncates at the
+          group-hover/row:pr-6 reserves the 24px more-button footprint so text truncates at the
           button's left edge instead of being overlapped by it. */}
       {showPreview ? (
-        <div className="min-w-0 flex-1 group-hover:pr-6">
+        <div className="min-w-0 flex-1 group-hover/row:pr-6">
           {/* Line 1: name (flex-1 truncate) + time (shrink-0; invisible on hover — keeps its
               box so row height is identical across initial/hover/clicked) */}
           <div className="flex items-baseline gap-1">
             <span className="min-w-0 flex-1 truncate" style={titleStyle}>
               {room.title}
             </span>
-            <span className="shrink-0 group-hover:invisible" style={timeStyle}>
+            <span className="shrink-0 group-hover/row:invisible" style={timeStyle}>
               {latestMsg ? formatListTime(latestMsg, now) : ''}
             </span>
           </div>
-          {/* Line 2: preview (flex-1 truncate) + unread dot (shrink-0; invisible on hover) */}
-          <div className="flex items-center gap-1">
+          {/* Line 2: preview (flex-1 truncate) + unread dot (8×8 with 6px each side via px-1.5; invisible on hover) */}
+          <div className="flex items-center">
             <p className="min-w-0 flex-1 truncate" style={subtitleStyle}>
               {previewText}
             </p>
             {isUnread && (
-              <span className="shrink-0 group-hover:invisible">
-                <Badge dot variant="critical" className="!bg-[#EC540F]" />
+              <span className="flex shrink-0 px-1.5 group-hover/row:invisible">
+                <Badge dot variant="high" className={UNREAD_DOT_SIZE} />
               </span>
             )}
           </div>
         </div>
       ) : (
-        <div className="flex min-w-0 flex-1 items-center gap-1 group-hover:pr-6">
+        <div className="flex min-w-0 flex-1 items-center group-hover/row:pr-6">
           <span className="min-w-0 flex-1 truncate" style={titleStyle}>
             {room.title}
           </span>
           {isUnread && (
-            <span className="shrink-0 group-hover:invisible">
-              <Badge dot variant="critical" className="!bg-[#EC540F]" />
+            <span className="flex shrink-0 px-1.5 group-hover/row:invisible">
+              <Badge dot variant="high" className={UNREAD_DOT_SIZE} />
             </span>
           )}
         </div>
@@ -1275,7 +1284,7 @@ function RoomRow({
       {/* Hover: 24×24 more button, box right edge 12px from divider (right-1 = 4px inside the row's 8px right padding).
           invisible (not hidden) keeps a measurable box so Radix anchors the dropdown correctly; overlays date/time + badge. */}
       <div
-        className="absolute right-1 top-1/2 -translate-y-1/2 invisible group-hover:visible [&:has([data-state=open])]:visible"
+        className="absolute right-1 top-1/2 -translate-y-1/2 invisible group-hover/row:visible [&:has([data-state=open])]:visible"
         onClick={(e) => e.stopPropagation()}
       >
         <RoomMoreMenu

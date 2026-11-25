@@ -111,7 +111,7 @@ NavRail
   - **重要**：DS Button 在 `iconOnly` + **string** `aria-label` 時會自動補一個 side="top" 的 tooltip（無法調位置）→ 會出現雙 tooltip。解法：**不傳 string `aria-label`**，改用 `aria-labelledby` 指向 sr-only span 保住無障礙名稱，讓 DS auto-tooltip 條件失效，只剩我們 right-side 的單一 tooltip。此規則僅 apply 在 nav rail 按鈕。
 - `NavRail` 底色可換（2026-10-23）：`backgroundClassName` 預設 `bg-surface`；tWorkspace 傳淺灰（見下方「tWorkspace 左側 chrome 底色」）。
 - `NavRail` 分頁可受控（2026-10-23）：`tab` / `onTabChange` 有傳時由 App 決定整頁內容；沒傳時沿用 base 行為（NavRail 內部記高亮）。`showAgent` 才渲染 tAgent 分頁。（2026-10-22 加的 `NavBtn pressed` 已隨 tAgent 改為分頁而移除。）
-- **尺寸 spec（2026-06-18 confirmed）**：`<nav>` 左右 `px-2`=8px + 按鈕 `!h-8 !w-8`=32×32 → 整體寬 `w-12`=48px（8+32+8）。按鈕間距 `gap-1`=4px。Chat tab 未讀 badge `<Badge variant="critical">` 加 `className="!bg-[#EC540F]"` 對齊 `bg/notification` token。More 按鈕同套 `!h-8 !w-8` 32×32 對齊。
+- **尺寸 spec（2026-06-18 confirmed）**：`<nav>` 左右 `px-2`=8px + 按鈕 `!h-8 !w-8`=32×32 → 整體寬 `w-12`=48px（8+32+8）。按鈕間距 `gap-1`=4px。Chat tab 未讀 badge `<Badge variant="high" count max={99}>`（藍 = Primary；2026-11-23 Aaron：平台所有通知用的點與數字 badge 一律藍，取代原 `#EC540F`；數字 badge 維持 16×16、數字 10px）。More 按鈕同套 `!h-8 !w-8` 32×32 對齊。
 
 ---
 
@@ -170,8 +170,8 @@ ChatList
 - **ScrollArea 寬度約束**：Radix viewport 內部會自動包一層 `display:table; min-width:100%` 的 div，會讓 `truncate` 的 row 以 max-content 撐大、溢出被分隔線遮擋。ChatList 的 ScrollArea 加 `[&_[data-radix-scroll-area-viewport]>div]:!block` 把它改回 block，row 才會被 aside 寬度約束、正常 truncate。
 - **Header「Chats」spec（2026-06-18 confirmed）**：`header` 上下 padding 改 10px（`style={{ paddingTop:10, paddingBottom:10 }}`，取代原 `py-2`=8px）；標題 `fontSize:16 / fontWeight:500 / lineHeight:'130%' / color:var(--color-neutral-9)`。
 - **Section spec（2026-06-18 confirmed）**：容器 `p-1`=4px all sides + `gap-1`=4px（左 icon ↔ label ↔ trailing icon 各 4px）；外層 ChatList `px-2`=8px 提供 section 與列表邊界的左右間隔。左側展開/收起鈕 `IconBtnSm` + `!h-5 !w-5`=20×20（icon 16px，由 `size="sm"` 預設對齊），color `var(--color-neutral-7)`。右側 trailing 鈕（"Add chat" Plus）改用 `IconBtnSm` + `!h-6 !w-6`=24×24，同色 neutral-7（原為 `ListBtn`，已換成可控尺寸的 `IconBtnSm`）。Section name 字級 `fontSize:12 / fontWeight:500 / lineHeight:'130%' / color:var(--color-neutral-7)`。`IconBtnSm` 新增 `style` prop 支援顏色 override。
-- **RoomRow 已讀/未讀 spec（2026-06-18 confirmed）**：未讀（`room.unread && !isMuted`）標題 `14px/700/150%/neutral-9`；已讀標題 `14px/400/150%/neutral-8`。時間資訊（`showPreview` ON 才顯示）一律 `12px/400/130%/neutral-7`。副標題（preview text）未讀 `12px/400/130%/neutral-9`，已讀 `12px/400/130%/neutral-8`。未讀 dot badge `<Badge dot variant="critical">` 加 `className="!bg-[#EC540F]"` 對齊 `bg/notification`。
-- **RoomRow hover 截斷 spec（2026-06-19 confirmed, v2）**：preview OFF 時未讀也在**標題後**顯示 `#EC540F` dot badge。hover 出現 RoomMoreMenu（24×24，絕對定位 `right-1`）時：文字容器加 `group-hover:pr-6`（保留 24px 按鈕 footprint）→ 標題/副標題截斷邊界移到 more 按鈕左緣、不被覆蓋；時間資訊與 dot badge 用 **`group-hover:invisible`（visibility:hidden，非 `hidden`/display:none）**隱藏 —— 保留原本佔位 box，確保 RoomRow 高度在 initial/hover/clicked 三態**完全一致**（`hidden` 會 collapse line-box 致 hover 高度微縮，2026-06-19 user 回報後修正）。截斷由 `pr-6` 負責、不依賴隱藏元素。
+- **RoomRow 已讀/未讀 spec（2026-06-18 confirmed）**：未讀（`room.unread && !isMuted`）標題 `14px/700/150%/neutral-9`；已讀標題 `14px/400/150%/neutral-8`。時間資訊（`showPreview` ON 才顯示）一律 `12px/400/130%/neutral-7`。副標題（preview text）未讀 `12px/400/130%/neutral-9`，已讀 `12px/400/130%/neutral-8`。未讀 dot badge `<Badge dot variant="high" className={UNREAD_DOT_SIZE}>`（藍、8×8；外框 `px-1.5` → 截斷文字 → 6px → 點 → 6px → 列內容邊緣；2026-11-23 Aaron）。副作用：點的右緣比上一行時間右緣內縮 6px，不再對齊（Aaron 已知）。頭像的在線狀態點是狀態不是通知，維持原色。
+- **RoomRow hover 截斷 spec（2026-06-19 confirmed, v2）**：preview OFF 時未讀也在**標題後**顯示未讀點（同上）。列是**具名群組 `group/row`**（2026-11-25 修：外層 DS Sidebar 也帶 `group` class，沒命名的 `group-hover` 會在滑進側欄任一處時讓每一列都 hover）。hover 出現 RoomMoreMenu（24×24，絕對定位 `right-1`）時：文字容器加 `group-hover/row:pr-6`（保留 24px 按鈕 footprint）→ 標題/副標題截斷邊界移到 more 按鈕左緣、不被覆蓋；時間資訊與 dot badge 用 **`group-hover/row:invisible`（visibility:hidden，非 `hidden`/display:none）**隱藏 —— 保留原本佔位 box，確保 RoomRow 高度在 initial/hover/clicked 三態**完全一致**（`hidden` 會 collapse line-box 致 hover 高度微縮，2026-06-19 user 回報後修正）。截斷由 `pr-6` 負責、不依賴隱藏元素。
 - **Chats section 測試資料（2026-06-18 updated v2）**：`GENERATED_CHAT_ROOMS`（App.tsx，`INITIAL_ROOMS` 之前宣告，IIFE）產生 **40 間不重複** room（id `gen-0`…`gen-39`）：**20 間 `type:'dm'`（1 on 1）+ 20 間 `type:'general'`（多人）= 精確 50/50**。
   - DM 用 `GENERATED_DM_PEOPLE`（20 位全新不重複人物，每位 unique name/avatar/color）；這 20 位以 `g-xxx` key **`PEOPLE.forEach` 注入 PEOPLE map**，讓 conversation 內 `PEOPLE[message.author]` 能解析頭像 + 名字。Group 用 `GENERATED_GROUP_TOPICS`（20 個 unique 主題，與既有 room 名不撞）+ 既有 7 位成員輪替 3 位。
   - **排序自然錯開**：`GENERATED_RUNS` run-length pattern `dm5, grp3, dm3, grp4, dm6, grp2, dm2, grp5, dm4, grp6`（dm/group 各總和 20），交錯成不規則但可重現的順序（非簡單 odd/even）。
@@ -340,7 +340,8 @@ TAgentDock
 5. **Sidebar 內容會被長標題撐寬**：SidebarContent 內包 DS ScrollArea 但沒開 `fillX`，Radix 捲動區內層是 `display: table`，被最長一行（tAgent Recents「payments-api ImagePullBackOff on staging」、Docs 頁面樹的文章標題）撐成 394 > 側欄 320 → 標題不截斷、收合箭頭與 Docs 空間選擇器右緣被裁（2026-10-29 劇本演示實測）。app 端補：`CHROME_SIDEBAR_FILL_X`（`chrome.ts`，= ScrollArea `fillX` 的三個 class，以後代選擇器套到 viewport 內層），Chat / tAgent / Tasks / Drive / Docs 五個側欄都套。DS 該做：SidebarContent 傳 `fillX`。
 6. **AgentMessage 使用者泡泡不斷字**：泡泡 `max-w-[85%]` 但沒有 `overflow-wrap`，附件 Chip 的 label 也不截斷 → 長網址（劇本的 Argo CD 連結）、長附件名（Docs 文章標題）在側邊面板寬度下溢出泡泡右緣（2026-10-29 實測）。app 端補：`USER_BUBBLE_WRAP`（`TAgent.tsx`；泡泡 `overflow-wrap: anywhere`、chip 不超過泡泡寬、label 截斷 …）。DS 該做：泡泡加 `[overflow-wrap:anywhere]`、訊息內 Chip 截斷。
 7. **AgentPanelHeader 歷史清單沒有未讀標示**：`AgentConversationSummary` 只有 `thinking`，沒有 unread → 側邊面板的歷史浮層無法在有新回覆的對話列上畫紅點（AI agent 整頁的 Recents / Pinned 有，§4.5a）。DS 該做：summary 加 `unread`，列尾畫 Badge dot。
-8. **DS 版本**：本版需要 0.1.0-beta.148（PR #169 尚未發版）；預覽是用 PR #169 本機打包的套件建置。
+8. **SidebarMenuBadge 不替點保留文字空間、dot 尺寸不可設**：點絕對定位在列右側，SidebarMenuButton 不讓位 → 長標題跑到點底下；dot 固定 6×6。app 端暫時做法見 `TAgentPage.tsx` `UNREAD_DOT_CLASS` / `UNREAD_ROW_PAD`（2026-11-25）。DS 該做：有 badge 時按鈕自動留右側空間，dot 提供 size。
+9. **DS 版本**：本版需要 0.1.0-beta.148（PR #169 尚未發版）；預覽是用 PR #169 本機打包的套件建置。
 
 ---
 
@@ -355,9 +356,9 @@ TAgentDock
 **背景回覆的通知與紅點**（2026-10-29 user：「處理案件的過程中，使用者可能會關掉 Agent panel 或跳離 AI Agent 頁面，需要通知機制以及紅點：nav bar 圖標右上角、Agent chat list 的該則 chat」）
 
 - 「使用者正看著」= AI agent 整頁開著那一則，或側邊面板開著（在有面板的分頁）且顯示那一則（App `viewedConversationId`）。代理在**沒被看著**的對話回完一則 → 該則記為未讀（engine `unreadIds`）+ 發 DS Toast；打開那一則（整頁點進去 / 面板顯示它）即清除。
-- 紅點 = 同 Chat 列表未讀點（`Badge dot variant="critical"`，同色 `#EC540F`）：
+- 未讀點 = 同 Chat 列表未讀點（`Badge dot variant="high"`，藍、8×8；2026-11-23 起取代原橘紅）：
   - NavRail AI agent 圖示右上角（`overlayBadge`，同 Chat 分頁的未讀數位置；不計數 —— 代理回覆以對話為單位）。
-  - AI agent 整頁 Pinned / Recents 的該則列尾（DS `SidebarMenuBadge`）；與 hover 才出現的 ⋯ 同位置 → 滑過 / 焦點在列上時讓位給 ⋯（同 Chat 列表）。
+  - AI agent 整頁 Pinned / Recents 的該則列尾（DS `SidebarMenuBadge`；點往內移 6px、有未讀時按鈕右側多留 20px，長標題在點左側 6px 截斷 —— DS 不替點留位置，§4.5 第 8 項）；與 hover 才出現的 ⋯ 同位置 → 滑過 / 焦點在列上時讓位給 ⋯（同 Chat 列表）。
   - 側邊面板歷史浮層：DS 沒有欄位，暫無（§4.5 第 7 項）。入口鈕本身照 DS 用招喚態（`attract`）提示有新訊。
 - Toast：DS `toast()` neutral，標題 = 對話名、內文 = 回覆開頭 80 字（Teams / Slack 訊息通知「哪裡 + 說了什麼」）；`<Toaster>` 掛在 tWorkspace 外框，落點照 DS 預設右下、可能疊在入口鈕上（toast.spec.md「落點」刻意如此）。**不放「View」動作**：toast.spec.md 的 action 只給「復原 / 重試」這類後手，回到對話靠紅點。
 
@@ -483,6 +484,7 @@ App 內通知卡（別人找你）。**不用 DS Toast**：toast.spec.md 規定�
 
 - 結構：來源列（app 圖示 + app · 脈絡 + 時間 + 關閉）→ 內容列（Family 2：ItemAvatar block / 沒有發送人時 app 圖示圓底 + ItemContent，整列可點 = 打開來源）→「為什麼收到」一行 → 動作列（Reply 展開就地回覆輸入框；最多 2 個 Button）。動作按鈕完成 → 卡片換成結果句（Approved…），3 秒後收起；**回覆送出 → 卡片直接收起，不顯示「Reply sent」**（2026-11-17 user）。
 - **品牌視覺（2026-11-17 user 規格，取代下方 Comfy / Compact 舊版面描述）**：深色卡 #33337B、寬 360、padding 12、圓角 8、陰影 0 8 16 #000 16%；數值照 user 指定，尚未 token 化。
+- **陰影維持原值（2026-11-24 Aaron）**：`0 8px 16px rgba(0,0,0,.16)`，亮暗共用。評估過 DS `--elevation-200`（`0 16px 32px`）不採用：在 Dev 外層容器 padding `12px 16px 120px 100px`（上右下左）下，右側與上方會被切掉。**給 Dev 的規則**：容器每一邊的 padding ≥ 陰影在那一邊的外擴量（上 = 模糊 − Y ≈ 8、左右 = 模糊 ≈ 16、下 = 模糊 + Y ≈ 24）；目前右邊剛好 16 對 16，加大陰影或縮右邊距要一起確認。容器要 `pointer-events: none`（目前已是），卡片本身才可點。待決定：多張卡同時出現的間距（目前 8px；Fluent 2 Toast 為 16px、最多 4 張）與上限張數；左邊 100px 的用途待問 Dev。
   - 共用：第一區 = 六角形 logo 16 + 「Workspace」12/130 bold 白 65% + 右側功能鈕（2026-11-25 user，由左至右）：emoji 快速回應（lucide smile-plus）→ 設定（lucide settings，hover tooltip「Go to Notification settings」，點擊開 Settings › Notifications）→ 關閉；三顆皆 16 白 65%、hover 白、點擊範圍 24、鈕距 8。Emoji 鈕滑鼠移上即開 popover（DS Popover，樣式沿用聊天 ReactionBar：👍 ❤️ 😂 👌，emoji 20px），移開 150ms 收；popover 開著時卡片不計時；選了 emoji 卡片直接收起（同回覆送出）。App 卡與 emoji 回應卡沒有 emoji 鈕（沒有可回應的訊息）。Popover 用 z-[70] 疊在通知卡 z-[60] 上；頭像 40 圓形 + 內框 1px #E8E8E8；名字 14/150 bold 白一行；頭像與文字間距 12；區塊間距 8。回覆輸入框高 28、底白 8%、框線 1px 白 25%、focus 框線 primary、placeholder「Send a reply」14/150 白 65%；右側送出鈕 lucide send-horizontal 16 白（點擊範圍 28×28）。
   - **Comfy**：訊息 12/130 白、最多兩行、固定兩行高；第三區輸入框一直顯示。卡高 136。
   - **Compact**：訊息一行，這一列固定高 28（= 輸入框高）；hover 或鍵盤 focus 進卡片時第二區最右側出現 Reply（DS Button tertiary sm，套 DS dark mode：`data-theme="dark"` 局部主題；寬 56 = DS sm 最小寬；規格原寫 54，2026-11-17 user 決定維持 56）；按 Reply → 第二列換成輸入框 + 送出鈕並自動 focus，Esc 回到訊息。卡高三種狀態都是 97。
