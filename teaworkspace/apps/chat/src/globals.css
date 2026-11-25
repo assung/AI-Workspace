@@ -24,12 +24,15 @@
 /* Rich text editor 樣式 → rich-text.css(RichTextEditor.tsx 直接 import;
    Storybook preview 不載本檔,樣式必須跟著元件走才兩邊都吃得到)。 */
 
-/* Push banner 回應確認過場(NotificationBanner.tsx,2026-11-25 user):遮罩淡入;emoji 64 → 80 帶回彈 */
+/* Push banner 回應確認過場(NotificationBanner.tsx,2026-11-25 user):遮罩淡入;emoji 64 → 80,明顯回彈 */
 @keyframes nb-overlay-in {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 @keyframes nb-react-pop {
-  from { transform: scale(0.8); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
+  0%   { transform: scale(0.8); opacity: 0; }   /* 64px */
+  45%  { transform: scale(1.12); opacity: 1; }  /* 衝過頭 ≈ 90px */
+  70%  { transform: scale(0.96); }              /* 回彈 ≈ 77px */
+  85%  { transform: scale(1.03); }
+  100% { transform: scale(1); }                 /* 停在 80px */
 }

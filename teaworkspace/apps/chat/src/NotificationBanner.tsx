@@ -361,7 +361,7 @@ export function NotificationBanner({
     </form>
   )
 
-  // 回應確認遮罩:卡片底色 45%;emoji 從 64 放大到 80、帶一點回彈(200ms);系統「減少動態效果」時只淡入
+  // 回應確認遮罩:黑 45%(2026-11-25 user);emoji 64 → 衝到約 90 → 回彈到約 77 → 停在 80(420ms);系統「減少動態效果」時只淡入
   const wrap = (card: React.ReactElement) => (
     <div className="relative w-[360px] max-w-full">
       {card}
@@ -369,10 +369,10 @@ export function NotificationBanner({
         <div
           aria-hidden
           className="absolute inset-0 z-10 flex items-center justify-center rounded-[8px] motion-safe:animate-[nb-overlay-in_150ms_ease-out]"
-          style={{ background: 'rgba(51, 51, 123, 0.45)' }}
+          style={{ background: 'rgba(0, 0, 0, 0.45)' }}
         >
           <span
-            className="leading-none motion-safe:animate-[nb-react-pop_200ms_cubic-bezier(0.34,1.56,0.64,1)] motion-reduce:animate-[nb-overlay-in_150ms_ease-out]"
+            className="leading-none motion-safe:animate-[nb-react-pop_420ms_ease-out_both] motion-reduce:animate-[nb-overlay-in_150ms_ease-out]"
             style={{ fontSize: emojiFontPx(80) }}
           >
             {reacted.emoji}
