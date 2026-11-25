@@ -136,7 +136,15 @@ export function NotificationBanner({
   const openReact = () => { window.clearTimeout(reactCloseTimer.current); if (!reactOpen) reactByHover.current = true; setReactOpen(true) }
   const closeReactSoon = () => { window.clearTimeout(reactCloseTimer.current); reactCloseTimer.current = window.setTimeout(() => setReactOpen(false), 150) }
   useEffect(() => () => window.clearTimeout(reactCloseTimer.current), [])
-  useEffect(() => { onInteractingChange?.(replying || reactOpen) }, [replying, reactOpen, onInteractingChange])
+  // 回應確認過場(2026-11-25 user,對齊 Teams):點了 emoji → 卡片蓋上遮罩、中間放大顯示 emoji,2 秒後收起。
+  // 期間卡片不能操作(遮罩擋滑鼠、inert 擋鍵盤);滑鼠停在卡上也照樣 2 秒收(動作已完成,不必再等)。
+  const [reacted, setReacted] = useState<(typeof QUICK_REACTIONS)[number] | null>(null)
+  useEffect(() => {
+    if (!reacted) return
+    const t = window.setTimeout(() => onDismiss?.(), REACT_CONFIRM_MS)
+    return () => window.clearTimeout(t)
+  }, [reacted, onDismiss])
+  useEffect(() => { onInteractingChange?.(replying || reactOpen || !!reacted) }, [replying, reactOpen, reacted, onInteractingChange])
   useEffect(() => {
     if (!result) return
     const t = window.setTimeout(() => onDismiss?.(), 3000)
@@ -255,7 +263,7 @@ export function NotificationBanner({
                   key={r.emoji}
                   type="button"
                   aria-label={`React with ${r.label}`}
-                  onClick={() => { setReactOpen(false); onReact?.(r.emoji); onDismiss?.() }}
+                  onClick={() => { setReactOpen(false); onReact?.(r.emoji); setReacted(r) }}
                   className="flex h-8 w-8 items-center justify-center rounded leading-none hover:bg-neutral-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
                   style={{ fontSize: emojiFontPx(24) }}
                 >
@@ -353,14 +361,38 @@ export function NotificationBanner({
     </form>
   )
 
+  // 回應確認遮罩:卡片底色 45%;emoji 從 64 放大到 80、帶一點回彈(200ms);系統「減少動態效果」時只淡入
+  const wrap = (card: React.ReactElement) => (
+    <div className="relative w-[360px] max-w-full">
+      {card}
+      {reacted && (
+        <div
+          aria-hidden
+          className="absolute inset-0 z-10 flex items-center justify-center rounded-[8px] motion-safe:animate-[nb-overlay-in_150ms_ease-out]"
+          style={{ background: 'rgba(51, 51, 123, 0.45)' }}
+        >
+          <span
+            className="leading-none motion-safe:animate-[nb-react-pop_200ms_cubic-bezier(0.34,1.56,0.64,1)] motion-reduce:animate-[nb-overlay-in_150ms_ease-out]"
+            style={{ fontSize: emojiFontPx(80) }}
+          >
+            {reacted.emoji}
+          </span>
+        </div>
+      )}
+      {/* 給螢幕閱讀器:卡片 inert 後讀不到,另開一個 live region */}
+      <span role="status" className="sr-only">{reacted ? `Reacted with ${reacted.label}` : ''}</span>
+    </div>
+  )
+
   // ── Compact(2026-11-17 user 視覺規格):外框、第一區、頭像、名字同 Comfy,差異只有三點 ──
   //   1. 第二列訊息最多一行,但這一列固定高 28px(= 回覆輸入框高),切到回覆時卡片高度不跳
   //   2. 滑鼠移到卡上(或鍵盤 focus 進卡片)時,第二區最右側出現 Reply(DS Button tertiary sm,寬 54px)
   //   3. 按 Reply → 第二列換成回覆輸入框 + 送出鈕(樣式同 Comfy 第三區)
   if (size === 'compact') {
     const compactBody = messageText
-    return (
+    return wrap(
       <div
+        inert={reacted ? true : undefined}
         role="status"
         aria-label={`${name}${data.context ? ` in ${data.context}` : ''}`}
         className="group flex w-[360px] max-w-full flex-col gap-2 overflow-hidden rounded-[8px] p-3 text-white"
@@ -416,8 +448,9 @@ export function NotificationBanner({
   //   第二區:頭像 40 圓形;名字 14/150 bold 白、一行;訊息 12/130 regular 白、最多兩行且固定兩行高;兩排間距 0;頭像與文字間距 12。
   //   第三區:回覆輸入框高 28、底白 8%、框線 1px 白 25%、placeholder「Send a reply」14/150 白 65%;右側送出鈕 lucide send-horizontal(白)。
   //   第二、三區間距 8;卡片 padding 12、圓角 8、底色 #33337B、陰影 0 8 16 #000 16%;頭像內框 1px #E8E8E8;輸入框 focus 框線 = primary(DS Textarea 同用 border-primary)。
-  return (
+  return wrap(
     <div
+      inert={reacted ? true : undefined}
       role="status"
       aria-label={`${name}${data.context ? ` in ${data.context}` : ''}`}
       className="flex w-[360px] max-w-full flex-col gap-2 overflow-hidden rounded-[8px] p-3 text-white"
@@ -483,6 +516,9 @@ export function emojiFontPx(size: number) {
   }
   return Math.round((size / emojiInkRatio) * 10) / 10
 }
+
+/** 回應確認過場總長(2026-11-25 user:約 2 秒後卡片收起) */
+const REACT_CONFIRM_MS = 2000
 
 /** 快速回應(2026-11-25 user):由左至右 讚 / 愛心 / 笑哭 / OK 手勢。通知卡與聊天訊息 hover 列(App.tsx ReactionBar)共用 */
 export const QUICK_REACTIONS = [
