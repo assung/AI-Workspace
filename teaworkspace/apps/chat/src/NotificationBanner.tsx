@@ -124,7 +124,9 @@ export function NotificationBanner({
   // 快速回應 popover:滑鼠移上 emoji 鈕就打開(2026-11-25 user),移開 150ms 後收;打開期間卡片不計時(popover 在卡片外,不算 hover 卡片)
   const [reactOpen, setReactOpen] = useState(false)
   const reactCloseTimer = useRef<number | undefined>(undefined)
-  const openReact = () => { window.clearTimeout(reactCloseTimer.current); setReactOpen(true) }
+  // 滑鼠打開的 → 關閉時不把焦點還給 emoji 鈕(否則鈕會出現焦點白框,2026-11-25 user 回報);鍵盤 / 點擊打開的照常還焦點
+  const reactByHover = useRef(false)
+  const openReact = () => { window.clearTimeout(reactCloseTimer.current); if (!reactOpen) reactByHover.current = true; setReactOpen(true) }
   const closeReactSoon = () => { window.clearTimeout(reactCloseTimer.current); reactCloseTimer.current = window.setTimeout(() => setReactOpen(false), 150) }
   useEffect(() => () => window.clearTimeout(reactCloseTimer.current), [])
   useEffect(() => { onInteractingChange?.(replying || reactOpen) }, [replying, reactOpen, onInteractingChange])
@@ -224,7 +226,7 @@ export function NotificationBanner({
       <span className="min-w-0 flex-1 truncate text-[12px] font-bold leading-[1.3]">Workspace</span>
       <div className="flex shrink-0 items-center gap-4">
         {canReact && (
-          <Popover open={reactOpen} onOpenChange={setReactOpen}>
+          <Popover open={reactOpen} onOpenChange={(v) => { if (v) reactByHover.current = false; setReactOpen(v) }}>
             <PopoverTrigger asChild>
               <button type="button" aria-label="Add reaction" className={iconBtnClass} onMouseEnter={openReact} onMouseLeave={closeReactSoon}>
                 <Smile size={16} aria-hidden />
@@ -237,7 +239,8 @@ export function NotificationBanner({
               className="z-[70] w-auto px-2 py-1"
               onMouseEnter={openReact}
               onMouseLeave={closeReactSoon}
-              onOpenAutoFocus={(e) => e.preventDefault()}
+              onOpenAutoFocus={(e) => { if (reactByHover.current) e.preventDefault() }}
+              onCloseAutoFocus={(e) => { if (reactByHover.current) e.preventDefault() }}
             >
               <div role="group" aria-label="Quick reactions" className="flex items-center gap-1">
               {QUICK_REACTIONS.map((r) => (
