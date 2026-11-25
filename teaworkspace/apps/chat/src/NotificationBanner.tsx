@@ -16,7 +16,7 @@
 // - 卡上「為什麼收到」一行(規格第 10 節第 1 點)。
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Avatar, Button, Popover, PopoverContent, PopoverTrigger, Tag, Tooltip, TooltipContent, TooltipTrigger } from '@qijenchen/design-system'
-import { FileText, HardDrive, Hexagon, ListChecks, MessageCircle, SendHorizontal, Settings, SmilePlus, Sparkles, X, type LucideIcon } from 'lucide-react'
+import { FileText, HardDrive, Hexagon, ListChecks, MessageCircle, SendHorizontal, Settings, Smile, Sparkles, X, type LucideIcon } from 'lucide-react'
 import { NATIVE_APPS, type NativeAppKey } from './WorkspaceSettings'
 
 export type BannerApp = NativeAppKey | 'agent'
@@ -213,7 +213,8 @@ export function NotificationBanner({
 
   // ── Comfy / Compact 共用的區塊 ──
   // 第一列右側功能鈕(2026-11-25 user):由左至右 emoji 快速回應 → 設定 → 關閉。
-  // 三顆同一種樣式(16px 圖示、白 65%、hover 白、可點範圍 24px);鈕與鈕之間 8px。
+  // 三顆同一種樣式(16px 圖示、白 65%、hover 白、可點範圍 24px);鈕(可點範圍)與鈕之間 8px(2026-11-25 user)→ 圖示之間 16。
+  // emoji 入口用 lucide smile(user 指定 face-slightly-smiling,Lucide 沒有,選同風格的 smile)
   // emoji 回應只出現在「一則訊息」的卡(DM / 群組 / 提及 / 轉傳);App 卡與「別人回應你」的卡沒有可回應的訊息。
   const canReact = kind !== 'app' && !data.reaction
   const iconBtnClass = '-m-1 flex shrink-0 items-center justify-center rounded p-1 text-white/65 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white data-[state=open]:text-white'
@@ -221,12 +222,12 @@ export function NotificationBanner({
     <div className="flex items-center gap-1 text-white/65">
       <Hexagon size={16} className="shrink-0" aria-hidden />
       <span className="min-w-0 flex-1 truncate text-[12px] font-bold leading-[1.3]">Workspace</span>
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex shrink-0 items-center gap-4">
         {canReact && (
           <Popover open={reactOpen} onOpenChange={setReactOpen}>
             <PopoverTrigger asChild>
               <button type="button" aria-label="Add reaction" className={iconBtnClass} onMouseEnter={openReact} onMouseLeave={closeReactSoon}>
-                <SmilePlus size={16} aria-hidden />
+                <Smile size={16} aria-hidden />
               </button>
             </PopoverTrigger>
             {/* 2026-11-25 user:每顆 emoji 範圍 32×32、字級 24、彼此間距 4;popover padding 上下 4 / 左右 8;z-[70] 疊在通知卡(z-[60])上 */}
