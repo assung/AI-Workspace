@@ -16,7 +16,7 @@
 // - 卡上「為什麼收到」一行(規格第 10 節第 1 點)。
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { AgentLogo, Avatar, Button, Popover, PopoverContent, PopoverTrigger, Tag, Tooltip, TooltipContent, TooltipTrigger } from '@qijenchen/design-system'
-import { FileText, HardDrive, Hexagon, ListChecks, MessageCircle, SendHorizontal, Settings, Smile, Sparkles, X, type LucideIcon } from 'lucide-react'
+import { FileText, HardDrive, Hexagon, ListChecks, MessageCircle, SendHorizontal, BellRing, Settings, Smile, Sparkles, X, type LucideIcon } from 'lucide-react'
 import { NATIVE_APPS, type NativeAppKey } from './WorkspaceSettings'
 
 export type BannerApp = NativeAppKey | 'agent'
@@ -84,6 +84,8 @@ export type BannerData = {
   reaction?: { emoji: string; message: string }
   /** 被 @ 提及(2026-11-17 user):'you' = 點名你 →「@You」標籤;'all' = @All →「@All」標籤。訊息內文本身含 @名字 / @All。 */
   mention?: 'you' | 'all'
+  /** 寄件人(人或 App)在優先聯絡人名單 → 第一列「Workspace」右邊出現優先標示(2026-11-27 user) */
+  priority?: boolean
   /** 疊放區內部用:同一張卡的 React key(原地更新時不變,保留回覆草稿) */
   instanceKey?: string
 }
@@ -238,7 +240,20 @@ export function NotificationBanner({
   const brandRow = (
     <div className="flex items-center gap-1 text-white/65">
       <Hexagon size={16} className="shrink-0" aria-hidden />
-      <span className="min-w-0 flex-1 truncate text-[12px] font-bold leading-[1.3]">Workspace</span>
+      <span className="min-w-0 truncate text-[12px] font-bold leading-[1.3]">Workspace</span>
+      {/* 優先聯絡人標示(2026-11-27 user):14×14 圓、底 bg/notification、bell-ring 圖示 text/foreground、與 Workspace 間距 4(本列 gap-1)。
+          通知卡不隨深淺色主題變 → 包一層 data-theme="light" 固定解析成淺色 token */}
+      {data.priority && (
+        <span
+          data-theme="light"
+          role="img"
+          aria-label="Priority contact"
+          className="flex h-[14px] w-[14px] shrink-0 items-center justify-center rounded-full bg-notification text-foreground"
+        >
+          <BellRing size={10} strokeWidth={2.25} aria-hidden />
+        </span>
+      )}
+      <span className="flex-1" aria-hidden />
       <div className="flex shrink-0 items-center gap-3">
         {canReact && (
           <Popover open={reactOpen} onOpenChange={(v) => { if (v) reactByHover.current = false; setReactOpen(v) }}>
@@ -744,7 +759,7 @@ export type IncomingEvent = {
 
 export type RouteContext = { inMeeting: boolean; systemDnd: boolean }
 
-export type RouteResult = { outcome: 'banner' | 'badge' | 'none'; gate: string; reason?: string }
+export type RouteResult = { outcome: 'banner' | 'badge' | 'none'; gate: string; reason?: string; /** 寄件人在優先名單(不論是否暫停)→ 卡片顯示優先標示 */ priority?: boolean }
 
 export function routeNotification(
   e: IncomingEvent,
@@ -782,5 +797,5 @@ export function routeNotification(
   }
   // 6.(第 2 張圖)系統勿擾連動
   if (ctx.systemDnd && prefs.followSystemFocus) return { outcome: 'badge', gate: 'System Do Not Disturb' }
-  return { outcome: 'banner', gate: 'Delivered', reason }
+  return { outcome: 'banner', gate: 'Delivered', reason, priority: isPriority }
 }
