@@ -230,7 +230,7 @@ export function NotificationBanner({
 
   // ── Comfy / Compact 共用的區塊 ──
   // 第一列右側功能鈕(2026-11-25 user):由左至右 emoji 快速回應 → 設定 → 關閉。
-  // 三顆同一種樣式(16px 圖示、白 65%、hover 白、可點範圍 24px);鈕(可點範圍)與鈕之間 8px(2026-11-25 user)→ 圖示之間 16。
+  // 三顆同一種樣式(16px 圖示、白 65%、hover 白、可點範圍 24px);鈕(可點範圍)與鈕之間 4px(2026-11-25 user,原 8)→ 圖示之間 12。
   // emoji 入口用 lucide smile(user 指定 face-slightly-smiling,Lucide 沒有,選同風格的 smile)
   // emoji 回應只出現在「一則訊息」的卡(DM / 群組 / 提及 / 轉傳);App 卡與「別人回應你」的卡沒有可回應的訊息。
   const canReact = kind !== 'app' && !data.reaction && !data.actor?.bot
@@ -239,7 +239,7 @@ export function NotificationBanner({
     <div className="flex items-center gap-1 text-white/65">
       <Hexagon size={16} className="shrink-0" aria-hidden />
       <span className="min-w-0 flex-1 truncate text-[12px] font-bold leading-[1.3]">Workspace</span>
-      <div className="flex shrink-0 items-center gap-4">
+      <div className="flex shrink-0 items-center gap-3">
         {canReact && (
           <Popover open={reactOpen} onOpenChange={(v) => { if (v) reactByHover.current = false; setReactOpen(v) }}>
             <PopoverTrigger asChild>
@@ -251,6 +251,8 @@ export function NotificationBanner({
             <PopoverContent
               align="end"
               sideOffset={6}
+              // 寫死深色樣式(2026-11-25 user):DS 局部主題 data-theme="dark",底色 / 外框 / hover 都換成深色 token
+              data-theme="dark"
               className="z-[70] w-auto px-2 py-1"
               onMouseEnter={openReact}
               onMouseLeave={closeReactSoon}
@@ -372,7 +374,7 @@ export function NotificationBanner({
           style={{ background: 'rgba(0, 0, 0, 0.45)' }}
         >
           <span
-            className="leading-none motion-safe:animate-[nb-react-pop_420ms_ease-out_both] motion-reduce:animate-[nb-overlay-in_150ms_ease-out]"
+            className="leading-none motion-safe:animate-[nb-react-pop_700ms_both] motion-reduce:animate-[nb-overlay-in_150ms_ease-out]"
             style={{ fontSize: emojiFontPx(80) }}
           >
             {reacted.emoji}
@@ -416,7 +418,7 @@ export function NotificationBanner({
                 {titleRow}
                 {/* 一行訊息;可回覆時這一列固定 28(= 輸入框高),App 不能回覆 → hug */}
                 <span className={`flex items-center ${canReply ? 'h-7' : ''}`}>
-                  <span className="truncate text-[12px] font-normal leading-[1.3] text-white">{compactBody}</span>
+                  <span className="truncate text-[14px] font-normal leading-[1.5] text-white">{compactBody}</span>
                 </span>
               </button>
             )}
@@ -445,7 +447,7 @@ export function NotificationBanner({
 
   // ── Comfy(2026-11-17 user 視覺規格):品牌深色卡。數值照 user 指定,尚未 token 化(見 STRUCTURE.md §Push banner)。
   //   第一區:六角形 logo 16 + 品牌名 12/130 bold,白 65%;右側關閉 16,同色。
-  //   第二區:頭像 40 圓形;名字 14/150 bold 白、一行;訊息 12/130 regular 白、最多兩行且固定兩行高;兩排間距 0;頭像與文字間距 12。
+  //   第二區:頭像 40 圓形;名字 14/150 bold 白、一行;訊息 14/150 regular 白(2026-11-27 user,原 12/130)、最多兩行且固定兩行高;兩排間距 0;頭像與文字間距 12。
   //   第三區:回覆輸入框高 28、底白 8%、框線 1px 白 25%、placeholder「Send a reply」14/150 白 65%;右側送出鈕 lucide send-horizontal(白)。
   //   第二、三區間距 8;卡片 padding 12、圓角 8、底色 #33337B、陰影 0 8 16 #000 16%;頭像內框 1px #E8E8E8;輸入框 focus 框線 = primary(DS Textarea 同用 border-primary)。
   return wrap(
@@ -470,7 +472,7 @@ export function NotificationBanner({
         <span className="flex min-w-0 flex-1 flex-col">
           {titleRow}
           {/* 最多兩行;可回覆時固定兩行高,App 不能回覆 → hug */}
-          <span className={`line-clamp-2 text-[12px] font-normal leading-[1.3] text-white ${hasFooter ? 'h-[2.6em]' : ''}`}>
+          <span className={`line-clamp-2 text-[14px] font-normal leading-[1.5] text-white ${hasFooter ? 'h-[3em]' : ''}`}>
             {messageText}
           </span>
         </span>
