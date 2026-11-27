@@ -1,0 +1,18 @@
+/* apps/chat/src/globals.css 裡 Chat 專用的部分(ai-agent 的 globals.css 沒有):訊息內表格的 hover 才出現捲軸 */
+.scroll-hover {
+  scrollbar-width: none; /* Firefox: hidden until hover */
+}
+.scroll-hover::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scroll-hover::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 4px;
+}
+.scroll-hover:hover {
+  scrollbar-width: thin;
+}
+.scroll-hover:hover::-webkit-scrollbar-thumb {
+  background: var(--color-neutral-4);
+}
