@@ -65,7 +65,7 @@ const VARIANTS: Scenario[] = [
     title: '暫停中,優先聯絡人仍通知',
     gate: '第 4 關:暫停 + Let priority contacts through',
     behavior: '優先聯絡人的一般訊息穿過暫停。@提及不會:暫停中 @Mentions 被強制 Off,優先聯絡人 @你 也不跳卡。',
-    data: { id: 'priority', threadKey: 'chat:guanyu', app: 'chats', actor: P.guanyu, body: 'Quick one — are we still on for the 4 PM tasting?', reason: 'Priority contact · notifications are paused', reply: true, time: 'now' },
+    data: { id: 'priority', threadKey: 'chat:guanyu', app: 'chats', actor: P.guanyu, body: 'Quick one — are we still on for the 4 PM tasting?', reason: 'Priority contact · notifications are paused', priority: true, reply: true, time: 'now' },
   },
   {
     title: '靜音的聊天,被 Personal @mention',
@@ -158,6 +158,7 @@ export function BannerGallery() {
         <ReactionVariants onPlay={play} />
         <Separator />
         <MentionVariants onPlay={play} />
+        <PriorityVariants onPlay={play} />
         <ForwardVariants onPlay={play} />
         <PreviewHiddenVariants />
         <Separator />
@@ -298,6 +299,45 @@ function ReactionVariants({ onPlay }: { onPlay: (s: Scenario) => void }) {
       <div className="grid grid-cols-1 gap-x-8 gap-y-6 xl:grid-cols-[repeat(3,360px)]">
         {REACT.map((c) => (
           <article key={c.key} className="flex min-w-0 flex-col gap-3" data-react={c.key}>
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-body font-semibold">{c.title}</h3>
+              <Button variant="secondary" size="sm" startIcon={Play} onClick={() => onPlay(c.s)}>Play</Button>
+            </div>
+            <p className="text-caption text-fg-secondary">Comfy</p>
+            <NotificationBanner data={c.s.data} size="comfy" onDismiss={() => {}} onOpen={() => {}} />
+            <p className="text-caption text-fg-secondary">Compact</p>
+            <NotificationBanner data={{ ...c.s.data, id: `${c.s.data.id}-compact` }} size="compact" onDismiss={() => {}} onOpen={() => {}} />
+            <p className="text-body text-fg-secondary">{c.note}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+/** 優先聯絡人(2026-11-27 user):寄件人(人或 App)在優先名單 → 第一列 Workspace 右邊出現 bell-ring 標示 */
+const PRIORITY: { key: string; title: string; note: string; s: Scenario }[] = [
+  {
+    key: 'dm', title: 'DM · 優先聯絡人', note: '寄件人在優先名單:Workspace 右邊出現標示。暫停通知時,這類卡也是唯一會跳出來的。',
+    s: { title: '', gate: '', behavior: '', data: { id: 'pr-dm', threadKey: 'chat:guanyu', app: 'chats', actor: P.guanyu, body: 'Quick one — are we still on for the 4 PM tasting?', priority: true, reply: true, time: 'now' } },
+  },
+  {
+    key: 'app', title: 'App · 優先聯絡人', note: 'App 也能設為優先:標示位置相同,其他照 App 卡規則(不能回覆、有按鈕時按鈕取代輸入框)。',
+    s: { title: '', gate: '', behavior: '', data: { ...ACT[1].s.data, id: 'pr-app', priority: true } },
+  },
+]
+function PriorityVariants({ onPlay }: { onPlay: (s: Scenario) => void }) {
+  return (
+    <section className="flex flex-col gap-6" data-priority>
+      <div className="flex flex-col gap-2">
+        <h2 className="text-h5 font-semibold">優先聯絡人</h2>
+        <p className="max-w-[68ch] text-body text-fg-secondary">
+          設為優先聯絡人的人或 App 傳訊息來時,第一列「Workspace」右邊 4px 出現 14×14 圓形標示(bg/notification 底、bell-ring 圖示 text/foreground)。不論是否暫停通知都會顯示。
+        </p>
+      </div>
+      <div className="grid grid-cols-1 gap-x-8 gap-y-6 xl:grid-cols-[repeat(2,360px)]">
+        {PRIORITY.map((c) => (
+          <article key={c.key} className="flex min-w-0 flex-col gap-3" data-priority-case={c.key}>
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-body font-semibold">{c.title}</h3>
               <Button variant="secondary" size="sm" startIcon={Play} onClick={() => onPlay(c.s)}>Play</Button>
