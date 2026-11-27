@@ -241,16 +241,16 @@ export function NotificationBanner({
     <div className="flex items-center gap-1 text-white/65">
       <Hexagon size={16} className="shrink-0" aria-hidden />
       <span className="min-w-0 truncate text-[12px] font-bold leading-[1.3]">Workspace</span>
-      {/* 優先聯絡人標示(2026-11-27 user):14×14 圓、底 bg/notification、bell-ring 圖示 text/foreground、與 Workspace 間距 4(本列 gap-1)。
-          通知卡不隨深淺色主題變 → 包一層 data-theme="light" 固定解析成淺色 token */}
+      {/* 優先聯絡人標示(2026-11-27 user):14×14 圓、底 bg/notification、bell-ring 10×10 text/foreground、與 Workspace 間距 4(本列 gap-1)。
+          圓形與圖示都寫死深色主題的顏色、不隨主題變 → 包一層 data-theme="dark" */}
       {data.priority && (
         <span
-          data-theme="light"
+          data-theme="dark"
           role="img"
           aria-label="Priority contact"
           className="flex h-[14px] w-[14px] shrink-0 items-center justify-center rounded-full bg-notification text-foreground"
         >
-          <BellRing size={10} strokeWidth={2.25} aria-hidden />
+          <BellRing size={10} aria-hidden />
         </span>
       )}
       <span className="flex-1" aria-hidden />
