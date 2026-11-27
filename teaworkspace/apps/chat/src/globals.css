@@ -23,3 +23,21 @@
 
 /* Rich text editor 樣式 → rich-text.css(RichTextEditor.tsx 直接 import;
    Storybook preview 不載本檔,樣式必須跟著元件走才兩邊都吃得到)。 */
+
+/* Push banner 回應確認過場(NotificationBanner.tsx,2026-11-25 user):遮罩淡入;emoji 64 → 80,明顯回彈 */
+@keyframes nb-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes nb-react-pop {
+  /* 彈簧感(2026-11-25 user:回彈照第一版的明顯程度,但最大時不能超出卡片):
+     衝過頭 → 落下壓扁 → 再彈一次 → 越晃越小;衝高時略瘦高、落下時略矮胖(squash & stretch)。
+     最高 1.16 倍:Compact 卡(97px)上 👍 ❤️ 😂 👌 最大時離卡片上下緣都還有 4px 以上 */
+  0%   { transform: scale(0.8, 0.8);   opacity: 0; animation-timing-function: cubic-bezier(0.2, 0.8, 0.4, 1); }  /* 64px */
+  30%  { transform: scale(1.12, 1.16); opacity: 1; animation-timing-function: ease-in-out; }  /* 衝過頭、拉長 */
+  48%  { transform: scale(1.06, 0.86); animation-timing-function: ease-in-out; }              /* 落下、壓扁 */
+  64%  { transform: scale(0.98, 1.1);  animation-timing-function: ease-in-out; }              /* 再彈一次 */
+  78%  { transform: scale(1.03, 0.96); animation-timing-function: ease-in-out; }
+  90%  { transform: scale(0.99, 1.02); animation-timing-function: ease-out; }
+  100% { transform: scale(1, 1); }                                                             /* 停在 80px */
+}

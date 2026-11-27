@@ -15,8 +15,8 @@
 // - 在任何地方讀過 → 卡片收起(規格第 10 節第 3 點)。
 // - 卡上「為什麼收到」一行(規格第 10 節第 1 點)。
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Avatar, Button, Tag } from '@qijenchen/design-system'
-import { FileText, HardDrive, Hexagon, ListChecks, MessageCircle, SendHorizontal, Sparkles, X, type LucideIcon } from 'lucide-react'
+import { AgentLogo, Avatar, Button, Popover, PopoverContent, PopoverTrigger, Tag, Tooltip, TooltipContent, TooltipTrigger } from '@qijenchen/design-system'
+import { FileText, HardDrive, Hexagon, ListChecks, MessageCircle, SendHorizontal, Settings, Smile, Sparkles, X, type LucideIcon } from 'lucide-react'
 import { NATIVE_APPS, type NativeAppKey } from './WorkspaceSettings'
 
 export type BannerApp = NativeAppKey | 'agent'
@@ -43,7 +43,11 @@ export type BannerData = {
   app: BannerApp
   /** 來源脈絡:聊天室 / 專案 / 文件名稱(1:1 聊天不填) */
   context?: string
-  actor?: { name: string; avatarUrl?: string }
+  /**
+   * bot = AI agent 這類非人的發話者(2026-11-25,交接文件第 5 點):頭像改用 DS AgentLogo;沒有人可以回應 emoji → 不出 emoji 鈕。
+   * AI agent 背景回覆用 Group chat 版面:第一排對話名(context)、第二排「AI agent: 回覆」。
+   */
+  actor?: { name: string; avatarUrl?: string; bot?: boolean }
   /** 沒有人(系統提醒)時的標題 */
   title?: string
   body: string
@@ -93,6 +97,9 @@ export function NotificationBanner({
   onDismiss,
   onOpen,
   onInteractingChange,
+  onOpenSettings,
+  onReact,
+  onReply,
   showPreview = true,
   size = 'comfy',
   defaultReplying = false,
@@ -105,6 +112,12 @@ export function NotificationBanner({
   onOpen?: () => void
   /** 回覆中 / 滑鼠停留 → 暫停自動收起 */
   onInteractingChange?: (v: boolean) => void
+  /** 第一列「Go to Notification settings」(2026-11-25 user) */
+  onOpenSettings?: () => void
+  /** 第一列快速回應 emoji;送出後卡片收起(同回覆) */
+  onReact?: (emoji: string) => void
+  /** 回覆送出(交接文件第 5 點):先交出文字,再收起卡片。沒接 = 只收卡(示範用的聊天卡) */
+  onReply?: (text: string) => void
   /** 設定「Show message and content previews」關閉 → 第二排一律「Message preview hidden」(2026-11-17 user) */
   showPreview?: boolean
 }) {
@@ -115,7 +128,23 @@ export function NotificationBanner({
   const [draft, setDraft] = useState('')
   const [result, setResult] = useState<string | null>(null)
 
-  useEffect(() => { onInteractingChange?.(replying) }, [replying, onInteractingChange])
+  // 快速回應 popover:滑鼠移上 emoji 鈕就打開(2026-11-25 user),移開 150ms 後收;打開期間卡片不計時(popover 在卡片外,不算 hover 卡片)
+  const [reactOpen, setReactOpen] = useState(false)
+  const reactCloseTimer = useRef<number | undefined>(undefined)
+  // 滑鼠打開的 → 關閉時不把焦點還給 emoji 鈕(否則鈕會出現焦點白框,2026-11-25 user 回報);鍵盤 / 點擊打開的照常還焦點
+  const reactByHover = useRef(false)
+  const openReact = () => { window.clearTimeout(reactCloseTimer.current); if (!reactOpen) reactByHover.current = true; setReactOpen(true) }
+  const closeReactSoon = () => { window.clearTimeout(reactCloseTimer.current); reactCloseTimer.current = window.setTimeout(() => setReactOpen(false), 150) }
+  useEffect(() => () => window.clearTimeout(reactCloseTimer.current), [])
+  // 回應確認過場(2026-11-25 user,對齊 Teams):點了 emoji → 卡片蓋上遮罩、中間放大顯示 emoji,2 秒後收起。
+  // 期間卡片不能操作(遮罩擋滑鼠、inert 擋鍵盤);滑鼠停在卡上也照樣 2 秒收(動作已完成,不必再等)。
+  const [reacted, setReacted] = useState<(typeof QUICK_REACTIONS)[number] | null>(null)
+  useEffect(() => {
+    if (!reacted) return
+    const t = window.setTimeout(() => onDismiss?.(), REACT_CONFIRM_MS)
+    return () => window.clearTimeout(t)
+  }, [reacted, onDismiss])
+  useEffect(() => { onInteractingChange?.(replying || reactOpen || !!reacted) }, [replying, reactOpen, reacted, onInteractingChange])
   useEffect(() => {
     if (!result) return
     const t = window.setTimeout(() => onDismiss?.(), 3000)
@@ -200,20 +229,67 @@ export function NotificationBanner({
   const replyTarget = data.thread ? 'Reply in thread' : data.context ? `Reply to ${data.context}` : `Reply to ${name.split(' ')[0]}`
 
   // ── Comfy / Compact 共用的區塊 ──
+  // 第一列右側功能鈕(2026-11-25 user):由左至右 emoji 快速回應 → 設定 → 關閉。
+  // 三顆同一種樣式(16px 圖示、白 65%、hover 白、可點範圍 24px);鈕(可點範圍)與鈕之間 4px(2026-11-25 user,原 8)→ 圖示之間 12。
+  // emoji 入口用 lucide smile(user 指定 face-slightly-smiling,Lucide 沒有,選同風格的 smile)
+  // emoji 回應只出現在「一則訊息」的卡(DM / 群組 / 提及 / 轉傳);App 卡與「別人回應你」的卡沒有可回應的訊息。
+  const canReact = kind !== 'app' && !data.reaction && !data.actor?.bot
+  const iconBtnClass = '-m-1 flex shrink-0 items-center justify-center rounded p-1 text-white/65 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white data-[state=open]:text-white'
   const brandRow = (
     <div className="flex items-center gap-1 text-white/65">
       <Hexagon size={16} className="shrink-0" aria-hidden />
       <span className="min-w-0 flex-1 truncate text-[12px] font-bold leading-[1.3]">Workspace</span>
-      {onDismiss && (
-        <button
-          type="button"
-          aria-label="Dismiss notification"
-          onClick={onDismiss}
-          className="-m-1 flex shrink-0 items-center justify-center rounded p-1 text-white/65 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
-        >
-          <X size={16} aria-hidden />
-        </button>
-      )}
+      <div className="flex shrink-0 items-center gap-3">
+        {canReact && (
+          <Popover open={reactOpen} onOpenChange={(v) => { if (v) reactByHover.current = false; setReactOpen(v) }}>
+            <PopoverTrigger asChild>
+              <button type="button" aria-label="Add reaction" className={iconBtnClass} onMouseEnter={openReact} onMouseLeave={closeReactSoon}>
+                <Smile size={16} aria-hidden />
+              </button>
+            </PopoverTrigger>
+            {/* 2026-11-25 user:每顆 emoji 範圍 32×32、字級 24、彼此間距 4;popover padding 上下 4 / 左右 8;z-[70] 疊在通知卡(z-[60])上 */}
+            <PopoverContent
+              align="end"
+              sideOffset={6}
+              // 寫死深色樣式(2026-11-25 user):DS 局部主題 data-theme="dark",底色 / 外框 / hover 都換成深色 token
+              data-theme="dark"
+              className="z-[70] w-auto px-2 py-1"
+              onMouseEnter={openReact}
+              onMouseLeave={closeReactSoon}
+              onOpenAutoFocus={(e) => { if (reactByHover.current) e.preventDefault() }}
+              onCloseAutoFocus={(e) => { if (reactByHover.current) e.preventDefault() }}
+            >
+              <div role="group" aria-label="Quick reactions" className="flex items-center gap-1">
+              {QUICK_REACTIONS.map((r) => (
+                <button
+                  key={r.emoji}
+                  type="button"
+                  aria-label={`React with ${r.label}`}
+                  onClick={() => { setReactOpen(false); onReact?.(r.emoji); setReacted(r) }}
+                  className="flex h-8 w-8 items-center justify-center rounded leading-none hover:bg-neutral-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                  style={{ fontSize: emojiFontPx(24) }}
+                >
+                  <span aria-hidden>{r.emoji}</span>
+                </button>
+              ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+        )}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button type="button" aria-label="Go to Notification settings" onClick={onOpenSettings} className={iconBtnClass}>
+              <Settings size={16} aria-hidden />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Go to Notification settings</TooltipContent>
+        </Tooltip>
+        {onDismiss && (
+          <button type="button" aria-label="Dismiss notification" onClick={onDismiss} className={iconBtnClass}>
+            <X size={16} aria-hidden />
+          </button>
+        )}
+      </div>
     </div>
   )
   const avatarEl = data.appInfo ? (
@@ -221,6 +297,11 @@ export function NotificationBanner({
     <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white" style={{ background: data.appInfo.color }} aria-hidden>
       <data.appInfo.icon size={20} />
       <span className="pointer-events-none absolute inset-0 rounded-full shadow-[inset_0_0_0_1px_#E8E8E8]" />
+    </span>
+  ) : data.actor?.bot ? (
+    // AI agent:DS AgentLogo 40(agent-panel-logo.spec.md 產品尺寸 16–48,所有尺寸同一造型);logo 自帶外形,不加頭像內框
+    <span className="relative flex h-10 w-10 shrink-0 items-center justify-center" aria-hidden>
+      <AgentLogo size={40} state="still" />
     </span>
   ) : data.actor ? (
     // 頭像內框 1px #E8E8E8(2026-11-17 user):疊一層 inset ring,不佔版面、不改變 40px 尺寸
@@ -246,6 +327,7 @@ export function NotificationBanner({
   )
   const sendReply = () => {
     if (!draft.trim()) return
+    onReply?.(draft.trim())
     // 送出後卡片直接收起,不顯示「Reply sent」(2026-11-17 user)
     setDraft('')
     setReplying(false)
@@ -281,14 +363,38 @@ export function NotificationBanner({
     </form>
   )
 
+  // 回應確認遮罩:黑 45%(2026-11-25 user);emoji 64 → 衝到約 90 → 回彈到約 77 → 停在 80(420ms);系統「減少動態效果」時只淡入
+  const wrap = (card: React.ReactElement) => (
+    <div className="relative w-[360px] max-w-full">
+      {card}
+      {reacted && (
+        <div
+          aria-hidden
+          className="absolute inset-0 z-10 flex items-center justify-center rounded-[8px] motion-safe:animate-[nb-overlay-in_150ms_ease-out]"
+          style={{ background: 'rgba(0, 0, 0, 0.45)' }}
+        >
+          <span
+            className="leading-none motion-safe:animate-[nb-react-pop_700ms_both] motion-reduce:animate-[nb-overlay-in_150ms_ease-out]"
+            style={{ fontSize: emojiFontPx(80) }}
+          >
+            {reacted.emoji}
+          </span>
+        </div>
+      )}
+      {/* 給螢幕閱讀器:卡片 inert 後讀不到,另開一個 live region */}
+      <span role="status" className="sr-only">{reacted ? `Reacted with ${reacted.label}` : ''}</span>
+    </div>
+  )
+
   // ── Compact(2026-11-17 user 視覺規格):外框、第一區、頭像、名字同 Comfy,差異只有三點 ──
   //   1. 第二列訊息最多一行,但這一列固定高 28px(= 回覆輸入框高),切到回覆時卡片高度不跳
   //   2. 滑鼠移到卡上(或鍵盤 focus 進卡片)時,第二區最右側出現 Reply(DS Button tertiary sm,寬 54px)
   //   3. 按 Reply → 第二列換成回覆輸入框 + 送出鈕(樣式同 Comfy 第三區)
   if (size === 'compact') {
     const compactBody = messageText
-    return (
+    return wrap(
       <div
+        inert={reacted ? true : undefined}
         role="status"
         aria-label={`${name}${data.context ? ` in ${data.context}` : ''}`}
         className="group flex w-[360px] max-w-full flex-col gap-2 overflow-hidden rounded-[8px] p-3 text-white"
@@ -312,7 +418,7 @@ export function NotificationBanner({
                 {titleRow}
                 {/* 一行訊息;可回覆時這一列固定 28(= 輸入框高),App 不能回覆 → hug */}
                 <span className={`flex items-center ${canReply ? 'h-7' : ''}`}>
-                  <span className="truncate text-[12px] font-normal leading-[1.3] text-white">{compactBody}</span>
+                  <span className="truncate text-[14px] font-normal leading-[1.5] text-white">{compactBody}</span>
                 </span>
               </button>
             )}
@@ -341,11 +447,12 @@ export function NotificationBanner({
 
   // ── Comfy(2026-11-17 user 視覺規格):品牌深色卡。數值照 user 指定,尚未 token 化(見 STRUCTURE.md §Push banner)。
   //   第一區:六角形 logo 16 + 品牌名 12/130 bold,白 65%;右側關閉 16,同色。
-  //   第二區:頭像 40 圓形;名字 14/150 bold 白、一行;訊息 12/130 regular 白、最多兩行且固定兩行高;兩排間距 0;頭像與文字間距 12。
+  //   第二區:頭像 40 圓形;名字 14/150 bold 白、一行;訊息 14/150 regular 白(2026-11-27 user,原 12/130)、最多兩行且固定兩行高;兩排間距 0;頭像與文字間距 12。
   //   第三區:回覆輸入框高 28、底白 8%、框線 1px 白 25%、placeholder「Send a reply」14/150 白 65%;右側送出鈕 lucide send-horizontal(白)。
   //   第二、三區間距 8;卡片 padding 12、圓角 8、底色 #33337B、陰影 0 8 16 #000 16%;頭像內框 1px #E8E8E8;輸入框 focus 框線 = primary(DS Textarea 同用 border-primary)。
-  return (
+  return wrap(
     <div
+      inert={reacted ? true : undefined}
       role="status"
       aria-label={`${name}${data.context ? ` in ${data.context}` : ''}`}
       className="flex w-[360px] max-w-full flex-col gap-2 overflow-hidden rounded-[8px] p-3 text-white"
@@ -365,7 +472,7 @@ export function NotificationBanner({
         <span className="flex min-w-0 flex-1 flex-col">
           {titleRow}
           {/* 最多兩行;可回覆時固定兩行高,App 不能回覆 → hug */}
-          <span className={`line-clamp-2 text-[12px] font-normal leading-[1.3] text-white ${hasFooter ? 'h-[2.6em]' : ''}`}>
+          <span className={`line-clamp-2 text-[14px] font-normal leading-[1.5] text-white ${hasFooter ? 'h-[3em]' : ''}`}>
             {messageText}
           </span>
         </span>
@@ -379,6 +486,49 @@ export function NotificationBanner({
     </div>
   )
 }
+
+/**
+ * 讓 emoji 畫出來剛好 size px(2026-11-25 user:emoji 24、範圍 32 → 四周看起來各 4)。
+ * 各平台彩色 emoji 字型畫出來的大小不一樣(Noto 在 24px 字級下 😂 約 28px 寬,Apple / Segoe 較接近字級),
+ * 所以量一次本機的實際筆畫:在 canvas 用 100px 畫 😂,掃不透明像素算出寬高,反推字級。量不到就用原字級。
+ */
+let emojiInkRatio: number | null = null
+export function emojiFontPx(size: number) {
+  if (emojiInkRatio == null) {
+    emojiInkRatio = 1
+    try {
+      const N = 160
+      const cv = document.createElement('canvas')
+      cv.width = N; cv.height = N
+      const ctx = cv.getContext('2d', { willReadFrequently: true })
+      if (ctx) {
+        ctx.font = `100px ${getComputedStyle(document.body).fontFamily}`
+        ctx.textBaseline = 'middle'
+        ctx.textAlign = 'center'
+        ctx.fillText('😂', N / 2, N / 2)
+        const { data } = ctx.getImageData(0, 0, N, N)
+        let x0 = N, y0 = N, x1 = -1, y1 = -1
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+          if (data[(y * N + x) * 4 + 3] > 32) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y }
+        }
+        const ink = Math.max(x1 - x0 + 1, y1 - y0 + 1)
+        if (x1 >= 0 && ink > 40) emojiInkRatio = ink / 100
+      }
+    } catch { /* 量不到就用原字級 */ }
+  }
+  return Math.round((size / emojiInkRatio) * 10) / 10
+}
+
+/** 回應確認過場總長(2026-11-25 user:約 2 秒後卡片收起) */
+const REACT_CONFIRM_MS = 2000
+
+/** 快速回應(2026-11-25 user):由左至右 讚 / 愛心 / 笑哭 / OK 手勢。通知卡與聊天訊息 hover 列(App.tsx ReactionBar)共用 */
+export const QUICK_REACTIONS = [
+  { emoji: '👍', label: 'Like' },
+  { emoji: '❤️', label: 'Heart' },
+  { emoji: '😂', label: 'Laugh' },
+  { emoji: '👌', label: 'OK' },
+] as const
 
 /** 預覽關閉時第二排的固定文字(2026-11-17 user) */
 const PREVIEW_HIDDEN = 'Message preview hidden'
@@ -423,7 +573,7 @@ export function useBannerStack() {
     setItems((list) => list.filter((x) => x.id !== id))
   }
   /** 在別處讀過 → 收起同一對話的卡 */
-  const dismissThread = (threadKey: string) => setItems((list) => list.filter((x) => x.threadKey !== threadKey))
+  const dismissThread = useCallback((threadKey: string) => setItems((list) => list.filter((x) => x.threadKey !== threadKey)), [])
   return { items, push, dismiss, dismissThread, setPinned }
 }
 
@@ -436,7 +586,8 @@ export function useBannerStack() {
 const APP_TAG_NUDGE = '[@media(min-resolution:2dppx)]:[&>span]:translate-y-[0.5px]'
 const MENTION_TAG_NUDGE = '[&>span]:translate-y-[0.5px]'
 
-/** 疊放區位置(2026-11-17 user):右下角,距右 16、距底 120 */
+/** 疊放區位置(2026-11-17 user):右下角,距右 16、距底 120;卡片之間 16(2026-11-25 user,原 8) */
+const STACK_GAP = 16
 
 /** 視窗右緣、疊放區高度那一帶,底下可捲動容器的直向捲軸寬(overlay 捲軸 = 0) */
 function rightEdgeScrollbarWidth(stack: HTMLElement) {
@@ -456,15 +607,21 @@ export function BannerStack({
   items,
   onDismiss,
   onOpen,
+  onReply,
   onPinnedChange,
+  onOpenSettings,
   showPreview,
   size = 'comfy',
 }: {
   items: BannerData[]
   onDismiss: (id: string) => void
   onOpen?: (b: BannerData) => void
+  /** 卡上回覆送出(交接文件第 5 點);沒接 = 只收卡 */
+  onReply?: (b: BannerData, text: string) => void
   /** 卡片停留 / 回覆中狀態 → useBannerStack().setPinned */
   onPinnedChange?: (id: string, pinned: boolean) => void
+  /** 卡片第一列的設定鈕 → 打開 Settings › Notifications */
+  onOpenSettings?: () => void
   showPreview: boolean
   size?: BannerSize
 }) {
@@ -483,7 +640,7 @@ export function BannerStack({
       let used = 0
       let n = 0
       for (const k of kids) {
-        const h = k.scrollHeight + (n > 0 ? 8 : 0) // gap-2
+        const h = k.scrollHeight + (n > 0 ? STACK_GAP : 0)
         if (used + h > limit) break
         used += h
         n++
@@ -499,7 +656,7 @@ export function BannerStack({
       ref={ref}
       aria-label="Notifications"
       // 由下(舊)往上(新)疊:items 是新→舊,底部對齊 → 最新在最上面、最舊在最下面,停留中的卡不會被新卡推動
-      className="pointer-events-none fixed bottom-[120px] z-[60] flex flex-col gap-2"
+      className="pointer-events-none fixed bottom-[120px] z-[60] flex flex-col gap-4"
       style={{ right: 16 + scrollbarW }}
     >
       {items.map((b, i) => (
@@ -509,7 +666,9 @@ export function BannerStack({
             size={size}
             onDismiss={() => onDismiss(b.id)}
             onOpen={onOpen ? () => { onOpen(b); onDismiss(b.id) } : undefined}
+            onReply={onReply ? (text) => onReply(b, text) : undefined}
             onPinnedChange={onPinnedChange}
+            onOpenSettings={onOpenSettings}
             showPreview={showPreview}
           />
         </div>
@@ -523,14 +682,18 @@ function TimedBanner({
   size,
   onDismiss,
   onOpen,
+  onReply,
   onPinnedChange,
+  onOpenSettings,
   showPreview,
 }: {
   data: BannerData
   size: BannerSize
   onDismiss: () => void
   onOpen?: () => void
+  onReply?: (text: string) => void
   onPinnedChange?: (id: string, pinned: boolean) => void
+  onOpenSettings?: () => void
   showPreview: boolean
 }) {
   const [hovered, setHovered] = useState(false)
@@ -557,7 +720,7 @@ function TimedBanner({
   }, [paused, onDismiss, data.count])
   return (
     <div className="pointer-events-auto" onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
-      <NotificationBanner data={data} size={size} onDismiss={onDismiss} onOpen={onOpen} onInteractingChange={setInteracting} showPreview={showPreview} />
+      <NotificationBanner data={data} size={size} onDismiss={onDismiss} onOpen={onOpen} onReply={onReply} onInteractingChange={setInteracting} onOpenSettings={onOpenSettings} showPreview={showPreview} />
     </div>
   )
 }

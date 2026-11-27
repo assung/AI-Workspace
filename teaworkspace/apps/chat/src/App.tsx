@@ -3,6 +3,7 @@
 
 import { Fragment, createContext, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import {
+  Toaster,
   TooltipProvider,
   Tooltip,
   TooltipTrigger,
@@ -12,8 +13,6 @@ import {
   ProfileCard,
   ProfileCardDefaultActions,
   Badge,
-  Toaster,
-  toast,
   Separator,
   ScrollArea,
   Popover,
@@ -94,7 +93,7 @@ import { TAgentPage, type TAgentRoute } from './TAgentPage'
 import { TasksPage, type TasksRoute } from './TasksPage'
 import { DrivePage, type DriveRoute } from './DrivePage'
 import { DocsPage, type DocsRoute } from './DocsPage'
-import { BannerStack, routeNotification, useBannerStack, type BannerData, type IncomingEvent } from './NotificationBanner'
+import { BannerStack, QUICK_REACTIONS, emojiFontPx, routeNotification, useBannerStack, type BannerData, type IncomingEvent } from './NotificationBanner'
 import { WorkspaceSettingsModal, WorkspaceAccountMenu, defaultNotificationPrefs, isPaused, type NotificationPrefs, type SettingsRoute } from './WorkspaceSettings'
 import { K8S_IMAGEPULL_SCRIPT } from './tagentScripts'
 import { CHROME_RAIL_BG, CHROME_SIDEBAR_BG, CHROME_SIDEBAR_FILL_X, NO_MOUNT_PANEL_TRANSITION, SHELL_SETTLE_MS } from './chrome'
@@ -646,7 +645,6 @@ const TEAMS_MIGRATED_ROOMS: Room[] = [
   },
 ]
 
-const COMMON_EMOJI = ['👍', '❤️', '😂', '🎉']
 
 // ── Status dot ────────────────────────────────────────────────────────────────
 function StatusDot({ status, size = 8 }: { status: Presence; size?: number }) {
@@ -863,6 +861,13 @@ const WORKSPACE_NAV_ITEMS: { tab: Exclude<NavTab, 'home'>; icon: React.Component
  */
 const MY_BUBBLE_BG = 'bg-[#EBEEFF] [[data-theme=dark]_&]:bg-[#282B3E]'
 
+/**
+ * 未讀點 8×8(DS Badge dot 預設 6×6 = w-1.5 h-1.5,這裡蓋掉;2026-11-23 Aaron)。
+ * 列表裡的點左右各留 6px(外框 px-1.5),避免貼著被截斷的文字;疊在 NavRail 圖示上的點不加間距。
+ * 頭像的在線狀態點(忙碌 / 離開 / 在線)是狀態不是通知,不套用。
+ */
+const UNREAD_DOT_SIZE = '!h-2 !w-2'
+
 function NavRail({
   unreadCount,
   agentUnread = false,
@@ -907,9 +912,10 @@ function NavRail({
 
   // workspace:Logo 列 / 分頁 / 底部群組都用 w-12(48)欄寬置中 —— rail 48 扣右邊線只剩 47,在 47 裡置中 32px 圖標會落在 x=7.5(半像素,1x 螢幕會糊);
   // 改以 48 欄置中 → 圖標 x=8、中心 24 都是整數,選中直線 6–8、tooltip 離圖標剛好 8(2026-10-25)。欄的最後 1px 疊在右邊線下,內容到 40 為止碰不到線。
-  const chatBadge = unreadCount > 0 ? <Badge variant="critical" count={unreadCount} max={99} className="!bg-[#EC540F]" /> : undefined
-  // AI agent 未讀 = 純點(不計數:代理回覆以「對話」為單位,DS Badge dot = 「這裡有東西要看」)
-  const agentBadge = <Badge dot variant="critical" aria-label="New AI agent reply" className="!bg-[#EC540F]" />
+  const chatBadge = unreadCount > 0 ? <Badge variant="high" count={unreadCount} max={99} /> : undefined
+  // AI agent 未讀 = 純點(不計數:代理回覆以「對話」為單位,DS Badge dot = 「這裡有東西要看」)。
+  // 通知用的點 / 數字一律藍(Primary)= DS Badge variant="high"(bg-info,與 --primary 同為 blue-6;2026-11-23 Aaron)
+  const agentBadge = <Badge dot variant="high" aria-label="New AI agent reply" className={UNREAD_DOT_SIZE} />
   const workspace = variant === 'workspace'
   // workspace:底部選單鈕 = lucide Settings、名稱「Settings and more」(2026-10-25 user;選單內容 Settings / Help / Sign out 不變)。
   // 對照 Microsoft Teams 左下同名入口「Settings and more」;icon 依 user 指定用 Settings 齒輪。
@@ -1214,7 +1220,8 @@ function RoomRow({
 
   return (
     <div
-      className={`group relative flex cursor-pointer items-center gap-2 rounded-[4px] px-2 ${
+      // 具名 group/row:外層 DS Sidebar 也帶 `group` class,沒命名的 group-hover 會在滑進側欄任一處時讓每一列都成立
+      className={`group/row relative flex cursor-pointer items-center gap-2 rounded-[4px] px-2 ${
         showPreview ? 'py-2' : 'py-1.5'
       } ${active ? 'bg-neutral-selected' : 'hover:bg-neutral-hover'}`}
       onClick={() => onSelect(room.id)}
@@ -1233,40 +1240,40 @@ function RoomRow({
       )}
 
       {/* Text content — min-w-0 flex-1 allows truncation without clipping right-side items.
-          group-hover:pr-6 reserves the 24px more-button footprint so text truncates at the
+          group-hover/row:pr-6 reserves the 24px more-button footprint so text truncates at the
           button's left edge instead of being overlapped by it. */}
       {showPreview ? (
-        <div className="min-w-0 flex-1 group-hover:pr-6">
+        <div className="min-w-0 flex-1 group-hover/row:pr-6">
           {/* Line 1: name (flex-1 truncate) + time (shrink-0; invisible on hover — keeps its
               box so row height is identical across initial/hover/clicked) */}
           <div className="flex items-baseline gap-1">
             <span className="min-w-0 flex-1 truncate" style={titleStyle}>
               {room.title}
             </span>
-            <span className="shrink-0 group-hover:invisible" style={timeStyle}>
+            <span className="shrink-0 group-hover/row:invisible" style={timeStyle}>
               {latestMsg ? formatListTime(latestMsg, now) : ''}
             </span>
           </div>
-          {/* Line 2: preview (flex-1 truncate) + unread dot (shrink-0; invisible on hover) */}
-          <div className="flex items-center gap-1">
+          {/* Line 2: preview (flex-1 truncate) + unread dot (8×8 with 6px each side via px-1.5; invisible on hover) */}
+          <div className="flex items-center">
             <p className="min-w-0 flex-1 truncate" style={subtitleStyle}>
               {previewText}
             </p>
             {isUnread && (
-              <span className="shrink-0 group-hover:invisible">
-                <Badge dot variant="critical" className="!bg-[#EC540F]" />
+              <span className="flex shrink-0 px-1.5 group-hover/row:invisible">
+                <Badge dot variant="high" className={UNREAD_DOT_SIZE} />
               </span>
             )}
           </div>
         </div>
       ) : (
-        <div className="flex min-w-0 flex-1 items-center gap-1 group-hover:pr-6">
+        <div className="flex min-w-0 flex-1 items-center group-hover/row:pr-6">
           <span className="min-w-0 flex-1 truncate" style={titleStyle}>
             {room.title}
           </span>
           {isUnread && (
-            <span className="shrink-0 group-hover:invisible">
-              <Badge dot variant="critical" className="!bg-[#EC540F]" />
+            <span className="flex shrink-0 px-1.5 group-hover/row:invisible">
+              <Badge dot variant="high" className={UNREAD_DOT_SIZE} />
             </span>
           )}
         </div>
@@ -1275,7 +1282,7 @@ function RoomRow({
       {/* Hover: 24×24 more button, box right edge 12px from divider (right-1 = 4px inside the row's 8px right padding).
           invisible (not hidden) keeps a measurable box so Radix anchors the dropdown correctly; overlays date/time + badge. */}
       <div
-        className="absolute right-1 top-1/2 -translate-y-1/2 invisible group-hover:visible [&:has([data-state=open])]:visible"
+        className="absolute right-1 top-1/2 -translate-y-1/2 invisible group-hover/row:visible [&:has([data-state=open])]:visible"
         onClick={(e) => e.stopPropagation()}
       >
         <RoomMoreMenu
@@ -1723,13 +1730,21 @@ function ReactionMoreMenu({
 
 function ReactionBar({ onOpenThread, mine, room, hideReplyInThread, onEdit }: { onOpenThread: () => void; mine: boolean; room: Room; hideReplyInThread?: boolean; onEdit?: () => void }) {
   return (
-    <div className="absolute -top-4 right-2 z-[8] flex items-center gap-0.5 rounded-lg border border-divider bg-surface-raised p-0.5 shadow-md invisible group-hover/msg:visible [&:has([data-state=open])]:visible">
-      {COMMON_EMOJI.map((e) => (
-        <Tooltip key={e}>
+    // 快速回應跟 push banner 的 emoji popover 同一套(2026-11-25 user):👍 ❤️ 😂 👌、每顆範圍 32×32、emoji 畫出 24、彼此間距 4、外框 padding 上下 4 / 左右 8
+    <div className="absolute -top-4 right-2 z-[8] flex items-center gap-1 rounded-lg border border-divider bg-surface-raised px-2 py-1 shadow-md invisible group-hover/msg:visible [&:has([data-state=open])]:visible">
+      {QUICK_REACTIONS.map((r) => (
+        <Tooltip key={r.emoji}>
           <TooltipTrigger asChild>
-            <button type="button" aria-label={`React ${e}`} className="rounded-md px-1.5 py-1 text-body hover:bg-neutral-hover">{e}</button>
+            <button
+              type="button"
+              aria-label={`React with ${r.label}`}
+              className="flex h-8 w-8 items-center justify-center rounded leading-none hover:bg-neutral-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+              style={{ fontSize: emojiFontPx(24) }}
+            >
+              <span aria-hidden>{r.emoji}</span>
+            </button>
           </TooltipTrigger>
-          <TooltipContent>{e}</TooltipContent>
+          <TooltipContent>{r.label}</TooltipContent>
         </Tooltip>
       ))}
       <IconBtnSm icon={SmilePlus} label="Add reaction" />
@@ -3414,19 +3429,25 @@ export default function App({
     onSendToRoom: handleAgentSendToRoom,
     script: agentEnabled && config?.agentScript !== false ? K8S_IMAGEPULL_SCRIPT : undefined,
     isViewing: (id) => viewedRef.current === id,
-    // DS Toast(neutral、無 action:toast.spec.md 的 action 只給「復原 / 重試」這類後手;回到對話靠紅點)。
-    // 標題 = 對話名(哪一件事),內文 = 回覆開頭 —— 同 Teams / Slack 訊息通知「誰 + 說了什麼」
+    // Push banner(2026-11-25 user:AI agent 通知跟 push banner 同一套樣式,取代原本的 DS Toast)。
+    // Group chat 版面:頭像 = AgentLogo、第一排 = 對話名(哪一件事)、第二排 =「AI agent: 回覆」(誰 + 說了什麼);
+    // 同一則對話的新回覆原地取代(threadKey);卡上可直接回覆 = 送進那則對話(在情境內完成)。
     onBackgroundReply: (conversation, replyText) => {
-      toast({
-        title: conversation.title,
-        description: replyText.length > 80 ? `${replyText.slice(0, 80)}…` : replyText,
-      })
+      bannerStack.push(
+        { id: `agent-${conversation.id}`, threadKey: `agent:${conversation.id}`, app: 'agent', context: conversation.title, actor: { name: TAGENT_LABEL, bot: true }, body: replyText, reply: true, time: 'now' },
+        notifPrefsRef.current.groupBanners,
+        notifPrefsRef.current.maxBanners,
+      )
     },
   })
   const markAgentRead = agentEngine.markRead
+  const dismissBannerThread = bannerStack.dismissThread
   useEffect(() => {
-    if (viewedConversationId) markAgentRead(viewedConversationId)
-  }, [viewedConversationId, markAgentRead])
+    if (!viewedConversationId) return
+    markAgentRead(viewedConversationId)
+    // 在別處讀過 → 收起同一則對話的通知卡(同 push banner 規則「在任何地方讀過,卡片就收起」)
+    dismissBannerThread(`agent:${viewedConversationId}`)
+  }, [viewedConversationId, markAgentRead, dismissBannerThread])
   // 代理內文的 Docs 連結:切到 Docs 分頁並開該頁(DocsPage 以 key 重新掛載、從指定位置開始)。
   // 從整頁對話點的 → 這則對話接到 Docs 頁的側邊面板、面板打開,看完文章可以在 Docs 頁繼續對話
   // (2026-10-29 user:「導到 doc 看 SOP 時 agent panel 可以打開,並將對話內容帶入」)。
@@ -3588,16 +3609,23 @@ export default function App({
           />
         }
       />
-      {/* AI agent 背景回覆的通知;落點照 DS 預設(右下、以整個視窗為準,toast.spec.md「落點」) */}
+      {/* DS Toast:Settings 的「Notifications paused」+ Undo(WorkspaceSettings);落點照 DS 預設(toast.spec.md「落點」)。AI agent 背景回覆改走下方 push banner */}
       <Toaster containerAriaLabel="Notifications" />
       {/* Push banner(右下,距右 16、距底 120;由下〔舊〕往上〔新〕疊)。點卡片內容 = 打開來源:聊天 → 切到 Chat 分頁該聊天室 */}
       <BannerStack
         items={bannerStack.items}
         onDismiss={bannerStack.dismiss}
         onPinnedChange={bannerStack.setPinned}
+        onOpenSettings={() => { setSettingsRoute('notifications'); setSettingsOpen(true); onAction?.({ type: 'open-settings' }) }}
         showPreview={notifPrefs.showPreview}
         size={notifPrefs.bannerSize}
+        onReply={(b, text) => {
+          // AI agent 卡:回覆送進那則對話(背景跑完再回來時,卡片 / 紅點照原規則再通知一次)
+          if (b.threadKey?.startsWith('agent:')) agentEngine.send(b.threadKey.slice('agent:'.length), text, [])
+        }}
         onOpen={(b) => {
+          // AI agent 卡 → AI agent 整頁的那則對話(打開即已讀,紅點消失)
+          if (b.threadKey?.startsWith('agent:')) { handleNavTabChange('agent'); setAgentRoute(`conversation:${b.threadKey.slice('agent:'.length)}`); return }
           const roomId = b.threadKey?.startsWith('chat:') ? b.threadKey.slice(5) : undefined
           if (roomId && rooms.some((r) => r.id === roomId)) { handleNavTabChange('chat'); setActiveId(roomId) }
           else if (b.app === 'drive') handleNavTabChange('drive')
